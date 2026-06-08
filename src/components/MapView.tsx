@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import mapboxgl from "mapbox-gl";
-import "mapbox-gl/dist/mapbox-gl.css";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import type { Feature, FeatureCollection, LineString } from "geojson";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -41,12 +41,14 @@ function segmentToFeature(s: SegmentLite): Feature<LineString> {
 }
 
 export function MapView({ token, city }: MapViewProps) {
+  void token;
   const container = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<mapboxgl.Map | null>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const segmentLayerRef = useRef<L.GeoJSON<LineString> | null>(null);
   const featuresRef = useRef<Map<string, Feature<LineString>>>(new Map());
   const importingRef = useRef(false);
   const lastFetchKeyRef = useRef<string>("");
-  const [webglOk, setWebglOk] = useState<boolean | null>(null);
+  const [mapError, setMapError] = useState(false);
 
   const queryClient = useQueryClient();
   const fetchSegments = useServerFn(getSegmentsInBbox);
@@ -57,22 +59,20 @@ export function MapView({ token, city }: MapViewProps) {
   const setFlyTo = useAppStore((s) => s.setFlyTo);
 
   const updateSource = useCallback(() => {
-    const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
-    const src = map.getSource("segments") as mapboxgl.GeoJSONSource | undefined;
-    if (!src) return;
+    const layer = segmentLayerRef.current;
+    if (!layer) return;
     const data: FeatureCollection<LineString> = {
       type: "FeatureCollection",
       features: Array.from(featuresRef.current.values()),
     };
-    src.setData(data);
+    layer.clearLayers();
+    layer.addData(data);
   }, []);
 
   const loadBbox = useCallback(async () => {
     const map = mapRef.current;
     if (!map) return;
     const b = map.getBounds();
-    if (!b) return;
     const minLng = b.getWest(), minLat = b.getSouth();
     const maxLng = b.getEast(), maxLat = b.getNorth();
     const w = maxLng - minLng, h = maxLat - minLat;
