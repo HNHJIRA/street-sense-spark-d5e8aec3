@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { User, MapPin, ShieldCheck, Bookmark, Heart, Clock, Car, ChevronRight } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
+import { AlertSettingsCard, NotificationHistoryCard } from "@/components/AlertSettings";
 import { useDeviceStore } from "@/stores/device-store";
 
 export const Route = createFileRoute("/profile")({
@@ -67,6 +68,13 @@ function ProfilePage() {
             Clear search history
           </button>
         )}
+
+        <div className="mt-6 space-y-3">
+          {mounted && <AlertSettingsCard />}
+          {mounted && <NotificationHistoryCard />}
+        </div>
+
+
 
         <p className="mt-8 px-1 text-[11px] text-muted-foreground">
           Saved spots, favorites, and parking sessions are stored on this device. When account sign-in is added, your data can sync across devices.

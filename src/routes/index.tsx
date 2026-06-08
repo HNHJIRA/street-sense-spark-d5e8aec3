@@ -9,6 +9,7 @@ import { StreetSheet } from "@/components/StreetSheet";
 import { ForecastSheet } from "@/components/ForecastSheet";
 import { SearchSheet } from "@/components/SearchSheet";
 import { ParkHereButton } from "@/components/ParkHereButton";
+import { ActiveSessionWidget } from "@/components/ActiveSessionWidget";
 import { useAppStore } from "@/stores/app-store";
 
 const cityOpts = queryOptions({
@@ -86,6 +87,7 @@ function HomePage() {
           isForecast={!!forecastAt}
         />
         <Legend />
+        <ActiveSessionWidget restrictionTypes={city.restrictionTypes} />
         <ParkHereButton cityId={city.id} timezone={city.timezone} />
         <BottomNav />
         <SearchSheet token={tokenQuery.data.token} />

@@ -4,13 +4,16 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery, useSuspenseQuery, queryOptions } from "@tanstack/react-query";
-import { Car, Clock, ShieldAlert, Timer, Database, MapPin, ArrowLeft } from "lucide-react";
+import { Car, Clock, ShieldAlert, Timer, Database, MapPin, ArrowLeft, BellRing } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
+import { ParkingStatusCard } from "@/components/ParkingStatusCard";
 import { useDeviceStore } from "@/stores/device-store";
 import { useAppStore } from "@/stores/app-store";
 import { getCityInfo, getSegmentDetails } from "@/lib/parking/parking.functions";
 import { evaluateRulesAt } from "@/lib/parking/engine";
 import { countdownTo, elapsedSince } from "@/lib/parking/countdown";
+import { computeAlertWindows, nextPlannedAlert } from "@/lib/parking/alerts";
+import { useSessionAlertScheduler } from "@/lib/parking/notifications";
 import type { StreetSegment } from "@/lib/parking/types";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +36,7 @@ function SessionPage() {
   const setFlyTo = useAppStore((s) => s.setFlyTo);
   const selectSegment = useAppStore((s) => s.selectSegment);
   const navigate = useNavigate();
+  const alertSettings = useDeviceStore((s) => s.alertSettings);
 
   const detailsQ = useQuery({
     queryKey: ["segment-details", session?.segmentId],
@@ -48,6 +52,30 @@ function SessionPage() {
     const id = window.setInterval(() => setNowMs(Date.now()), 1000);
     return () => window.clearInterval(id);
   }, [session]);
+
+  // Re-evaluate via engine using fresh rules (no-op when no session).
+  const details = detailsQ.data;
+  const segment: StreetSegment | null = details
+    ? {
+        id: details.id, name: details.name, side: details.side,
+        neighborhood: details.neighborhood, coordinates: [],
+        rules: details.rules, events: details.events,
+      }
+    : null;
+  const liveStatus = segment && session
+    ? evaluateRulesAt(segment, city.restrictionTypes, new Date(nowMs), session.cityTimezone)
+    : null;
+
+  const allowedUntil = liveStatus?.allowed_until ?? session?.initialAllowedUntil ?? null;
+  const color = liveStatus?.color ?? session?.initialColor ?? "green";
+  const label = liveStatus?.label ?? session?.initialLabel ?? "—";
+  const reason = liveStatus?.notes ?? session?.initialReason ?? null;
+  const permitZone = liveStatus?.permit_zone ?? null;
+  const timeLimit = liveStatus?.time_limit_minutes ?? null;
+  const sourceLabel = details?.source_label ?? session?.sourceLabel ?? null;
+
+  // Schedule + deliver any due parking alerts. Hook is safe with no session.
+  useSessionAlertScheduler({ allowedUntil, color, reason, nowMs });
 
   if (!session) {
     return (
@@ -68,25 +96,6 @@ function SessionPage() {
       </div>
     );
   }
-
-  // Re-evaluate via engine using fresh rules.
-  const details = detailsQ.data;
-  const segment: StreetSegment | null = details
-    ? {
-        id: details.id, name: details.name, side: details.side,
-        neighborhood: details.neighborhood, coordinates: [],
-        rules: details.rules, events: details.events,
-      }
-    : null;
-  const liveStatus = segment ? evaluateRulesAt(segment, city.restrictionTypes, new Date(nowMs), session.cityTimezone) : null;
-
-  const allowedUntil = liveStatus?.allowed_until ?? session.initialAllowedUntil;
-  const color = liveStatus?.color ?? session.initialColor;
-  const label = liveStatus?.label ?? session.initialLabel;
-  const reason = liveStatus?.notes ?? session.initialReason;
-  const permitZone = liveStatus?.permit_zone ?? null;
-  const timeLimit = liveStatus?.time_limit_minutes ?? null;
-  const sourceLabel = details?.source_label ?? session.sourceLabel ?? null;
 
   const cd = countdownTo(allowedUntil, nowMs);
   const elapsed = elapsedSince(session.startedAt, nowMs);
@@ -159,6 +168,17 @@ function SessionPage() {
           {sourceLabel && <Row icon={Database} label="Source provider" value={sourceLabel} />}
         </div>
 
+        <UpcomingAlerts
+          allowedUntil={allowedUntil}
+          color={color}
+          reason={reason}
+          alertSettings={alertSettings}
+          timezone={session.cityTimezone}
+          nowMs={nowMs}
+        />
+
+
+
         <div className="mt-5 grid grid-cols-2 gap-2">
           <button
             onClick={() => {
@@ -194,6 +214,66 @@ function Row({ icon: Icon, label, value }: { icon: typeof Clock; label: string; 
         <Icon className="h-4 w-4" /> {label}
       </span>
       <span className="text-sm font-semibold text-right">{value}</span>
+    </div>
+  );
+}
+
+function UpcomingAlerts({
+  allowedUntil, color, reason, alertSettings, timezone, nowMs,
+}: {
+  allowedUntil: string | null;
+  color: "green" | "yellow" | "red";
+  reason: string | null;
+  alertSettings: import("@/lib/parking/alerts").AlertSettings;
+  timezone: string;
+  nowMs: number;
+}) {
+  const planned = computeAlertWindows(allowedUntil, color, reason, alertSettings, nowMs);
+  const next = nextPlannedAlert(planned, nowMs);
+  const upcoming = planned.filter((a) => new Date(a.triggerAt).getTime() > nowMs).slice(0, 4);
+
+  if (!alertSettings.enabled) {
+    return (
+      <div className="mt-4 rounded-2xl bg-surface px-4 py-3 text-xs text-muted-foreground">
+        Alerts are turned off. Enable them in Profile to be warned before your window ends.
+      </div>
+    );
+  }
+  if (!allowedUntil) return null;
+
+  return (
+    <div className="mt-4 rounded-3xl border border-border bg-surface p-4">
+      <div className="flex items-center gap-2">
+        <BellRing className="h-4 w-4 text-primary" />
+        <div className="text-sm font-bold">Upcoming alerts</div>
+      </div>
+      {next ? (
+        <div className="mt-2 flex items-center justify-between rounded-2xl bg-primary/10 px-3 py-2">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-primary">Next alert</div>
+            <div className="text-sm font-bold">{next.label}</div>
+          </div>
+          <div className="text-sm font-bold tabular-nums text-primary">
+            {new Date(next.triggerAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: timezone })}
+          </div>
+        </div>
+      ) : (
+        <div className="mt-2 rounded-2xl bg-background px-3 py-2 text-[11px] text-muted-foreground">
+          No more alerts before this window ends.
+        </div>
+      )}
+      {upcoming.length > 0 && (
+        <ul className="mt-2 space-y-1">
+          {upcoming.map((a) => (
+            <li key={a.id} className="flex items-center justify-between rounded-2xl bg-background px-3 py-1.5 text-[11px]">
+              <span className="font-semibold">{a.label}</span>
+              <span className="tabular-nums text-muted-foreground">
+                {new Date(a.triggerAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: timezone })}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
