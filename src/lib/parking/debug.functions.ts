@@ -139,9 +139,9 @@ export const getSegmentDebug = createServerFn({ method: "GET" })
         side: (seg.side ?? "both") as string,
         data_source: seg.data_source as string,
         external_id: (seg.external_id ?? null) as string | null,
-        metadata: meta,
+        metadata_json: JSON.stringify(meta, null, 2),
       },
-      raw_source,
+      raw_source_json: JSON.stringify(raw_source, null, 2),
       normalized: {
         side: normalizeSide(rawSide),
         rules: reNormalized,
