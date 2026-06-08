@@ -53,6 +53,30 @@ function SessionPage() {
     return () => window.clearInterval(id);
   }, [session]);
 
+  // Re-evaluate via engine using fresh rules (no-op when no session).
+  const details = detailsQ.data;
+  const segment: StreetSegment | null = details
+    ? {
+        id: details.id, name: details.name, side: details.side,
+        neighborhood: details.neighborhood, coordinates: [],
+        rules: details.rules, events: details.events,
+      }
+    : null;
+  const liveStatus = segment && session
+    ? evaluateRulesAt(segment, city.restrictionTypes, new Date(nowMs), session.cityTimezone)
+    : null;
+
+  const allowedUntil = liveStatus?.allowed_until ?? session?.initialAllowedUntil ?? null;
+  const color = liveStatus?.color ?? session?.initialColor ?? "green";
+  const label = liveStatus?.label ?? session?.initialLabel ?? "—";
+  const reason = liveStatus?.notes ?? session?.initialReason ?? null;
+  const permitZone = liveStatus?.permit_zone ?? null;
+  const timeLimit = liveStatus?.time_limit_minutes ?? null;
+  const sourceLabel = details?.source_label ?? session?.sourceLabel ?? null;
+
+  // Schedule + deliver any due parking alerts. Hook is safe with no session.
+  useSessionAlertScheduler({ allowedUntil, color, reason, nowMs });
+
   if (!session) {
     return (
       <div className="relative min-h-screen bg-background pb-32">
@@ -72,25 +96,6 @@ function SessionPage() {
       </div>
     );
   }
-
-  // Re-evaluate via engine using fresh rules.
-  const details = detailsQ.data;
-  const segment: StreetSegment | null = details
-    ? {
-        id: details.id, name: details.name, side: details.side,
-        neighborhood: details.neighborhood, coordinates: [],
-        rules: details.rules, events: details.events,
-      }
-    : null;
-  const liveStatus = segment ? evaluateRulesAt(segment, city.restrictionTypes, new Date(nowMs), session.cityTimezone) : null;
-
-  const allowedUntil = liveStatus?.allowed_until ?? session.initialAllowedUntil;
-  const color = liveStatus?.color ?? session.initialColor;
-  const label = liveStatus?.label ?? session.initialLabel;
-  const reason = liveStatus?.notes ?? session.initialReason;
-  const permitZone = liveStatus?.permit_zone ?? null;
-  const timeLimit = liveStatus?.time_limit_minutes ?? null;
-  const sourceLabel = details?.source_label ?? session.sourceLabel ?? null;
 
   const cd = countdownTo(allowedUntil, nowMs);
   const elapsed = elapsedSince(session.startedAt, nowMs);
