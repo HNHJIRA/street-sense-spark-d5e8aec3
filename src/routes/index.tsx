@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useSuspenseQuery, useQuery, queryOptions } from "@tanstack/react-query";
+import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getCityBundle, getMapboxToken } from "@/lib/parking/parking.functions";
 import { MapView } from "@/components/MapView";
@@ -31,11 +31,18 @@ export const Route = createFileRoute("/")({
       { property: "og:description", content: "See parking legality on every street in Seattle, at a glance." },
     ],
   }),
-  loader: ({ context }) => {
-    context.queryClient.ensureQueryData(bundleOpts);
-    context.queryClient.ensureQueryData(tokenOpts);
+  loader: async ({ context }) => {
+    await Promise.all([
+      context.queryClient.ensureQueryData(bundleOpts),
+      context.queryClient.ensureQueryData(tokenOpts),
+    ]);
   },
   component: HomePage,
+  pendingComponent: () => (
+    <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="text-sm text-muted-foreground">Loading parking data…</div>
+    </div>
+  ),
   errorComponent: ({ error }) => (
     <div className="flex min-h-screen items-center justify-center bg-background p-6 text-center">
       <div>
@@ -48,7 +55,7 @@ export const Route = createFileRoute("/")({
 });
 
 function HomePage() {
-  const bundleQuery = useQuery(bundleOpts);
+  const bundleQuery = useSuspenseQuery(bundleOpts);
   const tokenQuery = useSuspenseQuery(tokenOpts);
 
   const forecastAt = useAppStore((s) => s.forecastAt);
@@ -62,16 +69,7 @@ function HomePage() {
   }, [forecastAt, bumpTick]);
 
   const now = forecastAt ?? new Date();
-  // Reference tick so the live clock recomputes
   void tick;
-
-  if (!bundleQuery.data) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-sm text-muted-foreground">Loading parking data…</div>
-      </div>
-    );
-  }
 
   const bundle = bundleQuery.data;
 
