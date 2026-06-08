@@ -423,6 +423,7 @@ export type Database = {
             }
             Returns: string
           }
+      city_center_geojson: { Args: { p_slug: string }; Returns: string }
       disablelongtransactions: { Args: never; Returns: string }
       dropgeometrycolumn:
         | {
@@ -1176,6 +1177,13 @@ export type Database = {
       st_wrapx: {
         Args: { geom: unknown; move: number; wrap: number }
         Returns: unknown
+      }
+      street_segments_geojson: {
+        Args: { p_city_id: string }
+        Returns: {
+          geojson: string
+          id: string
+        }[]
       }
       unlockrows: { Args: { "": string }; Returns: number }
       updategeometrysrid: {
