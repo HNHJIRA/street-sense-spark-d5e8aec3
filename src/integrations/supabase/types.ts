@@ -557,6 +557,24 @@ export type Database = {
       geomfromewkt: { Args: { "": string }; Returns: unknown }
       gettransactionid: { Args: never; Returns: unknown }
       longtransactionsenabled: { Args: never; Returns: boolean }
+      nearest_segment: {
+        Args: {
+          p_city_id: string
+          p_lat: number
+          p_lng: number
+          p_max_meters?: number
+        }
+        Returns: {
+          color: string
+          distance_m: number
+          geojson: string
+          id: string
+          label: string
+          name: string
+          restriction_code: string
+          side: string
+        }[]
+      }
       populate_geometry_columns:
         | { Args: { tbl_oid: unknown; use_typmod?: boolean }; Returns: number }
         | { Args: { use_typmod?: boolean }; Returns: string }
