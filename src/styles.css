@@ -136,3 +136,9 @@
 .h-screen-safe     { height: calc(100dvh - var(--safe-top) - var(--safe-bottom)); }
 .min-h-screen-safe { min-height: calc(100dvh - var(--safe-top) - var(--safe-bottom)); }
 
+
+/* Keep Leaflet's native controls clear of the TopBar / BottomNav and device insets. */
+.leaflet-top    { top: calc(var(--safe-top) + 3.75rem) !important; }
+.leaflet-bottom { bottom: calc(var(--safe-bottom) + 5.5rem) !important; }
+.leaflet-right  { right: calc(var(--safe-right) + 0.5rem) !important; }
+.leaflet-left   { left:  calc(var(--safe-left)  + 0.5rem) !important; }
