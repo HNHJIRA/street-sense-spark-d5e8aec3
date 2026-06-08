@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CircleCheck, CircleX, Loader2, Navigation, TriangleAlert } from "lucide-react";
+import { CircleCheck, CircleX, Loader2, Navigation, TriangleAlert, MapPin, Clock } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { checkParkingHere, type ParkHereResult } from "@/lib/parking/parking.functions";
@@ -8,18 +8,54 @@ import { cn } from "@/lib/utils";
 
 interface Props {
   cityId: string;
+  timezone: string;
+  /** Map center fallback when GPS is unavailable. Provided by MapView via store. */
 }
 
-export function ParkHereButton({ cityId }: Props) {
+function formatTime(d: Date, tz: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: tz, hour: "numeric", minute: "2-digit", hour12: true,
+  }).format(d);
+}
+
+export function ParkHereButton({ cityId, timezone }: Props) {
   const check = useServerFn(checkParkingHere);
   const setFlyTo = useAppStore((s) => s.setFlyTo);
   const selectSegment = useAppStore((s) => s.selectSegment);
+  const mapCenter = useAppStore((s) => s.mapCenter);
+  const forecastAt = useAppStore((s) => s.forecastAt);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ParkHereResult | null>(null);
 
+  const queryAt = (lng: number, lat: number, source: "gps" | "tap") =>
+    check({
+      data: {
+        cityId, lng, lat, source, timezone,
+        at: forecastAt ? forecastAt.toISOString() : null,
+      },
+    });
+
+  const runWithMapCenter = async () => {
+    if (!mapCenter) {
+      toast.error("Pan the map to a street, then tap again.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await queryAt(mapCenter.lng, mapCenter.lat, "tap");
+      setResult(res);
+      if (res.found && res.segmentId) selectSegment(res.segmentId);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const run = async () => {
-    if (!navigator.geolocation) {
-      toast.error("Geolocation is not available in this browser.");
+    if (!navigator.geolocation || !window.isSecureContext) {
+      // No GPS available — fall back to map center.
+      await runWithMapCenter();
       return;
     }
     setLoading(true);
@@ -28,7 +64,7 @@ export function ParkHereButton({ cityId }: Props) {
         try {
           const { latitude, longitude } = pos.coords;
           setFlyTo({ lat: latitude, lng: longitude, zoom: 18 });
-          const res = await check({ data: { cityId, lng: longitude, lat: latitude } });
+          const res = await queryAt(longitude, latitude, "gps");
           setResult(res);
           if (res.found && res.segmentId) selectSegment(res.segmentId);
         } catch (e) {
@@ -37,11 +73,11 @@ export function ParkHereButton({ cityId }: Props) {
           setLoading(false);
         }
       },
-      (err) => {
-        setLoading(false);
-        toast.error(err.message || "Could not get your location.");
+      async () => {
+        // GPS denied or failed — fall back gracefully.
+        await runWithMapCenter();
       },
-      { enableHighAccuracy: true, timeout: 10_000 },
+      { enableHighAccuracy: true, timeout: 8000 },
     );
   };
 
@@ -95,17 +131,37 @@ export function ParkHereButton({ cityId }: Props) {
                   )}
                   <div className="min-w-0">
                     <div className="text-[11px] font-bold uppercase tracking-wider opacity-80">
-                      {result.found ? `Nearest street · ${Math.round(result.distance_m ?? 0)} m away` : "Result"}
+                      {result.found
+                        ? `${result.source === "gps" ? "GPS" : "Map"} · ${Math.round(result.distance_m ?? 0)} m away`
+                        : "Result"}
                     </div>
                     <div className="text-base font-bold leading-tight">{result.message}</div>
                   </div>
                 </div>
+
+                {result.found && (
+                  <div className="mt-3 grid grid-cols-1 gap-1.5 text-xs">
+                    {result.allowed_until && (
+                      <DetailRow icon={Clock} label="Allowed until" value={formatTime(new Date(result.allowed_until), timezone)} />
+                    )}
+                    {result.permit_zone && (
+                      <DetailRow icon={MapPin} label="Permit zone" value={result.permit_zone} />
+                    )}
+                    {result.time_limit_minutes != null && (
+                      <DetailRow icon={Clock} label="Max stay" value={`${result.time_limit_minutes} min`} />
+                    )}
+                  </div>
+                )}
+
                 <button
                   type="button"
-                  onClick={() => setResult(null)}
-                  className="mt-4 w-full rounded-full bg-muted py-3 text-sm font-semibold"
+                  onClick={() => {
+                    setResult(null);
+                    if (result.found && result.segmentId) selectSegment(result.segmentId);
+                  }}
+                  className="mt-4 w-full rounded-full bg-primary py-3 text-sm font-semibold text-primary-foreground"
                 >
-                  Got it
+                  {result.found ? "See full street details" : "Got it"}
                 </button>
                 <p className="mt-3 text-center text-[10px] text-muted-foreground">
                   Verify posted signs before parking.
@@ -116,5 +172,16 @@ export function ParkHereButton({ cityId }: Props) {
         </>
       )}
     </>
+  );
+}
+
+function DetailRow({ icon: Icon, label, value }: { icon: typeof Clock; label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between rounded-xl bg-surface px-3 py-2">
+      <span className="flex items-center gap-2 text-muted-foreground">
+        <Icon className="h-3.5 w-3.5" /> {label}
+      </span>
+      <span className="font-semibold">{value}</span>
+    </div>
   );
 }

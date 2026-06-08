@@ -158,6 +158,50 @@ export type Database = {
           },
         ]
       }
+      provider_health: {
+        Row: {
+          city_id: string | null
+          healthy: boolean
+          id: string
+          last_error: string | null
+          last_error_at: string | null
+          last_success_at: string | null
+          provider: string
+          segments_total: number
+          updated_at: string
+        }
+        Insert: {
+          city_id?: string | null
+          healthy?: boolean
+          id?: string
+          last_error?: string | null
+          last_error_at?: string | null
+          last_success_at?: string | null
+          provider: string
+          segments_total?: number
+          updated_at?: string
+        }
+        Update: {
+          city_id?: string | null
+          healthy?: boolean
+          id?: string
+          last_error?: string | null
+          last_error_at?: string | null
+          last_success_at?: string | null
+          provider?: string
+          segments_total?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_health_city_id_fkey"
+            columns: ["city_id"]
+            isOneToOne: false
+            referencedRelation: "cities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       restriction_types: {
         Row: {
           code: string
@@ -243,6 +287,56 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "street_segments_city_id_fkey"
+            columns: ["city_id"]
+            isOneToOne: false
+            referencedRelation: "cities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sync_logs: {
+        Row: {
+          bbox: Json | null
+          city_id: string | null
+          duration_ms: number | null
+          error: string | null
+          finished_at: string | null
+          id: string
+          imported: number
+          provider: string
+          skipped: number
+          started_at: string
+          status: string
+        }
+        Insert: {
+          bbox?: Json | null
+          city_id?: string | null
+          duration_ms?: number | null
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          imported?: number
+          provider: string
+          skipped?: number
+          started_at?: string
+          status: string
+        }
+        Update: {
+          bbox?: Json | null
+          city_id?: string | null
+          duration_ms?: number | null
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          imported?: number
+          provider?: string
+          skipped?: number
+          started_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sync_logs_city_id_fkey"
             columns: ["city_id"]
             isOneToOne: false
             referencedRelation: "cities"
@@ -575,6 +669,24 @@ export type Database = {
           side: string
         }[]
       }
+      nearest_segment_full: {
+        Args: {
+          p_city_id: string
+          p_lat: number
+          p_lng: number
+          p_max_meters?: number
+        }
+        Returns: {
+          data_source: string
+          distance_m: number
+          geojson: string
+          id: string
+          metadata: Json
+          name: string
+          rules: Json
+          side: string
+        }[]
+      }
       populate_geometry_columns:
         | { Args: { tbl_oid: unknown; use_typmod?: boolean }; Returns: number }
         | { Args: { use_typmod?: boolean }; Returns: string }
@@ -630,6 +742,24 @@ export type Database = {
           label: string
           name: string
           restriction_code: string
+          side: string
+        }[]
+      }
+      segments_in_bbox_with_rules: {
+        Args: {
+          p_city_id: string
+          p_max_lat: number
+          p_max_lng: number
+          p_min_lat: number
+          p_min_lng: number
+        }
+        Returns: {
+          data_source: string
+          geojson: string
+          id: string
+          metadata: Json
+          name: string
+          rules: Json
           side: string
         }[]
       }

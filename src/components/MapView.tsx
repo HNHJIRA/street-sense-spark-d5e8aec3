@@ -64,6 +64,9 @@ export function MapView({ token, city }: MapViewProps) {
   const selectSegment = useAppStore((s) => s.selectSegment);
   const flyTo = useAppStore((s) => s.flyTo);
   const setFlyTo = useAppStore((s) => s.setFlyTo);
+  const setMapCenter = useAppStore((s) => s.setMapCenter);
+  const forecastAt = useAppStore((s) => s.forecastAt);
+  const forecastAtIso = forecastAt ? forecastAt.toISOString() : null;
 
   const updateSource = useCallback(() => {
     const map = mapRef.current;
@@ -86,15 +89,24 @@ export function MapView({ token, city }: MapViewProps) {
     const maxLng = b.getEast(), maxLat = b.getNorth();
     const w = maxLng - minLng, h = maxLat - minLat;
     if (w * h > 0.05) return;
-    const key = `${minLng.toFixed(3)},${minLat.toFixed(3)},${maxLng.toFixed(3)},${maxLat.toFixed(3)}`;
+    // Include forecastAt in the cache key so changing the forecast time
+    // re-fetches with engine-evaluated colors at that timestamp.
+    const key = `${minLng.toFixed(3)},${minLat.toFixed(3)},${maxLng.toFixed(3)},${maxLat.toFixed(3)}|${forecastAtIso ?? "live"}`;
     if (key === lastFetchKeyRef.current) return;
     lastFetchKeyRef.current = key;
 
     const segs = await queryClient.fetchQuery({
       queryKey: ["segments", city.id, key],
-      queryFn: () => fetchSegments({ data: { cityId: city.id, minLng, minLat, maxLng, maxLat } }),
+      queryFn: () => fetchSegments({
+        data: {
+          cityId: city.id, minLng, minLat, maxLng, maxLat,
+          at: forecastAtIso, timezone: city.timezone,
+        },
+      }),
       staleTime: 60_000,
     });
+    // Replace, don't merge — forecast time change must repaint every segment.
+    featuresRef.current.clear();
     for (const s of segs) featuresRef.current.set(s.id, segmentToFeature(s));
     updateSource();
 
@@ -114,7 +126,7 @@ export function MapView({ token, city }: MapViewProps) {
         importingRef.current = false;
       }
     }
-  }, [city.id, city.slug, fetchSegments, queryClient, runImport, updateSource]);
+  }, [city.id, city.slug, city.timezone, fetchSegments, forecastAtIso, queryClient, runImport, updateSource]);
 
   useEffect(() => {
     if (!container.current || mapRef.current) return;
@@ -300,9 +312,14 @@ export function MapView({ token, city }: MapViewProps) {
 
 
         map.on("moveend", () => {
+          const c = map.getCenter();
+          setMapCenter({ lng: c.lng, lat: c.lat });
           window.clearTimeout(moveTimer);
           moveTimer = window.setTimeout(() => { void loadBbox(); }, 350);
         });
+        // Seed map center for tap-to-query fallback before any move occurs.
+        const c0 = map.getCenter();
+        setMapCenter({ lng: c0.lng, lat: c0.lat });
         // Note: an additional non-fatal error logger is wired earlier; the
         // 401 token failure surfaces a friendly fallback UI.
         map.on("error", (e: any) => {
@@ -336,6 +353,13 @@ export function MapView({ token, city }: MapViewProps) {
     });
     setFlyTo(null);
   }, [flyTo, setFlyTo]);
+
+  // Forecast time changed → re-evaluate engine colors for the current bbox.
+  useEffect(() => {
+    if (!ready) return;
+    lastFetchKeyRef.current = "";
+    void loadBbox();
+  }, [forecastAtIso, ready, loadBbox]);
 
   const zoomIn = () => mapRef.current?.zoomIn();
   const zoomOut = () => mapRef.current?.zoomOut();

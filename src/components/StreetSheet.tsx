@@ -1,7 +1,7 @@
-import { X, Clock, ShieldAlert, BadgeInfo } from "lucide-react";
+import { X, Clock, ShieldAlert, BadgeInfo, Database, Timer } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { getSegmentDetails } from "@/lib/parking/parking.functions";
-import { computeStatus } from "@/lib/parking/engine";
+import { evaluateRulesAt } from "@/lib/parking/engine";
 import type { RestrictionType, StreetSegment } from "@/lib/parking/types";
 import { useAppStore } from "@/stores/app-store";
 import { cn } from "@/lib/utils";
@@ -28,6 +28,7 @@ const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 export function StreetSheet({ timezone, restrictionTypes }: StreetSheetProps) {
   const selectedSegmentId = useAppStore((s) => s.selectedSegmentId);
   const selectSegment = useAppStore((s) => s.selectSegment);
+  const forecastAt = useAppStore((s) => s.forecastAt);
 
   const detailsQuery = useQuery({
     queryKey: ["segment-details", selectedSegmentId],
@@ -39,7 +40,6 @@ export function StreetSheet({ timezone, restrictionTypes }: StreetSheetProps) {
   if (!selectedSegmentId) return null;
 
   const data = detailsQuery.data;
-  // Build a StreetSegment shape just for the engine (coordinates not needed for status).
   const segment: StreetSegment | null = data
     ? {
         id: data.id,
@@ -47,11 +47,12 @@ export function StreetSheet({ timezone, restrictionTypes }: StreetSheetProps) {
         side: data.side,
         neighborhood: data.neighborhood,
         coordinates: [],
-        rules: data.rules as StreetSegment["rules"],
-        events: data.events as StreetSegment["events"],
+        rules: data.rules,
+        events: data.events,
       }
     : null;
-  const status = segment ? computeStatus(segment, restrictionTypes, new Date(), timezone) : null;
+  const when = forecastAt ?? new Date();
+  const status = segment ? evaluateRulesAt(segment, restrictionTypes, when, timezone) : null;
 
   return (
     <>
@@ -68,8 +69,8 @@ export function StreetSheet({ timezone, restrictionTypes }: StreetSheetProps) {
                 <h2 className="font-display text-xl font-bold leading-tight">
                   {segment?.name ?? (detailsQuery.isLoading ? "Loading…" : "Street")}
                 </h2>
-                {segment?.neighborhood && (
-                  <p className="mt-0.5 text-xs text-muted-foreground">{segment.neighborhood}</p>
+                {data?.source_category && (
+                  <p className="mt-0.5 text-xs text-muted-foreground">{data.source_category}</p>
                 )}
               </div>
               <button
@@ -84,7 +85,9 @@ export function StreetSheet({ timezone, restrictionTypes }: StreetSheetProps) {
             {status && (
               <div className={cn("mt-4 flex items-center justify-between rounded-2xl border px-4 py-3", COLOR_CLASS[status.color])}>
                 <div>
-                  <div className="text-[11px] font-bold uppercase tracking-wider opacity-80">Right now</div>
+                  <div className="text-[11px] font-bold uppercase tracking-wider opacity-80">
+                    {forecastAt ? `At ${formatTime(forecastAt, timezone)}` : "Right now"}
+                  </div>
                   <div className="text-lg font-bold">{status.label}</div>
                 </div>
                 <span className={cn("h-3 w-3 rounded-full ring-4", {
@@ -98,16 +101,19 @@ export function StreetSheet({ timezone, restrictionTypes }: StreetSheetProps) {
             {status && (
               <div className="mt-4 grid grid-cols-1 gap-2 text-sm">
                 {status.allowed_until && (
-                  <Row icon={Clock} label="Restriction ends" value={formatTime(new Date(status.allowed_until), timezone)} />
+                  <Row icon={Clock} label="Allowed until" value={formatTime(new Date(status.allowed_until), timezone)} />
                 )}
                 {status.permit_zone && (
                   <Row icon={ShieldAlert} label="Permit zone" value={status.permit_zone} />
                 )}
                 {status.time_limit_minutes != null && (
-                  <Row icon={Clock} label="Max stay" value={`${status.time_limit_minutes} min`} />
+                  <Row icon={Timer} label="Max stay" value={`${status.time_limit_minutes} min`} />
                 )}
                 {status.notes && (
                   <Row icon={BadgeInfo} label="Notes" value={status.notes} />
+                )}
+                {data?.source_label && (
+                  <Row icon={Database} label="Source" value={data.source_label} />
                 )}
               </div>
             )}
@@ -141,7 +147,7 @@ export function StreetSheet({ timezone, restrictionTypes }: StreetSheetProps) {
             )}
 
             <div className="mt-5 text-center text-[10px] text-muted-foreground">
-              Source: OpenStreetMap · Verify posted signs before parking.
+              {data?.source_label ? `Source: ${data.source_label} · ` : ""}Verify posted signs before parking.
             </div>
           </div>
         </div>

@@ -52,10 +52,8 @@ function ruleAppliesNow(rule: ParkingRule, clock: CityClock): boolean {
   if (!rule.days_of_week.includes(clock.dow)) return false;
   const start = parseHHMM(rule.time_start);
   const end = parseHHMM(rule.time_end);
-  // If no time window, rule is "all day"
   if (start == null || end == null) return true;
   if (start <= end) return clock.hhmm >= start && clock.hhmm < end;
-  // Wraps midnight
   return clock.hhmm >= start || clock.hhmm < end;
 }
 
@@ -69,11 +67,7 @@ function activeEvent(events: ParkingEvent[], when: Date): ParkingEvent | null {
   return null;
 }
 
-function nextBoundary(
-  rule: ParkingRule | null,
-  timezone: string,
-  when: Date,
-): string | null {
+function nextBoundary(rule: ParkingRule | null, timezone: string, when: Date): string | null {
   if (!rule) return null;
   const end = parseHHMM(rule.time_end);
   if (end == null) return null;
@@ -83,7 +77,8 @@ function nextBoundary(
   return boundary.toISOString();
 }
 
-export function computeStatus(
+/** Evaluate a segment's rules at a given datetime in the city's timezone. */
+export function evaluateRulesAt(
   segment: StreetSegment,
   restrictionTypes: RestrictionType[],
   when: Date,
@@ -92,7 +87,7 @@ export function computeStatus(
   const typeByCode = new Map(restrictionTypes.map((t) => [t.code, t]));
   const clock = cityClock(when, timezone);
 
-  // 1) Temporary event wins
+  // 1) Temporary event wins (street closure, construction, etc.)
   const ev = activeEvent(segment.events, when);
   if (ev) {
     const t = typeByCode.get(ev.restriction_code);
@@ -111,7 +106,7 @@ export function computeStatus(
     };
   }
 
-  // 2) Sort rules by priority (lower wins) and find the first matching rule
+  // 2) Lowest-priority-number rule that matches the clock wins.
   const sorted = [...segment.rules].sort((a, b) => a.priority - b.priority);
   const match = sorted.find((r) => ruleAppliesNow(r, clock)) ?? null;
 
@@ -147,3 +142,6 @@ export function computeStatus(
     restriction_ends_at: null,
   };
 }
+
+/** Back-compat alias — older callers use computeStatus. */
+export const computeStatus = evaluateRulesAt;

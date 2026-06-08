@@ -10,11 +10,13 @@ interface ClockState {
   setSearchOpen: (v: boolean) => void;
   forecastOpen: boolean;
   setForecastOpen: (v: boolean) => void;
-  /** Tick value to force a re-render every minute in live mode. */
   tick: number;
   bumpTick: () => void;
   flyTo: { lng: number; lat: number; zoom?: number } | null;
   setFlyTo: (v: { lng: number; lat: number; zoom?: number } | null) => void;
+  /** Current map center, kept in sync by MapView so the "Can I park here?" button can use it as a tap-to-query fallback when GPS is unavailable. */
+  mapCenter: { lng: number; lat: number } | null;
+  setMapCenter: (v: { lng: number; lat: number } | null) => void;
 }
 
 export const useAppStore = create<ClockState>((set) => ({
@@ -30,4 +32,6 @@ export const useAppStore = create<ClockState>((set) => ({
   bumpTick: () => set((s) => ({ tick: s.tick + 1 })),
   flyTo: null,
   setFlyTo: (v) => set({ flyTo: v }),
+  mapCenter: null,
+  setMapCenter: (v) => set({ mapCenter: v }),
 }));
