@@ -8,6 +8,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { StreetSheet } from "@/components/StreetSheet";
 import { ForecastSheet } from "@/components/ForecastSheet";
 import { SearchSheet } from "@/components/SearchSheet";
+import { ParkHereButton } from "@/components/ParkHereButton";
 import { useAppStore } from "@/stores/app-store";
 
 const cityOpts = queryOptions({
@@ -83,6 +84,7 @@ function HomePage() {
         isForecast={!!forecastAt}
       />
       <Legend />
+      <ParkHereButton cityId={city.id} />
       <BottomNav />
       <SearchSheet token={tokenQuery.data.token} />
       <ForecastSheet />
