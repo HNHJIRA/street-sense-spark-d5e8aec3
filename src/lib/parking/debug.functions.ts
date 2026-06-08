@@ -23,9 +23,9 @@ export interface SegmentDebugReport {
     side: string;
     data_source: string;
     external_id: string | null;
-    metadata: Record<string, unknown>;
+    metadata_json: string;
   };
-  raw_source: Record<string, unknown>;
+  raw_source_json: string;
   normalized: {
     side: "left" | "right" | "both";
     rules: NormalizedRule[];
