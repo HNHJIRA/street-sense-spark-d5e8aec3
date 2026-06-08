@@ -217,3 +217,63 @@ function Row({ icon: Icon, label, value }: { icon: typeof Clock; label: string; 
     </div>
   );
 }
+
+function UpcomingAlerts({
+  allowedUntil, color, reason, alertSettings, timezone, nowMs,
+}: {
+  allowedUntil: string | null;
+  color: "green" | "yellow" | "red";
+  reason: string | null;
+  alertSettings: import("@/lib/parking/alerts").AlertSettings;
+  timezone: string;
+  nowMs: number;
+}) {
+  const planned = computeAlertWindows(allowedUntil, color, reason, alertSettings, nowMs);
+  const next = nextPlannedAlert(planned, nowMs);
+  const upcoming = planned.filter((a) => new Date(a.triggerAt).getTime() > nowMs).slice(0, 4);
+
+  if (!alertSettings.enabled) {
+    return (
+      <div className="mt-4 rounded-2xl bg-surface px-4 py-3 text-xs text-muted-foreground">
+        Alerts are turned off. Enable them in Profile to be warned before your window ends.
+      </div>
+    );
+  }
+  if (!allowedUntil) return null;
+
+  return (
+    <div className="mt-4 rounded-3xl border border-border bg-surface p-4">
+      <div className="flex items-center gap-2">
+        <BellRing className="h-4 w-4 text-primary" />
+        <div className="text-sm font-bold">Upcoming alerts</div>
+      </div>
+      {next ? (
+        <div className="mt-2 flex items-center justify-between rounded-2xl bg-primary/10 px-3 py-2">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-primary">Next alert</div>
+            <div className="text-sm font-bold">{next.label}</div>
+          </div>
+          <div className="text-sm font-bold tabular-nums text-primary">
+            {new Date(next.triggerAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: timezone })}
+          </div>
+        </div>
+      ) : (
+        <div className="mt-2 rounded-2xl bg-background px-3 py-2 text-[11px] text-muted-foreground">
+          No more alerts before this window ends.
+        </div>
+      )}
+      {upcoming.length > 0 && (
+        <ul className="mt-2 space-y-1">
+          {upcoming.map((a) => (
+            <li key={a.id} className="flex items-center justify-between rounded-2xl bg-background px-3 py-1.5 text-[11px]">
+              <span className="font-semibold">{a.label}</span>
+              <span className="tabular-nums text-muted-foreground">
+                {new Date(a.triggerAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: timezone })}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
