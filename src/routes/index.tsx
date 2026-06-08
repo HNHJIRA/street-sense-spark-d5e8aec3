@@ -90,7 +90,7 @@ function HomePage() {
         <BottomNav />
         <SearchSheet token={tokenQuery.data.token} />
         <ForecastSheet />
-        <StreetSheet timezone={city.timezone} restrictionTypes={city.restrictionTypes} />
+        <StreetSheet timezone={city.timezone} restrictionTypes={city.restrictionTypes} cityId={city.id} />
       </div>
     </div>
   );
