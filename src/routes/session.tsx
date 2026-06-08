@@ -168,6 +168,17 @@ function SessionPage() {
           {sourceLabel && <Row icon={Database} label="Source provider" value={sourceLabel} />}
         </div>
 
+        <UpcomingAlerts
+          allowedUntil={allowedUntil}
+          color={color}
+          reason={reason}
+          alertSettings={alertSettings}
+          timezone={session.cityTimezone}
+          nowMs={nowMs}
+        />
+
+
+
         <div className="mt-5 grid grid-cols-2 gap-2">
           <button
             onClick={() => {
