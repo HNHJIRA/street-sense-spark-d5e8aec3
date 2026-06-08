@@ -216,6 +216,32 @@ function parseOsmXml(xml: string): OsmWay[] {
   return ways;
 }
 
+async function fetchOsmMapBbox(minLng: number, minLat: number, maxLng: number, maxLat: number) {
+  const res = await fetch(
+    `https://api.openstreetmap.org/api/0.6/map?bbox=${minLng},${minLat},${maxLng},${maxLat}`,
+    { headers: { Accept: "application/xml", "User-Agent": "ParkClear real-time parking map" } },
+  );
+  if (!res.ok) throw new Error(`OSM ${res.status}`);
+  return parseOsmXml(await res.text());
+}
+
+async function fetchOsmMapSplit(minLng: number, minLat: number, maxLng: number, maxLat: number) {
+  const ways = new Map<number, OsmWay>();
+  const cols = 4;
+  const rows = 2;
+  for (let x = 0; x < cols; x += 1) {
+    for (let y = 0; y < rows; y += 1) {
+      const aLng = minLng + ((maxLng - minLng) * x) / cols;
+      const bLng = minLng + ((maxLng - minLng) * (x + 1)) / cols;
+      const aLat = minLat + ((maxLat - minLat) * y) / rows;
+      const bLat = minLat + ((maxLat - minLat) * (y + 1)) / rows;
+      const chunk = await fetchOsmMapBbox(aLng, aLat, bLng, bLat);
+      for (const way of chunk) ways.set(way.id, way);
+    }
+  }
+  return Array.from(ways.values());
+}
+
 const HIGHWAY_KINDS = [
   "motorway", "trunk", "primary", "secondary", "tertiary",
   "residential", "unclassified", "living_street", "service",
