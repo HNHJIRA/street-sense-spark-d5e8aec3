@@ -99,7 +99,7 @@ function HomePage() {
 function Legend() {
   return (
     <div
-      className="pointer-events-none fixed left-1/2 z-10 -translate-x-1/2"
+      className="pointer-events-none absolute left-1/2 z-10 -translate-x-1/2"
       style={{ bottom: "calc(var(--safe-bottom) + 11rem)" }}
     >
       <div className="flex items-center gap-3 rounded-full border border-border bg-surface/85 px-4 py-2 backdrop-blur-xl">
