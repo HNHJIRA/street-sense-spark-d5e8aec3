@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import L from "leaflet";
+import type * as Leaflet from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { Feature, FeatureCollection, LineString } from "geojson";
 import { useQueryClient } from "@tanstack/react-query";
@@ -43,8 +43,8 @@ function segmentToFeature(s: SegmentLite): Feature<LineString> {
 export function MapView({ token, city }: MapViewProps) {
   void token;
   const container = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<L.Map | null>(null);
-  const segmentLayerRef = useRef<L.GeoJSON<LineString> | null>(null);
+  const mapRef = useRef<Leaflet.Map | null>(null);
+  const segmentLayerRef = useRef<Leaflet.GeoJSON<LineString> | null>(null);
   const featuresRef = useRef<Map<string, Feature<LineString>>>(new Map());
   const importingRef = useRef(false);
   const lastFetchKeyRef = useRef<string>("");
@@ -95,6 +95,10 @@ export function MapView({ token, city }: MapViewProps) {
       const id = toast.loading("Loading real street data for this area…");
       try {
         const res = await runImport({ data: { citySlug: city.slug, minLng, minLat, maxLng, maxLat } });
+        if (res.error) {
+          toast.message(res.error, { id });
+          return;
+        }
         toast.success(`Imported ${res.imported} streets`, { id });
         // Force refetch by clearing the key memo.
         lastFetchKeyRef.current = "";
@@ -111,56 +115,63 @@ export function MapView({ token, city }: MapViewProps) {
   // Init map once with raster tiles so it works without WebGL.
   useEffect(() => {
     if (!container.current || mapRef.current) return;
-    let map: L.Map;
-    try {
-      map = L.map(container.current, {
+    let disposed = false;
+    let moveTimer: number | undefined;
+
+    const initMap = async () => {
+      try {
+        const L = await import("leaflet");
+        if (!container.current || mapRef.current || disposed) return;
+        const map = L.map(container.current, {
         center: [city.center[1], city.center[0]],
         zoom: Math.max(15, city.default_zoom),
         zoomControl: false,
         attributionControl: false,
       });
-    } catch {
-      setMapError(true);
-      return;
-    }
 
-    L.control.zoom({ position: "topright" }).addTo(map);
-    L.tileLayer(
-      `https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/512/{z}/{x}/{y}@2x?access_token=${token}`,
-      { tileSize: 512, zoomOffset: -1, maxZoom: 20 },
-    ).addTo(map);
+        L.control.zoom({ position: "topright" }).addTo(map);
+        L.tileLayer(
+          `https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/512/{z}/{x}/{y}@2x?access_token=${token}`,
+          { tileSize: 512, zoomOffset: -1, maxZoom: 20 },
+        ).addTo(map);
 
-    segmentLayerRef.current = L.geoJSON(undefined, {
-      style: (feature) => ({
-        color: COLOR_HEX[(feature?.properties?.color as ParkingColor | undefined) ?? "green"],
-        weight: 7,
-        opacity: 0.95,
-        lineCap: "round",
-        lineJoin: "round",
-      }),
-      onEachFeature: (feature, layer) => {
-        layer.on("click", () => {
-          const id = feature.properties?.segmentId as string | undefined;
-          if (id) selectSegment(id);
+        segmentLayerRef.current = L.geoJSON(undefined, {
+          style: (feature) => ({
+            color: COLOR_HEX[(feature?.properties?.color as ParkingColor | undefined) ?? "green"],
+            weight: 7,
+            opacity: 0.95,
+            lineCap: "round",
+            lineJoin: "round",
+          }),
+          onEachFeature: (feature, layer) => {
+            layer.on("click", () => {
+              const id = feature.properties?.segmentId as string | undefined;
+              if (id) selectSegment(id);
+            });
+          },
+        }).addTo(map) as Leaflet.GeoJSON<LineString>;
+
+        map.on("moveend", () => {
+          window.clearTimeout(moveTimer);
+          moveTimer = window.setTimeout(() => { void loadBbox(); }, 350);
         });
-      },
-    }).addTo(map) as L.GeoJSON<LineString>;
 
-    let moveTimer: number | undefined;
-    map.on("moveend", () => {
-      window.clearTimeout(moveTimer);
-      moveTimer = window.setTimeout(() => { void loadBbox(); }, 350);
-    });
+        mapRef.current = map;
+        window.setTimeout(() => {
+          map.invalidateSize();
+          void loadBbox();
+        }, 0);
+      } catch {
+        if (!disposed) setMapError(true);
+      }
+    };
 
-    mapRef.current = map;
-    window.setTimeout(() => {
-      map.invalidateSize();
-      void loadBbox();
-    }, 0);
+    void initMap();
 
     return () => {
+      disposed = true;
       window.clearTimeout(moveTimer);
-      map.remove();
+      mapRef.current?.remove();
       mapRef.current = null;
       segmentLayerRef.current = null;
     };

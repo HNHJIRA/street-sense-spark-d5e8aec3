@@ -227,6 +227,7 @@ async function fetchOsmMapBbox(minLng: number, minLat: number, maxLng: number, m
 
 async function fetchOsmMapSplit(minLng: number, minLat: number, maxLng: number, maxLat: number) {
   const ways = new Map<number, OsmWay>();
+  let lastErr = "";
   const cols = 4;
   const rows = 2;
   for (let x = 0; x < cols; x += 1) {
@@ -235,10 +236,15 @@ async function fetchOsmMapSplit(minLng: number, minLat: number, maxLng: number, 
       const bLng = minLng + ((maxLng - minLng) * (x + 1)) / cols;
       const aLat = minLat + ((maxLat - minLat) * y) / rows;
       const bLat = minLat + ((maxLat - minLat) * (y + 1)) / rows;
-      const chunk = await fetchOsmMapBbox(aLng, aLat, bLng, bLat);
-      for (const way of chunk) ways.set(way.id, way);
+      try {
+        const chunk = await fetchOsmMapBbox(aLng, aLat, bLng, bLat);
+        for (const way of chunk) ways.set(way.id, way);
+      } catch (e) {
+        lastErr = (e as Error).message;
+      }
     }
   }
+  if (ways.size === 0 && lastErr) throw new Error(lastErr);
   return Array.from(ways.values());
 }
 
@@ -309,7 +315,7 @@ export const importOsmStreets = createServerFn({ method: "POST" })
     // Guard: cap bbox area so a runaway query can't pull all of Seattle.
     const w = Math.abs(data.maxLng - data.minLng);
     const h = Math.abs(data.maxLat - data.minLat);
-    if (w * h > 0.05) throw new Error("Area too large — zoom in and try again.");
+    if (w * h > 0.05) return { imported: 0, skipped: 0, error: "Zoom in to load detailed street data." };
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const admin = supabaseAdmin as unknown as {
@@ -356,7 +362,7 @@ export const importOsmStreets = createServerFn({ method: "POST" })
       try {
         ways = await fetchOsmMapSplit(data.minLng, data.minLat, data.maxLng, data.maxLat);
       } catch (e) {
-        if (!json) throw new Error(`OSM unavailable: ${lastErr || (e as Error).message}`);
+        if (!json) return { imported: 0, skipped: 0, error: `Real street data is temporarily rate limited. ${lastErr || (e as Error).message}` };
       }
     }
     if (ways.length === 0) return { imported: 0, skipped: 0 };
@@ -401,7 +407,7 @@ export const importOsmStreets = createServerFn({ method: "POST" })
       // Fallback: insert via PostgREST using a JSON column wrapper isn't possible for geometry,
       // so we use a custom SQL RPC.
       const { data: ins, error } = await admin.rpc("upsert_osm_segments", { p_rows: chunk });
-      if (error) throw new Error(`Insert failed: ${(error as { message?: string }).message}`);
+      if (error) return { imported, skipped: ways.length - imported, error: `Street import failed: ${(error as { message?: string }).message}` };
       const rows = (ins ?? []) as Array<{ id: string; external_id: string }>;
       for (const r of rows) {
         const c = classMap.get(r.external_id);
