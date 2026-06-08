@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import type { Feature, FeatureCollection, LineString } from "geojson";
@@ -46,7 +46,7 @@ export function MapView({ token, city }: MapViewProps) {
   const featuresRef = useRef<Map<string, Feature<LineString>>>(new Map());
   const importingRef = useRef(false);
   const lastFetchKeyRef = useRef<string>("");
-  const webglOk = typeof window !== "undefined" && mapboxgl.supported();
+  const [webglOk, setWebglOk] = useState<boolean | null>(null);
 
   const queryClient = useQueryClient();
   const fetchSegments = useServerFn(getSegmentsInBbox);
@@ -109,16 +109,26 @@ export function MapView({ token, city }: MapViewProps) {
 
   // Init map once
   useEffect(() => {
-    if (!container.current || mapRef.current || !webglOk) return;
+    if (!container.current || mapRef.current) return;
+    const supported = mapboxgl.supported();
+    setWebglOk(supported);
+    if (!supported) return;
+
     mapboxgl.accessToken = token;
-    const map = new mapboxgl.Map({
-      container: container.current,
-      style: "mapbox://styles/mapbox/dark-v11",
-      center: city.center,
-      zoom: Math.max(15, city.default_zoom),
-      attributionControl: false,
-      pitchWithRotate: false,
-    });
+    let map: mapboxgl.Map;
+    try {
+      map = new mapboxgl.Map({
+        container: container.current,
+        style: "mapbox://styles/mapbox/dark-v11",
+        center: city.center,
+        zoom: Math.max(15, city.default_zoom),
+        attributionControl: false,
+        pitchWithRotate: false,
+      });
+    } catch {
+      setWebglOk(false);
+      return;
+    }
     map.addControl(new mapboxgl.NavigationControl({ showCompass: false, visualizePitch: false }), "top-right");
     map.addControl(new mapboxgl.GeolocateControl({ trackUserLocation: true, showUserHeading: true }), "top-right");
 
@@ -193,7 +203,7 @@ export function MapView({ token, city }: MapViewProps) {
   return (
     <>
       <div ref={container} className="absolute inset-0" />
-      {!webglOk && (
+      {webglOk === false && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-background p-6 text-center">
           <div className="max-w-sm">
             <h2 className="font-display text-lg font-bold">Map can't render here</h2>
