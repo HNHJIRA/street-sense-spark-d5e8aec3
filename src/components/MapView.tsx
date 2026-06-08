@@ -64,6 +64,9 @@ export function MapView({ token, city }: MapViewProps) {
   const selectSegment = useAppStore((s) => s.selectSegment);
   const flyTo = useAppStore((s) => s.flyTo);
   const setFlyTo = useAppStore((s) => s.setFlyTo);
+  const setMapCenter = useAppStore((s) => s.setMapCenter);
+  const forecastAt = useAppStore((s) => s.forecastAt);
+  const forecastAtIso = forecastAt ? forecastAt.toISOString() : null;
 
   const updateSource = useCallback(() => {
     const map = mapRef.current;
