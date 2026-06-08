@@ -354,6 +354,13 @@ export function MapView({ token, city }: MapViewProps) {
     setFlyTo(null);
   }, [flyTo, setFlyTo]);
 
+  // Forecast time changed → re-evaluate engine colors for the current bbox.
+  useEffect(() => {
+    if (!ready) return;
+    lastFetchKeyRef.current = "";
+    void loadBbox();
+  }, [forecastAtIso, ready, loadBbox]);
+
   const zoomIn = () => mapRef.current?.zoomIn();
   const zoomOut = () => mapRef.current?.zoomOut();
   const locate = () => {
