@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type * as Leaflet from "leaflet";
-import "leaflet/dist/leaflet.css";
+import type * as MapboxGL from "mapbox-gl";
+import "mapbox-gl/dist/mapbox-gl.css";
 import type { Feature, FeatureCollection, LineString } from "geojson";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
+import { Sliders, Info, LocateFixed, Plus, Minus } from "lucide-react";
 import {
   getSegmentsInBbox,
   importOsmStreets,
@@ -20,10 +21,16 @@ interface MapViewProps {
 }
 
 const COLOR_HEX: Record<ParkingColor, string> = {
-  green: "#5BE0A4",
+  green: "#22C55E",
   yellow: "#F0CE63",
-  red: "#F26A5C",
+  red: "#EF4444",
 };
+
+// Seattle parking-area bounds (SW, NE).
+const BOUNDS: [[number, number], [number, number]] = [
+  [-122.459, 47.481],
+  [-122.224, 47.734],
+];
 
 function segmentToFeature(s: SegmentLite): Feature<LineString> {
   return {
@@ -34,6 +41,7 @@ function segmentToFeature(s: SegmentLite): Feature<LineString> {
       segmentId: s.id,
       name: s.name,
       color: s.color,
+      side: s.side,
       label: s.label,
       restriction_code: s.restriction_code,
     },
@@ -41,14 +49,13 @@ function segmentToFeature(s: SegmentLite): Feature<LineString> {
 }
 
 export function MapView({ token, city }: MapViewProps) {
-  void token;
   const container = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<Leaflet.Map | null>(null);
-  const segmentLayerRef = useRef<Leaflet.GeoJSON<LineString> | null>(null);
+  const mapRef = useRef<MapboxGL.Map | null>(null);
   const featuresRef = useRef<Map<string, Feature<LineString>>>(new Map());
   const importingRef = useRef(false);
   const lastFetchKeyRef = useRef<string>("");
   const [mapError, setMapError] = useState(false);
+  const [ready, setReady] = useState(false);
 
   const queryClient = useQueryClient();
   const fetchSegments = useServerFn(getSegmentsInBbox);
@@ -59,24 +66,26 @@ export function MapView({ token, city }: MapViewProps) {
   const setFlyTo = useAppStore((s) => s.setFlyTo);
 
   const updateSource = useCallback(() => {
-    const layer = segmentLayerRef.current;
-    if (!layer) return;
+    const map = mapRef.current;
+    if (!map) return;
+    const src = map.getSource("segments") as MapboxGL.GeoJSONSource | undefined;
+    if (!src) return;
     const data: FeatureCollection<LineString> = {
       type: "FeatureCollection",
       features: Array.from(featuresRef.current.values()),
     };
-    layer.clearLayers();
-    layer.addData(data);
+    src.setData(data);
   }, []);
 
   const loadBbox = useCallback(async () => {
     const map = mapRef.current;
     if (!map) return;
     const b = map.getBounds();
+    if (!b) return;
     const minLng = b.getWest(), minLat = b.getSouth();
     const maxLng = b.getEast(), maxLat = b.getNorth();
     const w = maxLng - minLng, h = maxLat - minLat;
-    if (w * h > 0.05) return; // too zoomed out — skip
+    if (w * h > 0.05) return;
     const key = `${minLng.toFixed(3)},${minLat.toFixed(3)},${maxLng.toFixed(3)},${maxLat.toFixed(3)}`;
     if (key === lastFetchKeyRef.current) return;
     lastFetchKeyRef.current = key;
@@ -89,18 +98,13 @@ export function MapView({ token, city }: MapViewProps) {
     for (const s of segs) featuresRef.current.set(s.id, segmentToFeature(s));
     updateSource();
 
-    // Auto-import once if the area is empty and we're zoomed in enough.
     if (segs.length === 0 && map.getZoom() >= 14 && !importingRef.current) {
       importingRef.current = true;
       const id = toast.loading("Loading real street data for this area…");
       try {
         const res = await runImport({ data: { citySlug: city.slug, minLng, minLat, maxLng, maxLat } });
-        if (res.error) {
-          toast.message(res.error, { id });
-          return;
-        }
+        if (res.error) { toast.message(res.error, { id }); return; }
         toast.success(`Imported ${res.imported} streets`, { id });
-        // Force refetch by clearing the key memo.
         lastFetchKeyRef.current = "";
         await queryClient.invalidateQueries({ queryKey: ["segments", city.id] });
         await loadBbox();
@@ -112,78 +116,161 @@ export function MapView({ token, city }: MapViewProps) {
     }
   }, [city.id, city.slug, fetchSegments, queryClient, runImport, updateSource]);
 
-  // Init map once with raster tiles so it works without WebGL.
   useEffect(() => {
     if (!container.current || mapRef.current) return;
     let disposed = false;
     let moveTimer: number | undefined;
 
-    const initMap = async () => {
+    (async () => {
       try {
-        const L = await import("leaflet");
+        const mod = await import("mapbox-gl");
+        const mapboxgl = mod.default;
         if (!container.current || mapRef.current || disposed) return;
-        // Seattle parking-area bounds (SW, NE). Pan/zoom is clamped to this box.
-        const SEATTLE_BOUNDS = L.latLngBounds(
-          L.latLng(47.481, -122.459),
-          L.latLng(47.734, -122.224),
-        );
 
-        const map = L.map(container.current, {
-          center: [city.center[1], city.center[0]],
-          zoom: Math.max(15, city.default_zoom),
-          zoomControl: false,
-          attributionControl: false,
-          maxBounds: SEATTLE_BOUNDS,
-          maxBoundsViscosity: 1.0, // hard stop at the boundary
+        mapboxgl.accessToken = token;
+
+        const map = new mapboxgl.Map({
+          container: container.current,
+          style: "mapbox://styles/mapbox/streets-v12",
+          center: city.center as [number, number],
+          zoom: Math.max(15.5, city.default_zoom),
+          pitch: 60,
+          bearing: -18,
+          maxBounds: BOUNDS,
           minZoom: 12,
-          maxZoom: 19,
+          maxZoom: 20,
+          attributionControl: false,
+          antialias: true,
         });
 
-        L.control.zoom({ position: "topright" }).addTo(map);
-        L.tileLayer(
-          `https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/512/{z}/{x}/{y}@2x?access_token=${token}`,
-          { tileSize: 512, zoomOffset: -1, maxZoom: 20, bounds: SEATTLE_BOUNDS },
-        ).addTo(map);
+        map.on("style.load", () => {
+          // 3D buildings layer (Apple Maps-like extrusions)
+          const layers = map.getStyle()?.layers ?? [];
+          const labelLayer = layers.find(
+            (l: any) => l.type === "symbol" && l.layout?.["text-field"],
+          ) as any;
+          const labelId = labelLayer?.id;
 
-        segmentLayerRef.current = L.geoJSON(undefined, {
-          style: (feature) => ({
-            color: COLOR_HEX[(feature?.properties?.color as ParkingColor | undefined) ?? "green"],
-            weight: 7,
-            opacity: 0.95,
-            lineCap: "round",
-            lineJoin: "round",
-          }),
-          onEachFeature: (feature, layer) => {
-            layer.on("click", () => {
-              const id = feature.properties?.segmentId as string | undefined;
-              if (id) selectSegment(id);
+          if (!map.getLayer("3d-buildings")) {
+            map.addLayer(
+              {
+                id: "3d-buildings",
+                source: "composite",
+                "source-layer": "building",
+                filter: ["==", "extrude", "true"],
+                type: "fill-extrusion",
+                minzoom: 14,
+                paint: {
+                  "fill-extrusion-color": "#E8E1D6",
+                  "fill-extrusion-height": [
+                    "interpolate", ["linear"], ["zoom"],
+                    14, 0, 15.5, ["get", "height"],
+                  ],
+                  "fill-extrusion-base": [
+                    "interpolate", ["linear"], ["zoom"],
+                    14, 0, 15.5, ["get", "min_height"],
+                  ],
+                  "fill-extrusion-opacity": 0.85,
+                },
+              },
+              labelId,
+            );
+          }
+
+          // Parking segment source + curb-offset line layers per side.
+          if (!map.getSource("segments")) {
+            map.addSource("segments", {
+              type: "geojson",
+              data: { type: "FeatureCollection", features: [] },
+              promoteId: "segmentId",
             });
-          },
-        }).addTo(map) as Leaflet.GeoJSON<LineString>;
+          }
+
+          const colorExpr: any = [
+            "match", ["get", "color"],
+            "green", COLOR_HEX.green,
+            "yellow", COLOR_HEX.yellow,
+            "red", COLOR_HEX.red,
+            COLOR_HEX.green,
+          ];
+          const widthExpr: any = [
+            "interpolate", ["linear"], ["zoom"],
+            13, 1.5,
+            15, 3,
+            17, 5,
+            19, 8,
+          ];
+          const offsetBase: any = [
+            "interpolate", ["linear"], ["zoom"],
+            13, 1, 15, 2.5, 17, 5, 19, 9,
+          ];
+
+          // LEFT side: negative offset
+          map.addLayer({
+            id: "seg-left",
+            type: "line",
+            source: "segments",
+            filter: ["any", ["==", ["get", "side"], "left"], ["==", ["get", "side"], "both"]],
+            layout: { "line-cap": "round", "line-join": "round" },
+            paint: {
+              "line-color": colorExpr,
+              "line-width": widthExpr,
+              "line-offset": ["*", offsetBase, -1],
+              "line-opacity": 0.95,
+            },
+          });
+
+          // RIGHT side: positive offset (also 'both' rendered here as second line)
+          map.addLayer({
+            id: "seg-right",
+            type: "line",
+            source: "segments",
+            filter: ["any", ["==", ["get", "side"], "right"], ["==", ["get", "side"], "both"]],
+            layout: { "line-cap": "round", "line-join": "round" },
+            paint: {
+              "line-color": colorExpr,
+              "line-width": widthExpr,
+              "line-offset": offsetBase,
+              "line-opacity": 0.95,
+            },
+          });
+
+          map.on("click", ["seg-left", "seg-right"] as any, (e: any) => {
+            const f = e.features?.[0];
+            const id = f?.properties?.segmentId as string | undefined;
+            if (id) selectSegment(id);
+          });
+          for (const id of ["seg-left", "seg-right"]) {
+            map.on("mouseenter", id, () => { map.getCanvas().style.cursor = "pointer"; });
+            map.on("mouseleave", id, () => { map.getCanvas().style.cursor = ""; });
+          }
+
+          mapRef.current = map;
+          setReady(true);
+          updateSource();
+          void loadBbox();
+        });
 
         map.on("moveend", () => {
           window.clearTimeout(moveTimer);
           moveTimer = window.setTimeout(() => { void loadBbox(); }, 350);
         });
 
-        mapRef.current = map;
-        window.setTimeout(() => {
-          map.invalidateSize();
-          void loadBbox();
-        }, 0);
+        map.on("error", (e: any) => {
+          // Token / style failures
+          if (e?.error?.status === 401) setMapError(true);
+        });
       } catch {
         if (!disposed) setMapError(true);
       }
-    };
-
-    void initMap();
+    })();
 
     return () => {
       disposed = true;
       window.clearTimeout(moveTimer);
       mapRef.current?.remove();
       mapRef.current = null;
-      segmentLayerRef.current = null;
+      setReady(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, city.id]);
@@ -191,24 +278,78 @@ export function MapView({ token, city }: MapViewProps) {
   // Fly to from search
   useEffect(() => {
     if (!flyTo || !mapRef.current) return;
-    mapRef.current.flyTo([flyTo.lat, flyTo.lng], flyTo.zoom ?? 16, { duration: 1.2 });
+    mapRef.current.flyTo({
+      center: [flyTo.lng, flyTo.lat],
+      zoom: flyTo.zoom ?? 16.5,
+      pitch: 60,
+      duration: 1400,
+      essential: true,
+    });
     setFlyTo(null);
   }, [flyTo, setFlyTo]);
+
+  const zoomIn = () => mapRef.current?.zoomIn();
+  const zoomOut = () => mapRef.current?.zoomOut();
+  const locate = () => {
+    if (!navigator.geolocation || !mapRef.current) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        mapRef.current?.flyTo({
+          center: [pos.coords.longitude, pos.coords.latitude],
+          zoom: 17, pitch: 60, duration: 1200,
+        });
+      },
+      () => toast.error("Couldn't get your location"),
+      { enableHighAccuracy: true, timeout: 8000 },
+    );
+  };
 
   return (
     <>
       <div ref={container} className="absolute inset-0 z-0 isolate" />
+
+      {ready && (
+        <div
+          className="pointer-events-none absolute right-0 z-20 flex flex-col items-end gap-2 px-3"
+          style={{ top: "calc(var(--safe-top) + 8rem)" }}
+        >
+          <MapBtn onClick={zoomIn} ariaLabel="Zoom in"><Plus className="h-5 w-5" /></MapBtn>
+          <MapBtn onClick={zoomOut} ariaLabel="Zoom out"><Minus className="h-5 w-5" /></MapBtn>
+          <div className="h-1" />
+          <MapBtn onClick={() => toast.message("Map settings coming soon")} ariaLabel="Map settings">
+            <Sliders className="h-5 w-5" />
+          </MapBtn>
+          <MapBtn onClick={() => toast.message("Tap any colored line for details")} ariaLabel="Info">
+            <Info className="h-5 w-5" />
+          </MapBtn>
+          <MapBtn onClick={locate} ariaLabel="My location"><LocateFixed className="h-5 w-5" /></MapBtn>
+        </div>
+      )}
+
       {mapError && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-background p-6 text-center">
           <div className="max-w-sm">
             <h2 className="font-display text-lg font-bold">Map can't render here</h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              Your browser or this preview iframe has WebGL disabled. Open the preview in a new tab
-              (or use Chrome / Safari with hardware acceleration on) to see the parking map.
+              Mapbox failed to load. Check the token or try a different browser.
             </p>
           </div>
         </div>
       )}
     </>
+  );
+}
+
+function MapBtn({
+  children, onClick, ariaLabel,
+}: { children: React.ReactNode; onClick: () => void; ariaLabel: string }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label={ariaLabel}
+      className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-neutral-800 shadow-lg ring-1 ring-black/5 transition hover:bg-neutral-50 active:scale-95"
+    >
+      {children}
+    </button>
   );
 }
