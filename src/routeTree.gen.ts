@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SavedRouteImport } from './routes/saved'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DebugParkingRouteImport } from './routes/debug.parking'
 
 const SavedRoute = SavedRouteImport.update({
   id: '/saved',
@@ -28,35 +29,44 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DebugParkingRoute = DebugParkingRouteImport.update({
+  id: '/debug/parking',
+  path: '/debug/parking',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/profile': typeof ProfileRoute
   '/saved': typeof SavedRoute
+  '/debug/parking': typeof DebugParkingRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/profile': typeof ProfileRoute
   '/saved': typeof SavedRoute
+  '/debug/parking': typeof DebugParkingRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/profile': typeof ProfileRoute
   '/saved': typeof SavedRoute
+  '/debug/parking': typeof DebugParkingRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/profile' | '/saved'
+  fullPaths: '/' | '/profile' | '/saved' | '/debug/parking'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/profile' | '/saved'
-  id: '__root__' | '/' | '/profile' | '/saved'
+  to: '/' | '/profile' | '/saved' | '/debug/parking'
+  id: '__root__' | '/' | '/profile' | '/saved' | '/debug/parking'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ProfileRoute: typeof ProfileRoute
   SavedRoute: typeof SavedRoute
+  DebugParkingRoute: typeof DebugParkingRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -82,6 +92,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/debug/parking': {
+      id: '/debug/parking'
+      path: '/debug/parking'
+      fullPath: '/debug/parking'
+      preLoaderRoute: typeof DebugParkingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -89,6 +106,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ProfileRoute: ProfileRoute,
   SavedRoute: SavedRoute,
+  DebugParkingRoute: DebugParkingRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
