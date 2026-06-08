@@ -47,7 +47,10 @@ export function ParkHereButton({ cityId }: Props) {
 
   return (
     <>
-      <div className="pointer-events-none fixed inset-x-0 bottom-24 z-20 safe-bottom mb-12">
+      <div
+        className="pointer-events-none fixed inset-x-0 z-20 safe-x"
+        style={{ bottom: "calc(var(--safe-bottom) + 7rem)" }}
+      >
         <div className="mx-auto flex max-w-md justify-center px-3">
           <button
             type="button"
