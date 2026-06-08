@@ -1,8 +1,7 @@
 import { useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
-import { getCityBundle, getMapboxToken } from "@/lib/parking/parking.functions";
+import { getCityInfo, getMapboxToken } from "@/lib/parking/parking.functions";
 import { MapView } from "@/components/MapView";
 import { TopBar } from "@/components/TopBar";
 import { BottomNav } from "@/components/BottomNav";
@@ -11,9 +10,9 @@ import { ForecastSheet } from "@/components/ForecastSheet";
 import { SearchSheet } from "@/components/SearchSheet";
 import { useAppStore } from "@/stores/app-store";
 
-const bundleOpts = queryOptions({
-  queryKey: ["parking", "bundle", "seattle"],
-  queryFn: () => getCityBundle({ data: { citySlug: "seattle" } }),
+const cityOpts = queryOptions({
+  queryKey: ["parking", "city", "seattle"],
+  queryFn: () => getCityInfo({ data: { citySlug: "seattle" } }),
   staleTime: 5 * 60 * 1000,
 });
 const tokenOpts = queryOptions({
@@ -33,7 +32,7 @@ export const Route = createFileRoute("/")({
   }),
   loader: async ({ context }) => {
     await Promise.all([
-      context.queryClient.ensureQueryData(bundleOpts),
+      context.queryClient.ensureQueryData(cityOpts),
       context.queryClient.ensureQueryData(tokenOpts),
     ]);
   },
@@ -55,7 +54,7 @@ export const Route = createFileRoute("/")({
 });
 
 function HomePage() {
-  const bundleQuery = useSuspenseQuery(bundleOpts);
+  const cityQuery = useSuspenseQuery(cityOpts);
   const tokenQuery = useSuspenseQuery(tokenOpts);
 
   const forecastAt = useAppStore((s) => s.forecastAt);
@@ -70,23 +69,22 @@ function HomePage() {
 
   const now = forecastAt ?? new Date();
   void tick;
-
-  const bundle = bundleQuery.data;
+  const city = cityQuery.data;
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-background">
-      <MapView token={tokenQuery.data.token} bundle={bundle} now={now} />
+      <MapView token={tokenQuery.data.token} city={city} />
       <TopBar
-        cityName={bundle.city.name}
+        cityName={city.name}
         now={now}
-        timezone={bundle.city.timezone}
+        timezone={city.timezone}
         isForecast={!!forecastAt}
       />
       <Legend />
       <BottomNav />
       <SearchSheet token={tokenQuery.data.token} />
       <ForecastSheet />
-      <StreetSheet bundle={bundle} now={now} />
+      <StreetSheet timezone={city.timezone} restrictionTypes={city.restrictionTypes} />
     </div>
   );
 }
