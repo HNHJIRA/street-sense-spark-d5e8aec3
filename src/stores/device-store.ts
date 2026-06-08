@@ -63,6 +63,8 @@ export interface NotificationLogItem {
 }
 
 interface DeviceState {
+  deviceId: string;
+  onboardingCompletedAt: string | null;
   savedSpots: SavedSpot[];
   favorites: FavoritePlace[];
   searchHistory: SearchHistoryItem[];
@@ -73,6 +75,9 @@ interface DeviceState {
   // Per-session set of already-fired alert ids — keeps the scheduler idempotent
   // across remounts and tab focuses.
   deliveredAlertIds: string[];
+
+  completeOnboarding: () => void;
+  resetOnboarding: () => void;
 
   addSavedSpot: (spot: Omit<SavedSpot, "id" | "createdAt">) => void;
   removeSavedSpot: (id: string) => void;
@@ -95,6 +100,7 @@ interface DeviceState {
   hasDeliveredAlert: (alertId: string) => boolean;
 }
 
+
 const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto
   ? crypto.randomUUID()
   : `id_${Math.random().toString(36).slice(2)}_${Date.now()}`);
@@ -102,6 +108,8 @@ const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto
 export const useDeviceStore = create<DeviceState>()(
   persist(
     (set, get) => ({
+      deviceId: uid(),
+      onboardingCompletedAt: null,
       savedSpots: [],
       favorites: [],
       searchHistory: [],
@@ -110,6 +118,9 @@ export const useDeviceStore = create<DeviceState>()(
       alertSettings: DEFAULT_ALERT_SETTINGS,
       notificationHistory: [],
       deliveredAlertIds: [],
+
+      completeOnboarding: () => set({ onboardingCompletedAt: new Date().toISOString() }),
+      resetOnboarding: () => set({ onboardingCompletedAt: null }),
 
       addSavedSpot: (spot) =>
         set((s) => ({
@@ -146,7 +157,7 @@ export const useDeviceStore = create<DeviceState>()(
       startSession: (s) =>
         set({
           activeSession: { ...s, id: uid(), startedAt: new Date().toISOString() },
-          deliveredAlertIds: [], // reset per-session dedupe
+          deliveredAlertIds: [],
         }),
       endSession: () => set({ activeSession: null, deliveredAlertIds: [] }),
 
@@ -173,6 +184,8 @@ export const useDeviceStore = create<DeviceState>()(
       name: "parkclear-device-v1",
       storage: createJSONStorage(() => (typeof window !== "undefined" ? window.localStorage : undefined as any)),
       partialize: (s) => ({
+        deviceId: s.deviceId,
+        onboardingCompletedAt: s.onboardingCompletedAt,
         savedSpots: s.savedSpots,
         favorites: s.favorites,
         searchHistory: s.searchHistory,
@@ -184,3 +197,10 @@ export const useDeviceStore = create<DeviceState>()(
     },
   ),
 );
+
+/** Stable anonymous device id, safe to call from SSR. */
+export function getDeviceId(): string {
+  if (typeof window === "undefined") return "ssr";
+  return useDeviceStore.getState().deviceId;
+}
+
