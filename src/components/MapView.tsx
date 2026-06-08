@@ -129,7 +129,7 @@ export function MapView({ token, city }: MapViewProps) {
       { tileSize: 512, zoomOffset: -1, maxZoom: 20 },
     ).addTo(map);
 
-    segmentLayerRef.current = L.geoJSON<LineString>(undefined, {
+    segmentLayerRef.current = L.geoJSON(undefined, {
       style: (feature) => ({
         color: COLOR_HEX[(feature?.properties?.color as ParkingColor | undefined) ?? "green"],
         weight: 7,
@@ -143,7 +143,7 @@ export function MapView({ token, city }: MapViewProps) {
           if (id) selectSegment(id);
         });
       },
-    }).addTo(map);
+    }).addTo(map) as L.GeoJSON<LineString>;
 
     let moveTimer: number | undefined;
     map.on("moveend", () => {
