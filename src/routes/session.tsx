@@ -4,13 +4,16 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery, useSuspenseQuery, queryOptions } from "@tanstack/react-query";
-import { Car, Clock, ShieldAlert, Timer, Database, MapPin, ArrowLeft } from "lucide-react";
+import { Car, Clock, ShieldAlert, Timer, Database, MapPin, ArrowLeft, BellRing } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
+import { ParkingStatusCard } from "@/components/ParkingStatusCard";
 import { useDeviceStore } from "@/stores/device-store";
 import { useAppStore } from "@/stores/app-store";
 import { getCityInfo, getSegmentDetails } from "@/lib/parking/parking.functions";
 import { evaluateRulesAt } from "@/lib/parking/engine";
 import { countdownTo, elapsedSince } from "@/lib/parking/countdown";
+import { computeAlertWindows, nextPlannedAlert } from "@/lib/parking/alerts";
+import { useSessionAlertScheduler } from "@/lib/parking/notifications";
 import type { StreetSegment } from "@/lib/parking/types";
 import { cn } from "@/lib/utils";
 
