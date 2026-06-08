@@ -123,11 +123,27 @@ export function MapView({ token, city }: MapViewProps) {
 
     (async () => {
       try {
+        // mapbox-gl v3 requires WebGL2. Some sandboxed iframes only expose
+        // WebGL1 — detect ahead of construction and show fallback UI.
+        try {
+          const probe = document.createElement("canvas");
+          const gl2 = probe.getContext("webgl2");
+          if (!gl2) {
+            console.warn("[MapView] WebGL2 unavailable in this context");
+            setMapError(true);
+            return;
+          }
+        } catch {
+          setMapError(true);
+          return;
+        }
+
         const mod = await import("mapbox-gl");
         const mapboxgl = mod.default;
         if (!container.current || mapRef.current || disposed) return;
 
         mapboxgl.accessToken = token;
+
 
         let map: MapboxGL.Map;
         try {
