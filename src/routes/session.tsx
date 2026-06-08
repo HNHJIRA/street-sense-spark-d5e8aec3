@@ -36,6 +36,7 @@ function SessionPage() {
   const setFlyTo = useAppStore((s) => s.setFlyTo);
   const selectSegment = useAppStore((s) => s.selectSegment);
   const navigate = useNavigate();
+  const alertSettings = useDeviceStore((s) => s.alertSettings);
 
   const detailsQ = useQuery({
     queryKey: ["segment-details", session?.segmentId],
