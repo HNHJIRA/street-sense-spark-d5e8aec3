@@ -175,9 +175,10 @@ export interface SegmentDetails {
   neighborhood: string | null;
   data_source: string;
   source_label: string;
+  /** Provider-supplied category label, if any (e.g. SDOT PARKING_CATEGORY). */
+  source_category: string | null;
   rules: ParkingRule[];
   events: ParkingEvent[];
-  metadata: Record<string, unknown>;
 }
 
 const SOURCE_LABELS: Record<string, string> = {
