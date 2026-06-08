@@ -123,153 +123,175 @@ export function MapView({ token, city }: MapViewProps) {
 
     (async () => {
       try {
+        // mapbox-gl v3 requires WebGL2. Some sandboxed iframes only expose
+        // WebGL1 — detect ahead of construction and show fallback UI.
+        try {
+          const probe = document.createElement("canvas");
+          const gl2 = probe.getContext("webgl2");
+          if (!gl2) {
+            console.warn("[MapView] WebGL2 unavailable in this context");
+            setMapError(true);
+            return;
+          }
+        } catch {
+          setMapError(true);
+          return;
+        }
+
         const mod = await import("mapbox-gl");
         const mapboxgl = mod.default;
         if (!container.current || mapRef.current || disposed) return;
 
         mapboxgl.accessToken = token;
 
-        const map = new mapboxgl.Map({
-          container: container.current,
-          style: "mapbox://styles/mapbox/streets-v12",
-          center: city.center as [number, number],
-          zoom: Math.max(15.5, city.default_zoom),
-          pitch: 60,
-          bearing: -18,
-          maxBounds: BOUNDS,
-          minZoom: 12,
-          maxZoom: 20,
-          attributionControl: false,
-          antialias: true,
+
+        let map: MapboxGL.Map;
+        try {
+          map = new mapboxgl.Map({
+            container: container.current,
+            style: "mapbox://styles/mapbox/streets-v12",
+            center: city.center as [number, number],
+            zoom: Math.max(15.5, city.default_zoom),
+            pitch: 60,
+            bearing: -18,
+            maxBounds: BOUNDS,
+            minZoom: 12,
+            maxZoom: 20,
+            attributionControl: false,
+            antialias: true,
+          });
+        } catch (err) {
+          // WebGL2 unavailable in this preview iframe → surface fallback UI.
+          console.error("[MapView] mapbox-gl init failed", err);
+          setMapError(true);
+          return;
+        }
+
+        map.on("error", (e: any) => {
+          console.error("[MapView] mapbox error", e?.error ?? e);
         });
 
         map.on("style.load", () => {
-          // 3D buildings layer (Apple Maps-like extrusions)
-          const layers = map.getStyle()?.layers ?? [];
-          const labelLayer = layers.find(
-            (l: any) => l.type === "symbol" && l.layout?.["text-field"],
-          ) as any;
-          const labelId = labelLayer?.id;
+          try {
+            const layers = map.getStyle()?.layers ?? [];
+            const labelLayer = layers.find(
+              (l: any) => l.type === "symbol" && l.layout?.["text-field"],
+            ) as any;
+            const labelId = labelLayer?.id as string | undefined;
 
-          if (!map.getLayer("3d-buildings")) {
-            map.addLayer(
-              {
-                id: "3d-buildings",
-                source: "composite",
-                "source-layer": "building",
-                filter: ["==", "extrude", "true"],
-                type: "fill-extrusion",
-                minzoom: 14,
+            // 3D buildings (best-effort — skip if style schema differs).
+            try {
+              if (!map.getLayer("3d-buildings")) {
+                map.addLayer(
+                  {
+                    id: "3d-buildings",
+                    source: "composite",
+                    "source-layer": "building",
+                    filter: ["==", "extrude", "true"],
+                    type: "fill-extrusion",
+                    minzoom: 14,
+                    paint: {
+                      "fill-extrusion-color": "#E8E1D6",
+                      "fill-extrusion-height": [
+                        "interpolate", ["linear"], ["zoom"],
+                        14, 0, 15.5, ["get", "height"],
+                      ],
+                      "fill-extrusion-base": [
+                        "interpolate", ["linear"], ["zoom"],
+                        14, 0, 15.5, ["get", "min_height"],
+                      ],
+                      "fill-extrusion-opacity": 0.85,
+                    },
+                  },
+                  labelId,
+                );
+              }
+            } catch (err) {
+              console.warn("[MapView] 3d-buildings layer skipped", err);
+            }
+
+            if (!map.getSource("segments")) {
+              map.addSource("segments", {
+                type: "geojson",
+                data: { type: "FeatureCollection", features: [] },
+                promoteId: "segmentId",
+              });
+            }
+
+            const colorExpr: any = [
+              "match", ["get", "color"],
+              "green", COLOR_HEX.green,
+              "yellow", COLOR_HEX.yellow,
+              "red", COLOR_HEX.red,
+              COLOR_HEX.green,
+            ];
+            const widthExpr: any = [
+              "interpolate", ["linear"], ["zoom"],
+              13, 1.8, 15, 3.5, 16, 4.5, 17, 6, 18, 8, 19, 11,
+            ];
+            const offsetBase: any = [
+              "interpolate", ["linear"], ["zoom"],
+              13, 2, 15, 5, 16, 7, 17, 10, 18, 14, 19, 20,
+            ];
+
+            const addSeg = (id: string, side: "left" | "right", sign: 1 | -1) => {
+              if (map.getLayer(id)) return;
+              const layer: any = {
+                id,
+                type: "line",
+                source: "segments",
+                filter: ["any", ["==", ["get", "side"], side], ["==", ["get", "side"], "both"]],
+                layout: { "line-cap": "round", "line-join": "round" },
                 paint: {
-                  "fill-extrusion-color": "#E8E1D6",
-                  "fill-extrusion-height": [
-                    "interpolate", ["linear"], ["zoom"],
-                    14, 0, 15.5, ["get", "height"],
-                  ],
-                  "fill-extrusion-base": [
-                    "interpolate", ["linear"], ["zoom"],
-                    14, 0, 15.5, ["get", "min_height"],
-                  ],
-                  "fill-extrusion-opacity": 0.85,
+                  "line-color": colorExpr,
+                  "line-width": widthExpr,
+                  "line-offset": sign === -1 ? ["*", offsetBase, -1] : offsetBase,
+                  "line-opacity": 1,
                 },
-              },
-              labelId,
-            );
-          }
+              };
+              if (labelId && map.getLayer(labelId)) map.addLayer(layer, labelId);
+              else map.addLayer(layer);
+            };
+            addSeg("seg-left", "left", -1);
+            addSeg("seg-right", "right", 1);
 
-          // Parking segment source + curb-offset line layers per side.
-          if (!map.getSource("segments")) {
-            map.addSource("segments", {
-              type: "geojson",
-              data: { type: "FeatureCollection", features: [] },
-              promoteId: "segmentId",
+            map.on("click", ["seg-left", "seg-right"] as any, (e: any) => {
+              const f = e.features?.[0];
+              const id = f?.properties?.segmentId as string | undefined;
+              if (id) selectSegment(id);
             });
+
+            for (const id of ["seg-left", "seg-right"]) {
+              map.on("mouseenter", id, () => { map.getCanvas().style.cursor = "pointer"; });
+              map.on("mouseleave", id, () => { map.getCanvas().style.cursor = ""; });
+            }
+
+            mapRef.current = map;
+            setReady(true);
+            // Force resize in case the container measured 0px during construction
+            // (e.g., suspense fallback flicker). Tiles only fetch once sized.
+            window.requestAnimationFrame(() => map.resize());
+            window.setTimeout(() => map.resize(), 250);
+            updateSource();
+            void loadBbox();
+
+          } catch (err) {
+            console.error("[MapView] style.load handler failed", err);
+            setMapError(true);
           }
-
-          const colorExpr: any = [
-            "match", ["get", "color"],
-            "green", COLOR_HEX.green,
-            "yellow", COLOR_HEX.yellow,
-            "red", COLOR_HEX.red,
-            COLOR_HEX.green,
-          ];
-          // Thicker, saturated curb stripes — matches ParkUsher rendering.
-          const widthExpr: any = [
-            "interpolate", ["linear"], ["zoom"],
-            13, 1.8,
-            15, 3.5,
-            16, 4.5,
-            17, 6,
-            18, 8,
-            19, 11,
-          ];
-          // Push lines out to the curb edge (further than lane center).
-          const offsetBase: any = [
-            "interpolate", ["linear"], ["zoom"],
-            13, 2,
-            15, 5,
-            16, 7,
-            17, 10,
-            18, 14,
-            19, 20,
-          ];
-
-          // LEFT side: negative offset. Insert BELOW road labels so street
-          // names remain readable on top of the colored curb lines.
-          map.addLayer({
-            id: "seg-left",
-            type: "line",
-            source: "segments",
-            filter: ["any", ["==", ["get", "side"], "left"], ["==", ["get", "side"], "both"]],
-            layout: { "line-cap": "round", "line-join": "round" },
-            paint: {
-              "line-color": colorExpr,
-              "line-width": widthExpr,
-              "line-offset": ["*", offsetBase, -1],
-              "line-opacity": 1,
-            },
-          }, labelId);
-
-          // RIGHT side: positive offset.
-          map.addLayer({
-            id: "seg-right",
-            type: "line",
-            source: "segments",
-            filter: ["any", ["==", ["get", "side"], "right"], ["==", ["get", "side"], "both"]],
-            layout: { "line-cap": "round", "line-join": "round" },
-            paint: {
-              "line-color": colorExpr,
-              "line-width": widthExpr,
-              "line-offset": offsetBase,
-              "line-opacity": 1,
-            },
-          }, labelId);
-
-          map.on("click", ["seg-left", "seg-right"] as any, (e: any) => {
-            const f = e.features?.[0];
-            const id = f?.properties?.segmentId as string | undefined;
-            if (id) selectSegment(id);
-          });
-          for (const id of ["seg-left", "seg-right"]) {
-            map.on("mouseenter", id, () => { map.getCanvas().style.cursor = "pointer"; });
-            map.on("mouseleave", id, () => { map.getCanvas().style.cursor = ""; });
-          }
-
-          mapRef.current = map;
-          setReady(true);
-          updateSource();
-          void loadBbox();
         });
+
 
         map.on("moveend", () => {
           window.clearTimeout(moveTimer);
           moveTimer = window.setTimeout(() => { void loadBbox(); }, 350);
         });
-
+        // Note: an additional non-fatal error logger is wired earlier; the
+        // 401 token failure surfaces a friendly fallback UI.
         map.on("error", (e: any) => {
-          // Token / style failures
           if (e?.error?.status === 401) setMapError(true);
         });
+
       } catch {
         if (!disposed) setMapError(true);
       }
@@ -316,7 +338,9 @@ export function MapView({ token, city }: MapViewProps) {
 
   return (
     <>
-      <div ref={container} className="absolute inset-0 z-0 isolate" />
+      <div ref={container} className="absolute inset-0 z-0 h-full w-full" />
+
+
 
       {ready && (
         <div
