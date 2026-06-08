@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { User, MapPin, ShieldCheck, Bookmark, Heart, Clock, Car, ChevronRight } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
+import { AlertSettingsCard, NotificationHistoryCard } from "@/components/AlertSettings";
 import { useDeviceStore } from "@/stores/device-store";
 
 export const Route = createFileRoute("/profile")({
