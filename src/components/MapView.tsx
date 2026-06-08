@@ -229,9 +229,16 @@ export function MapView({ token, city }: MapViewProps) {
               "interpolate", ["linear"], ["zoom"],
               13, 1.8, 15, 3.5, 16, 4.5, 17, 6, 18, 8, 19, 11,
             ];
-            const offsetBase: any = [
+            // line-offset cannot wrap a zoom interpolate in a multiplication —
+            // zoom must be the TOP-LEVEL input. Build sign-baked offsets instead.
+            const offsetFor = (sign: 1 | -1): any => [
               "interpolate", ["linear"], ["zoom"],
-              13, 2, 15, 5, 16, 7, 17, 10, 18, 14, 19, 20,
+              13, 2 * sign,
+              15, 5 * sign,
+              16, 7 * sign,
+              17, 10 * sign,
+              18, 14 * sign,
+              19, 20 * sign,
             ];
 
             const addSeg = (id: string, side: "left" | "right", sign: 1 | -1) => {
@@ -245,7 +252,7 @@ export function MapView({ token, city }: MapViewProps) {
                 paint: {
                   "line-color": colorExpr,
                   "line-width": widthExpr,
-                  "line-offset": sign === -1 ? ["*", offsetBase, -1] : offsetBase,
+                  "line-offset": offsetFor(sign),
                   "line-opacity": 1,
                 },
               };
@@ -254,6 +261,7 @@ export function MapView({ token, city }: MapViewProps) {
             };
             addSeg("seg-left", "left", -1);
             addSeg("seg-right", "right", 1);
+
 
             map.on("click", ["seg-left", "seg-right"] as any, (e: any) => {
               const f = e.features?.[0];
