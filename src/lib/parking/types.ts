@@ -13,7 +13,7 @@ export interface ParkingRule {
   priority: number;
   restriction_code: string;
   days_of_week: number[]; // 0=Sun..6=Sat
-  time_start: string | null; // "HH:MM:SS"
+  time_start: string | null;
   time_end: string | null;
   permit_zone: string | null;
   time_limit_minutes: number | null;
@@ -35,8 +35,7 @@ export interface StreetSegment {
   id: string;
   name: string;
   side: string;
-  metadata: Record<string, unknown>;
-  // GeoJSON LineString coordinates: [lng,lat][]
+  neighborhood: string | null;
   coordinates: [number, number][];
   rules: ParkingRule[];
   events: ParkingEvent[];
@@ -64,7 +63,7 @@ export interface ParkingStatus {
   time_limit_minutes: number | null;
   rule_id: string | null;
   event_id: string | null;
-  allowed_until: string | null; // ISO timestamp of next boundary, when known
+  allowed_until: string | null;
   restriction_starts_at: string | null;
   restriction_ends_at: string | null;
 }
