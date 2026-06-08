@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CircleCheck, CircleX, Loader2, Navigation, TriangleAlert, MapPin, Clock } from "lucide-react";
+import { CircleCheck, CircleX, Loader2, Navigation, TriangleAlert, MapPin, Clock, ScanLine } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { checkParkingHere, type ParkHereResult } from "@/lib/parking/parking.functions";
@@ -87,7 +87,7 @@ export function ParkHereButton({ cityId, timezone }: Props) {
         className="pointer-events-none absolute inset-x-0 z-20 safe-x"
         style={{ bottom: "calc(var(--safe-bottom) + 7rem)" }}
       >
-        <div className="mx-auto flex max-w-md justify-center px-3">
+        <div className="mx-auto flex max-w-md items-center justify-center gap-2 px-3">
           <button
             type="button"
             onClick={run}
@@ -101,8 +101,16 @@ export function ParkHereButton({ cityId, timezone }: Props) {
             )}
             {loading ? "Checking…" : "Can I park here?"}
           </button>
+          <a
+            href="/scan"
+            className="pointer-events-auto flex items-center gap-1.5 rounded-full bg-surface px-4 py-3 text-sm font-bold shadow-[0_20px_60px_-10px_rgba(0,0,0,0.5)] transition active:scale-95"
+          >
+            <ScanLine className="h-4 w-4" strokeWidth={2.5} />
+            Scan sign
+          </a>
         </div>
       </div>
+
 
       {result && (
         <>

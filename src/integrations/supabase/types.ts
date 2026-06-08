@@ -47,6 +47,41 @@ export type Database = {
         }
         Relationships: []
       }
+      ocr_results: {
+        Row: {
+          created_at: string
+          id: string
+          model: string
+          raw_text: string
+          scan_id: string
+          sign_count: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          model: string
+          raw_text?: string
+          scan_id: string
+          sign_count?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          model?: string
+          raw_text?: string
+          scan_id?: string
+          sign_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ocr_results_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "parking_sign_scans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       parking_events: {
         Row: {
           created_at: string
@@ -158,6 +193,148 @@ export type Database = {
           },
         ]
       }
+      parking_sign_images: {
+        Row: {
+          created_at: string
+          height: number | null
+          id: string
+          public_url: string | null
+          scan_id: string
+          storage_path: string
+          width: number | null
+        }
+        Insert: {
+          created_at?: string
+          height?: number | null
+          id?: string
+          public_url?: string | null
+          scan_id: string
+          storage_path: string
+          width?: number | null
+        }
+        Update: {
+          created_at?: string
+          height?: number | null
+          id?: string
+          public_url?: string | null
+          scan_id?: string
+          storage_path?: string
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parking_sign_images_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "parking_sign_scans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      parking_sign_scans: {
+        Row: {
+          city_id: string | null
+          created_at: string
+          decision: Json
+          id: string
+          lat: number | null
+          lng: number | null
+          overall_confidence: number | null
+          segment_id: string | null
+        }
+        Insert: {
+          city_id?: string | null
+          created_at?: string
+          decision?: Json
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          overall_confidence?: number | null
+          segment_id?: string | null
+        }
+        Update: {
+          city_id?: string | null
+          created_at?: string
+          decision?: Json
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          overall_confidence?: number | null
+          segment_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parking_sign_scans_city_id_fkey"
+            columns: ["city_id"]
+            isOneToOne: false
+            referencedRelation: "cities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parking_sign_scans_segment_id_fkey"
+            columns: ["segment_id"]
+            isOneToOne: false
+            referencedRelation: "street_segments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      parsed_sign_rules: {
+        Row: {
+          confidence: number | null
+          created_at: string
+          days_of_week: number[]
+          id: string
+          notes: string | null
+          permit_zone: string | null
+          priority: number
+          restriction_code: string
+          scan_id: string
+          sequence: number
+          time_end: string | null
+          time_limit_minutes: number | null
+          time_start: string | null
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string
+          days_of_week?: number[]
+          id?: string
+          notes?: string | null
+          permit_zone?: string | null
+          priority?: number
+          restriction_code: string
+          scan_id: string
+          sequence?: number
+          time_end?: string | null
+          time_limit_minutes?: number | null
+          time_start?: string | null
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string
+          days_of_week?: number[]
+          id?: string
+          notes?: string | null
+          permit_zone?: string | null
+          priority?: number
+          restriction_code?: string
+          scan_id?: string
+          sequence?: number
+          time_end?: string | null
+          time_limit_minutes?: number | null
+          time_start?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parsed_sign_rules_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "parking_sign_scans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       provider_health: {
         Row: {
           city_id: string | null
@@ -222,6 +399,51 @@ export type Database = {
           label?: string
         }
         Relationships: []
+      }
+      scan_validation_results: {
+        Row: {
+          confidence: number | null
+          created_at: string
+          detail: string | null
+          id: string
+          matched_rule_id: string | null
+          outcome: string
+          scan_id: string
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string
+          detail?: string | null
+          id?: string
+          matched_rule_id?: string | null
+          outcome: string
+          scan_id: string
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string
+          detail?: string | null
+          id?: string
+          matched_rule_id?: string | null
+          outcome?: string
+          scan_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scan_validation_results_matched_rule_id_fkey"
+            columns: ["matched_rule_id"]
+            isOneToOne: false
+            referencedRelation: "parking_rules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scan_validation_results_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "parking_sign_scans"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       spatial_ref_sys: {
         Row: {

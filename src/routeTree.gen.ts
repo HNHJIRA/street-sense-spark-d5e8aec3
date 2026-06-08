@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SessionRouteImport } from './routes/session'
+import { Route as ScanRouteImport } from './routes/scan'
 import { Route as SavedRouteImport } from './routes/saved'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as AdminRouteImport } from './routes/admin'
@@ -24,6 +25,11 @@ import { Route as AdminForecastRouteImport } from './routes/admin.forecast'
 const SessionRoute = SessionRouteImport.update({
   id: '/session',
   path: '/session',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ScanRoute = ScanRouteImport.update({
+  id: '/scan',
+  path: '/scan',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SavedRoute = SavedRouteImport.update({
@@ -82,6 +88,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/profile': typeof ProfileRoute
   '/saved': typeof SavedRoute
+  '/scan': typeof ScanRoute
   '/session': typeof SessionRoute
   '/admin/forecast': typeof AdminForecastRoute
   '/admin/health': typeof AdminHealthRoute
@@ -94,6 +101,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/profile': typeof ProfileRoute
   '/saved': typeof SavedRoute
+  '/scan': typeof ScanRoute
   '/session': typeof SessionRoute
   '/admin/forecast': typeof AdminForecastRoute
   '/admin/health': typeof AdminHealthRoute
@@ -108,6 +116,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/profile': typeof ProfileRoute
   '/saved': typeof SavedRoute
+  '/scan': typeof ScanRoute
   '/session': typeof SessionRoute
   '/admin/forecast': typeof AdminForecastRoute
   '/admin/health': typeof AdminHealthRoute
@@ -123,6 +132,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/profile'
     | '/saved'
+    | '/scan'
     | '/session'
     | '/admin/forecast'
     | '/admin/health'
@@ -135,6 +145,7 @@ export interface FileRouteTypes {
     | '/'
     | '/profile'
     | '/saved'
+    | '/scan'
     | '/session'
     | '/admin/forecast'
     | '/admin/health'
@@ -148,6 +159,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/profile'
     | '/saved'
+    | '/scan'
     | '/session'
     | '/admin/forecast'
     | '/admin/health'
@@ -162,6 +174,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRouteWithChildren
   ProfileRoute: typeof ProfileRoute
   SavedRoute: typeof SavedRoute
+  ScanRoute: typeof ScanRoute
   SessionRoute: typeof SessionRoute
   DebugParkingRoute: typeof DebugParkingRoute
 }
@@ -173,6 +186,13 @@ declare module '@tanstack/react-router' {
       path: '/session'
       fullPath: '/session'
       preLoaderRoute: typeof SessionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/scan': {
+      id: '/scan'
+      path: '/scan'
+      fullPath: '/scan'
+      preLoaderRoute: typeof ScanRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/saved': {
@@ -271,6 +291,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRouteWithChildren,
   ProfileRoute: ProfileRoute,
   SavedRoute: SavedRoute,
+  ScanRoute: ScanRoute,
   SessionRoute: SessionRoute,
   DebugParkingRoute: DebugParkingRoute,
 }
