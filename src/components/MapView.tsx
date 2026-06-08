@@ -8,7 +8,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Sliders, Info, LocateFixed, Plus, Minus } from "lucide-react";
 import {
   getSegmentsInBbox,
-  importOsmStreets,
+  importSeattleBlockface,
   type CityInfo,
   type SegmentLite,
 } from "@/lib/parking/parking.functions";
