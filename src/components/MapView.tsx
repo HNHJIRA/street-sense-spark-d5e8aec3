@@ -156,107 +156,95 @@ export function MapView({ token, city }: MapViewProps) {
         });
 
         map.on("style.load", () => {
+          try {
+            const layers = map.getStyle()?.layers ?? [];
+            const labelLayer = layers.find(
+              (l: any) => l.type === "symbol" && l.layout?.["text-field"],
+            ) as any;
+            const labelId = labelLayer?.id as string | undefined;
 
-          // 3D buildings layer (Apple Maps-like extrusions)
-          const layers = map.getStyle()?.layers ?? [];
-          const labelLayer = layers.find(
-            (l: any) => l.type === "symbol" && l.layout?.["text-field"],
-          ) as any;
-          const labelId = labelLayer?.id;
+            // 3D buildings (best-effort — skip if style schema differs).
+            try {
+              if (!map.getLayer("3d-buildings")) {
+                map.addLayer(
+                  {
+                    id: "3d-buildings",
+                    source: "composite",
+                    "source-layer": "building",
+                    filter: ["==", "extrude", "true"],
+                    type: "fill-extrusion",
+                    minzoom: 14,
+                    paint: {
+                      "fill-extrusion-color": "#E8E1D6",
+                      "fill-extrusion-height": [
+                        "interpolate", ["linear"], ["zoom"],
+                        14, 0, 15.5, ["get", "height"],
+                      ],
+                      "fill-extrusion-base": [
+                        "interpolate", ["linear"], ["zoom"],
+                        14, 0, 15.5, ["get", "min_height"],
+                      ],
+                      "fill-extrusion-opacity": 0.85,
+                    },
+                  },
+                  labelId,
+                );
+              }
+            } catch (err) {
+              console.warn("[MapView] 3d-buildings layer skipped", err);
+            }
 
-          if (!map.getLayer("3d-buildings")) {
-            map.addLayer(
-              {
-                id: "3d-buildings",
-                source: "composite",
-                "source-layer": "building",
-                filter: ["==", "extrude", "true"],
-                type: "fill-extrusion",
-                minzoom: 14,
+            if (!map.getSource("segments")) {
+              map.addSource("segments", {
+                type: "geojson",
+                data: { type: "FeatureCollection", features: [] },
+                promoteId: "segmentId",
+              });
+            }
+
+            const colorExpr: any = [
+              "match", ["get", "color"],
+              "green", COLOR_HEX.green,
+              "yellow", COLOR_HEX.yellow,
+              "red", COLOR_HEX.red,
+              COLOR_HEX.green,
+            ];
+            const widthExpr: any = [
+              "interpolate", ["linear"], ["zoom"],
+              13, 1.8, 15, 3.5, 16, 4.5, 17, 6, 18, 8, 19, 11,
+            ];
+            const offsetBase: any = [
+              "interpolate", ["linear"], ["zoom"],
+              13, 2, 15, 5, 16, 7, 17, 10, 18, 14, 19, 20,
+            ];
+
+            const addSeg = (id: string, side: "left" | "right", sign: 1 | -1) => {
+              if (map.getLayer(id)) return;
+              const layer: any = {
+                id,
+                type: "line",
+                source: "segments",
+                filter: ["any", ["==", ["get", "side"], side], ["==", ["get", "side"], "both"]],
+                layout: { "line-cap": "round", "line-join": "round" },
                 paint: {
-                  "fill-extrusion-color": "#E8E1D6",
-                  "fill-extrusion-height": [
-                    "interpolate", ["linear"], ["zoom"],
-                    14, 0, 15.5, ["get", "height"],
-                  ],
-                  "fill-extrusion-base": [
-                    "interpolate", ["linear"], ["zoom"],
-                    14, 0, 15.5, ["get", "min_height"],
-                  ],
-                  "fill-extrusion-opacity": 0.85,
+                  "line-color": colorExpr,
+                  "line-width": widthExpr,
+                  "line-offset": sign === -1 ? ["*", offsetBase, -1] : offsetBase,
+                  "line-opacity": 1,
                 },
-              },
-              labelId,
-            );
-          }
+              };
+              if (labelId && map.getLayer(labelId)) map.addLayer(layer, labelId);
+              else map.addLayer(layer);
+            };
+            addSeg("seg-left", "left", -1);
+            addSeg("seg-right", "right", 1);
 
-          // Parking segment source + curb-offset line layers per side.
-          if (!map.getSource("segments")) {
-            map.addSource("segments", {
-              type: "geojson",
-              data: { type: "FeatureCollection", features: [] },
-              promoteId: "segmentId",
+            map.on("click", ["seg-left", "seg-right"] as any, (e: any) => {
+              const f = e.features?.[0];
+              const id = f?.properties?.segmentId as string | undefined;
+              if (id) selectSegment(id);
             });
-          }
 
-          const colorExpr: any = [
-            "match", ["get", "color"],
-            "green", COLOR_HEX.green,
-            "yellow", COLOR_HEX.yellow,
-            "red", COLOR_HEX.red,
-            COLOR_HEX.green,
-          ];
-          // Thicker, saturated curb stripes — matches ParkUsher rendering.
-          const widthExpr: any = [
-            "interpolate", ["linear"], ["zoom"],
-            13, 1.8,
-            15, 3.5,
-            16, 4.5,
-            17, 6,
-            18, 8,
-            19, 11,
-          ];
-          // Push lines out to the curb edge (further than lane center).
-          const offsetBase: any = [
-            "interpolate", ["linear"], ["zoom"],
-            13, 2,
-            15, 5,
-            16, 7,
-            17, 10,
-            18, 14,
-            19, 20,
-          ];
-
-          // LEFT side: negative offset. Insert BELOW road labels so street
-          // names remain readable on top of the colored curb lines.
-          map.addLayer({
-            id: "seg-left",
-            type: "line",
-            source: "segments",
-            filter: ["any", ["==", ["get", "side"], "left"], ["==", ["get", "side"], "both"]],
-            layout: { "line-cap": "round", "line-join": "round" },
-            paint: {
-              "line-color": colorExpr,
-              "line-width": widthExpr,
-              "line-offset": ["*", offsetBase, -1],
-              "line-opacity": 1,
-            },
-          }, labelId);
-
-          // RIGHT side: positive offset.
-          map.addLayer({
-            id: "seg-right",
-            type: "line",
-            source: "segments",
-            filter: ["any", ["==", ["get", "side"], "right"], ["==", ["get", "side"], "both"]],
-            layout: { "line-cap": "round", "line-join": "round" },
-            paint: {
-              "line-color": colorExpr,
-              "line-width": widthExpr,
-              "line-offset": offsetBase,
-              "line-opacity": 1,
-            },
-          }, labelId);
 
           map.on("click", ["seg-left", "seg-right"] as any, (e: any) => {
             const f = e.features?.[0];
