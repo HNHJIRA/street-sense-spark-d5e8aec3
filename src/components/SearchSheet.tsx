@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { X, Search, MapPin } from "lucide-react";
+import { X, Search, MapPin, Loader2 } from "lucide-react";
 import { useAppStore } from "@/stores/app-store";
 
 interface MapboxFeature {
@@ -9,7 +9,9 @@ interface MapboxFeature {
   center: [number, number];
 }
 
-const SEATTLE_BBOX = "-122.459,47.481,-122.224,47.734";
+// Seattle center — used as a proximity bias so local matches rank first
+// (NOT as a hard bbox, so users can still search anything).
+const SEATTLE_PROX = "-122.3321,47.6062";
 
 export function SearchSheet({ token }: { token: string }) {
   const open = useAppStore((s) => s.searchOpen);
@@ -17,20 +19,36 @@ export function SearchSheet({ token }: { token: string }) {
   const setFlyTo = useAppStore((s) => s.setFlyTo);
   const [q, setQ] = useState("");
   const [results, setResults] = useState<MapboxFeature[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
+    if (q.trim().length < 2) {
+      setResults([]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+    const ctl = new AbortController();
+    setLoading(true);
     const t = setTimeout(async () => {
-      if (q.trim().length < 2) {
+      try {
+        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(q)}.json?access_token=${token}&proximity=${SEATTLE_PROX}&limit=6&types=address,poi,place,neighborhood,locality`;
+        const res = await fetch(url, { signal: ctl.signal });
+        if (!res.ok) throw new Error(`Mapbox ${res.status}`);
+        const json = (await res.json()) as { features?: MapboxFeature[] };
+        setResults(json.features ?? []);
+        setError(null);
+      } catch (e) {
+        if ((e as Error).name === "AbortError") return;
+        setError((e as Error).message);
         setResults([]);
-        return;
+      } finally {
+        setLoading(false);
       }
-      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(q)}.json?access_token=${token}&bbox=${SEATTLE_BBOX}&limit=6`;
-      const res = await fetch(url);
-      const json = (await res.json()) as { features?: MapboxFeature[] };
-      setResults(json.features ?? []);
-    }, 200);
-    return () => clearTimeout(t);
+    }, 250);
+    return () => { ctl.abort(); clearTimeout(t); };
   }, [q, open, token]);
 
   if (!open) return null;
