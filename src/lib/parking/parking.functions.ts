@@ -354,12 +354,7 @@ export const importOsmStreets = createServerFn({ method: "POST" })
     );
     if (ways.length === 0) {
       try {
-        const res = await fetch(
-          `https://api.openstreetmap.org/api/0.6/map?bbox=${data.minLng},${data.minLat},${data.maxLng},${data.maxLat}`,
-          { headers: { Accept: "application/xml" } },
-        );
-        if (!res.ok) throw new Error(`OSM ${res.status}`);
-        ways = parseOsmXml(await res.text());
+        ways = await fetchOsmMapSplit(data.minLng, data.minLat, data.maxLng, data.maxLat);
       } catch (e) {
         if (!json) throw new Error(`OSM unavailable: ${lastErr || (e as Error).message}`);
       }
