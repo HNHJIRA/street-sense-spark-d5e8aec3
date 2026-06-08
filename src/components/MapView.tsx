@@ -312,9 +312,14 @@ export function MapView({ token, city }: MapViewProps) {
 
 
         map.on("moveend", () => {
+          const c = map.getCenter();
+          setMapCenter({ lng: c.lng, lat: c.lat });
           window.clearTimeout(moveTimer);
           moveTimer = window.setTimeout(() => { void loadBbox(); }, 350);
         });
+        // Seed map center for tap-to-query fallback before any move occurs.
+        const c0 = map.getCenter();
+        setMapCenter({ lng: c0.lng, lat: c0.lat });
         // Note: an additional non-fatal error logger is wired earlier; the
         // 401 token failure surfaces a friendly fallback UI.
         map.on("error", (e: any) => {
