@@ -59,7 +59,7 @@ export function MapView({ token, city }: MapViewProps) {
 
   const queryClient = useQueryClient();
   const fetchSegments = useServerFn(getSegmentsInBbox);
-  const runImport = useServerFn(importOsmStreets);
+  const runImport = useServerFn(importSeattleBlockface);
 
   const selectSegment = useAppStore((s) => s.selectSegment);
   const flyTo = useAppStore((s) => s.flyTo);
