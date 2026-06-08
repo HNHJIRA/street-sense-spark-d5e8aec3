@@ -46,6 +46,7 @@ export function MapView({ token, city }: MapViewProps) {
   const featuresRef = useRef<Map<string, Feature<LineString>>>(new Map());
   const importingRef = useRef(false);
   const lastFetchKeyRef = useRef<string>("");
+  const webglOk = typeof window !== "undefined" && mapboxgl.supported();
 
   const queryClient = useQueryClient();
   const fetchSegments = useServerFn(getSegmentsInBbox);
