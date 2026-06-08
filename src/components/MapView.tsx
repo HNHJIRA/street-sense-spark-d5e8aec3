@@ -109,7 +109,7 @@ export function MapView({ token, city }: MapViewProps) {
 
   // Init map once
   useEffect(() => {
-    if (!container.current || mapRef.current) return;
+    if (!container.current || mapRef.current || !webglOk) return;
     mapboxgl.accessToken = token;
     const map = new mapboxgl.Map({
       container: container.current,
