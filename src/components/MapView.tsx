@@ -122,17 +122,27 @@ export function MapView({ token, city }: MapViewProps) {
       try {
         const L = await import("leaflet");
         if (!container.current || mapRef.current || disposed) return;
+        // Seattle parking-area bounds (SW, NE). Pan/zoom is clamped to this box.
+        const SEATTLE_BOUNDS = L.latLngBounds(
+          L.latLng(47.481, -122.459),
+          L.latLng(47.734, -122.224),
+        );
+
         const map = L.map(container.current, {
-        center: [city.center[1], city.center[0]],
-        zoom: Math.max(15, city.default_zoom),
-        zoomControl: false,
-        attributionControl: false,
-      });
+          center: [city.center[1], city.center[0]],
+          zoom: Math.max(15, city.default_zoom),
+          zoomControl: false,
+          attributionControl: false,
+          maxBounds: SEATTLE_BOUNDS,
+          maxBoundsViscosity: 1.0, // hard stop at the boundary
+          minZoom: 12,
+          maxZoom: 19,
+        });
 
         L.control.zoom({ position: "topright" }).addTo(map);
         L.tileLayer(
           `https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/512/{z}/{x}/{y}@2x?access_token=${token}`,
-          { tileSize: 512, zoomOffset: -1, maxZoom: 20 },
+          { tileSize: 512, zoomOffset: -1, maxZoom: 20, bounds: SEATTLE_BOUNDS },
         ).addTo(map);
 
         segmentLayerRef.current = L.geoJSON(undefined, {
