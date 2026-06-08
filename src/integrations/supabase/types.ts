@@ -597,6 +597,24 @@ export type Database = {
       }
       postgis_version: { Args: never; Returns: string }
       postgis_wagyu_version: { Args: never; Returns: string }
+      segments_in_bbox: {
+        Args: {
+          p_city_id: string
+          p_max_lat: number
+          p_max_lng: number
+          p_min_lat: number
+          p_min_lng: number
+        }
+        Returns: {
+          color: string
+          geojson: string
+          id: string
+          label: string
+          name: string
+          restriction_code: string
+          side: string
+        }[]
+      }
       st_3dclosestpoint: {
         Args: { geom1: unknown; geom2: unknown }
         Returns: unknown
