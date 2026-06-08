@@ -245,22 +245,21 @@ export function MapView({ token, city }: MapViewProps) {
               if (id) selectSegment(id);
             });
 
+            for (const id of ["seg-left", "seg-right"]) {
+              map.on("mouseenter", id, () => { map.getCanvas().style.cursor = "pointer"; });
+              map.on("mouseleave", id, () => { map.getCanvas().style.cursor = ""; });
+            }
 
-          map.on("click", ["seg-left", "seg-right"] as any, (e: any) => {
-            const f = e.features?.[0];
-            const id = f?.properties?.segmentId as string | undefined;
-            if (id) selectSegment(id);
-          });
-          for (const id of ["seg-left", "seg-right"]) {
-            map.on("mouseenter", id, () => { map.getCanvas().style.cursor = "pointer"; });
-            map.on("mouseleave", id, () => { map.getCanvas().style.cursor = ""; });
+            mapRef.current = map;
+            setReady(true);
+            updateSource();
+            void loadBbox();
+          } catch (err) {
+            console.error("[MapView] style.load handler failed", err);
+            setMapError(true);
           }
-
-          mapRef.current = map;
-          setReady(true);
-          updateSource();
-          void loadBbox();
         });
+
 
         map.on("moveend", () => {
           window.clearTimeout(moveTimer);
