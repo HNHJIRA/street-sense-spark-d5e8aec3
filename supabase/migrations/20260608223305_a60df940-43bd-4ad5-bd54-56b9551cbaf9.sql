@@ -1,0 +1,2 @@
+ALTER TABLE public.street_segments DROP CONSTRAINT IF EXISTS street_segments_side_check;
+ALTER TABLE public.street_segments ADD CONSTRAINT street_segments_side_check CHECK (side = ANY (ARRAY['left'::text, 'right'::text, 'both'::text]));
