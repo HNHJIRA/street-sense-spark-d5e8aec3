@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
 import { getCityInfo, getMapboxToken } from "@/lib/parking/parking.functions";
@@ -56,18 +56,20 @@ export const Route = createFileRoute("/")({
 function HomePage() {
   const cityQuery = useSuspenseQuery(cityOpts);
   const tokenQuery = useSuspenseQuery(tokenOpts);
+  const [now, setNow] = useState<Date | null>(null);
 
   const forecastAt = useAppStore((s) => s.forecastAt);
   const tick = useAppStore((s) => s.tick);
   const bumpTick = useAppStore((s) => s.bumpTick);
 
   useEffect(() => {
+    setNow(new Date());
     if (forecastAt) return;
     const id = window.setInterval(bumpTick, 60_000);
     return () => window.clearInterval(id);
   }, [forecastAt, bumpTick]);
 
-  const now = forecastAt ?? new Date();
+  const displayTime = forecastAt ?? now;
   void tick;
   const city = cityQuery.data;
 
@@ -76,7 +78,7 @@ function HomePage() {
       <MapView token={tokenQuery.data.token} city={city} />
       <TopBar
         cityName={city.name}
-        now={now}
+        now={displayTime}
         timezone={city.timezone}
         isForecast={!!forecastAt}
       />
