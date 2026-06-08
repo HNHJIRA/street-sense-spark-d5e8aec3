@@ -1214,6 +1214,13 @@ export type Database = {
         }
         Returns: string
       }
+      upsert_osm_segments: {
+        Args: { p_rows: Json }
+        Returns: {
+          external_id: string
+          id: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
