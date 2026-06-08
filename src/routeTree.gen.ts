@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SessionRouteImport } from './routes/session'
 import { Route as SavedRouteImport } from './routes/saved'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as AdminRouteImport } from './routes/admin'
@@ -20,6 +21,11 @@ import { Route as AdminProviderSyncRouteImport } from './routes/admin.provider-s
 import { Route as AdminHealthRouteImport } from './routes/admin.health'
 import { Route as AdminForecastRouteImport } from './routes/admin.forecast'
 
+const SessionRoute = SessionRouteImport.update({
+  id: '/session',
+  path: '/session',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SavedRoute = SavedRouteImport.update({
   id: '/saved',
   path: '/saved',
@@ -76,6 +82,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/profile': typeof ProfileRoute
   '/saved': typeof SavedRoute
+  '/session': typeof SessionRoute
   '/admin/forecast': typeof AdminForecastRoute
   '/admin/health': typeof AdminHealthRoute
   '/admin/provider-sync': typeof AdminProviderSyncRoute
@@ -87,6 +94,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/profile': typeof ProfileRoute
   '/saved': typeof SavedRoute
+  '/session': typeof SessionRoute
   '/admin/forecast': typeof AdminForecastRoute
   '/admin/health': typeof AdminHealthRoute
   '/admin/provider-sync': typeof AdminProviderSyncRoute
@@ -100,6 +108,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/profile': typeof ProfileRoute
   '/saved': typeof SavedRoute
+  '/session': typeof SessionRoute
   '/admin/forecast': typeof AdminForecastRoute
   '/admin/health': typeof AdminHealthRoute
   '/admin/provider-sync': typeof AdminProviderSyncRoute
@@ -114,6 +123,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/profile'
     | '/saved'
+    | '/session'
     | '/admin/forecast'
     | '/admin/health'
     | '/admin/provider-sync'
@@ -125,6 +135,7 @@ export interface FileRouteTypes {
     | '/'
     | '/profile'
     | '/saved'
+    | '/session'
     | '/admin/forecast'
     | '/admin/health'
     | '/admin/provider-sync'
@@ -137,6 +148,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/profile'
     | '/saved'
+    | '/session'
     | '/admin/forecast'
     | '/admin/health'
     | '/admin/provider-sync'
@@ -150,11 +162,19 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRouteWithChildren
   ProfileRoute: typeof ProfileRoute
   SavedRoute: typeof SavedRoute
+  SessionRoute: typeof SessionRoute
   DebugParkingRoute: typeof DebugParkingRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/session': {
+      id: '/session'
+      path: '/session'
+      fullPath: '/session'
+      preLoaderRoute: typeof SessionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/saved': {
       id: '/saved'
       path: '/saved'
@@ -251,8 +271,19 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRouteWithChildren,
   ProfileRoute: ProfileRoute,
   SavedRoute: SavedRoute,
+  SessionRoute: SessionRoute,
   DebugParkingRoute: DebugParkingRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
