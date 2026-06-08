@@ -408,10 +408,10 @@ export const importOsmStreets = createServerFn({ method: "POST" })
       // so we use a custom SQL RPC.
       const { data: ins, error } = await admin.rpc("upsert_osm_segments", { p_rows: chunk });
       if (error) return { imported, skipped: ways.length - imported, error: `Street import failed: ${(error as { message?: string }).message}` };
-      const rows = (ins ?? []) as Array<{ id: string; external_id: string }>;
+      const rows = (ins ?? []) as Array<{ segment_id: string; segment_external_id: string }>;
       for (const r of rows) {
-        const c = classMap.get(r.external_id);
-        if (c) insertedIds.push({ id: r.id, external_id: r.external_id, classification: c });
+        const c = classMap.get(r.segment_external_id);
+        if (c) insertedIds.push({ id: r.segment_id, external_id: r.segment_external_id, classification: c });
       }
       imported += rows.length;
     }

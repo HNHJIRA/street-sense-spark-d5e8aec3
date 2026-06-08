@@ -1217,8 +1217,8 @@ export type Database = {
       upsert_osm_segments: {
         Args: { p_rows: Json }
         Returns: {
-          external_id: string
-          id: string
+          segment_external_id: string
+          segment_id: string
         }[]
       }
     }
