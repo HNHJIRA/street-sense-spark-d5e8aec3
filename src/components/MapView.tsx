@@ -187,7 +187,7 @@ export function MapView({ token, city }: MapViewProps) {
 
   return (
     <>
-      <div ref={container} className="absolute inset-0" />
+      <div ref={container} className="absolute inset-0 z-0 isolate" />
       {mapError && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-background p-6 text-center">
           <div className="max-w-sm">
