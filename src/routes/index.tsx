@@ -75,20 +75,23 @@ function HomePage() {
   const city = cityQuery.data;
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-background">
-      <MapView token={tokenQuery.data.token} city={city} />
-      <TopBar
-        cityName={city.name}
-        now={displayTime}
-        timezone={city.timezone}
-        isForecast={!!forecastAt}
-      />
-      <Legend />
-      <ParkHereButton cityId={city.id} />
-      <BottomNav />
-      <SearchSheet token={tokenQuery.data.token} />
-      <ForecastSheet />
-      <StreetSheet timezone={city.timezone} restrictionTypes={city.restrictionTypes} />
+    <div className="relative h-screen w-screen overflow-hidden bg-black">
+      {/* Mobile phone frame — constrains the map and all overlays to a phone-width column on larger screens. */}
+      <div className="relative mx-auto h-full w-full max-w-md overflow-hidden bg-background shadow-2xl">
+        <MapView token={tokenQuery.data.token} city={city} />
+        <TopBar
+          cityName={city.name}
+          now={displayTime}
+          timezone={city.timezone}
+          isForecast={!!forecastAt}
+        />
+        <Legend />
+        <ParkHereButton cityId={city.id} />
+        <BottomNav />
+        <SearchSheet token={tokenQuery.data.token} />
+        <ForecastSheet />
+        <StreetSheet timezone={city.timezone} restrictionTypes={city.restrictionTypes} />
+      </div>
     </div>
   );
 }
@@ -96,7 +99,7 @@ function HomePage() {
 function Legend() {
   return (
     <div
-      className="pointer-events-none fixed left-1/2 z-10 -translate-x-1/2"
+      className="pointer-events-none absolute left-1/2 z-10 -translate-x-1/2"
       style={{ bottom: "calc(var(--safe-bottom) + 11rem)" }}
     >
       <div className="flex items-center gap-3 rounded-full border border-border bg-surface/85 px-4 py-2 backdrop-blur-xl">

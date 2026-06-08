@@ -19,7 +19,7 @@ export function TopBar({ cityName, now, timezone, isForecast }: TopBarProps) {
   const clearForecast = useAppStore((s) => s.setForecastAt);
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-0 z-20 safe-top safe-x">
+    <div className="pointer-events-none absolute inset-x-0 top-0 z-20 safe-top safe-x">
       <div className="mx-auto flex max-w-md items-center gap-2 px-3 pt-2">
         <div className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-border bg-surface/90 px-3 py-1.5 backdrop-blur-xl shadow-lg">
           <MapPin className="h-3.5 w-3.5 text-primary" strokeWidth={2.4} />

@@ -48,7 +48,7 @@ export function ParkHereButton({ cityId }: Props) {
   return (
     <>
       <div
-        className="pointer-events-none fixed inset-x-0 z-20 safe-x"
+        className="pointer-events-none absolute inset-x-0 z-20 safe-x"
         style={{ bottom: "calc(var(--safe-bottom) + 7rem)" }}
       >
         <div className="mx-auto flex max-w-md justify-center px-3">
@@ -71,10 +71,10 @@ export function ParkHereButton({ cityId }: Props) {
       {result && (
         <>
           <div
-            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+            className="absolute inset-0 z-40 bg-black/40 backdrop-blur-sm"
             onClick={() => setResult(null)}
           />
-          <div className="fixed inset-x-0 bottom-0 z-50 safe-bottom animate-in slide-in-from-bottom duration-200">
+          <div className="absolute inset-x-0 bottom-0 z-50 safe-bottom animate-in slide-in-from-bottom duration-200">
             <div className="mx-auto max-w-md px-3 pb-3">
               <div className="rounded-3xl border border-border bg-elevated p-5 shadow-2xl">
                 <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-muted" />
