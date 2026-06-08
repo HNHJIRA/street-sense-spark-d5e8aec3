@@ -8,7 +8,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Sliders, Info, LocateFixed, Plus, Minus } from "lucide-react";
 import {
   getSegmentsInBbox,
-  importOsmStreets,
+  importSeattleBlockface,
   type CityInfo,
   type SegmentLite,
 } from "@/lib/parking/parking.functions";
@@ -59,7 +59,7 @@ export function MapView({ token, city }: MapViewProps) {
 
   const queryClient = useQueryClient();
   const fetchSegments = useServerFn(getSegmentsInBbox);
-  const runImport = useServerFn(importOsmStreets);
+  const runImport = useServerFn(importSeattleBlockface);
 
   const selectSegment = useAppStore((s) => s.selectSegment);
   const flyTo = useAppStore((s) => s.flyTo);
@@ -104,7 +104,7 @@ export function MapView({ token, city }: MapViewProps) {
       try {
         const res = await runImport({ data: { citySlug: city.slug, minLng, minLat, maxLng, maxLat } });
         if (res.error) { toast.message(res.error, { id }); return; }
-        toast.success(`Imported ${res.imported} streets`, { id });
+        toast.success(`Loaded ${res.imported} blockfaces`, { id });
         lastFetchKeyRef.current = "";
         await queryClient.invalidateQueries({ queryKey: ["segments", city.id] });
         await loadBbox();
