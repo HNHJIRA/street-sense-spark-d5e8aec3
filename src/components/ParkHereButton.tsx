@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CircleCheck, CircleX, Loader2, Navigation, TriangleAlert, MapPin, Clock } from "lucide-react";
+import { CircleCheck, CircleX, Loader2, Navigation, TriangleAlert, MapPin, Clock, ScanLine } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { checkParkingHere, type ParkHereResult } from "@/lib/parking/parking.functions";
