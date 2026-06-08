@@ -75,20 +75,23 @@ function HomePage() {
   const city = cityQuery.data;
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-background">
-      <MapView token={tokenQuery.data.token} city={city} />
-      <TopBar
-        cityName={city.name}
-        now={displayTime}
-        timezone={city.timezone}
-        isForecast={!!forecastAt}
-      />
-      <Legend />
-      <ParkHereButton cityId={city.id} />
-      <BottomNav />
-      <SearchSheet token={tokenQuery.data.token} />
-      <ForecastSheet />
-      <StreetSheet timezone={city.timezone} restrictionTypes={city.restrictionTypes} />
+    <div className="relative h-screen w-screen overflow-hidden bg-black">
+      {/* Mobile phone frame — constrains the map and all overlays to a phone-width column on larger screens. */}
+      <div className="relative mx-auto h-full w-full max-w-md overflow-hidden bg-background shadow-2xl">
+        <MapView token={tokenQuery.data.token} city={city} />
+        <TopBar
+          cityName={city.name}
+          now={displayTime}
+          timezone={city.timezone}
+          isForecast={!!forecastAt}
+        />
+        <Legend />
+        <ParkHereButton cityId={city.id} />
+        <BottomNav />
+        <SearchSheet token={tokenQuery.data.token} />
+        <ForecastSheet />
+        <StreetSheet timezone={city.timezone} restrictionTypes={city.restrictionTypes} />
+      </div>
     </div>
   );
 }
