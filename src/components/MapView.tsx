@@ -190,5 +190,20 @@ export function MapView({ token, city }: MapViewProps) {
     setFlyTo(null);
   }, [flyTo, setFlyTo]);
 
-  return <div ref={container} className="absolute inset-0" />;
+  return (
+    <>
+      <div ref={container} className="absolute inset-0" />
+      {!webglOk && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-background p-6 text-center">
+          <div className="max-w-sm">
+            <h2 className="font-display text-lg font-bold">Map can't render here</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Your browser or this preview iframe has WebGL disabled. Open the preview in a new tab
+              (or use Chrome / Safari with hardware acceleration on) to see the parking map.
+            </p>
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
