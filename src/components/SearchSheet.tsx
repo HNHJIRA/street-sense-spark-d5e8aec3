@@ -79,6 +79,17 @@ export function SearchSheet({ token }: { token: string }) {
                   Try "Space Needle", "Pike Place Market", or an address.
                 </div>
               )}
+              {loading && (
+                <div className="flex items-center gap-2 px-2 py-3 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Searching…
+                </div>
+              )}
+              {!loading && error && (
+                <div className="px-2 py-3 text-xs text-park-red">Couldn't search: {error}</div>
+              )}
+              {!loading && !error && q.trim().length >= 2 && results.length === 0 && (
+                <div className="px-2 py-3 text-xs text-muted-foreground">No matches for "{q}".</div>
+              )}
               {results.map((f) => (
                 <button
                   key={f.id}
