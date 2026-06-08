@@ -11,8 +11,14 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SavedRouteImport } from './routes/saved'
 import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as DebugParkingRouteImport } from './routes/debug.parking'
+import { Route as AdminValidationRouteImport } from './routes/admin.validation'
+import { Route as AdminProviderSyncRouteImport } from './routes/admin.provider-sync'
+import { Route as AdminHealthRouteImport } from './routes/admin.health'
+import { Route as AdminForecastRouteImport } from './routes/admin.forecast'
 
 const SavedRoute = SavedRouteImport.update({
   id: '/saved',
@@ -24,46 +30,124 @@ const ProfileRoute = ProfileRouteImport.update({
   path: '/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
 } as any)
 const DebugParkingRoute = DebugParkingRouteImport.update({
   id: '/debug/parking',
   path: '/debug/parking',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminValidationRoute = AdminValidationRouteImport.update({
+  id: '/validation',
+  path: '/validation',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminProviderSyncRoute = AdminProviderSyncRouteImport.update({
+  id: '/provider-sync',
+  path: '/provider-sync',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminHealthRoute = AdminHealthRouteImport.update({
+  id: '/health',
+  path: '/health',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminForecastRoute = AdminForecastRouteImport.update({
+  id: '/forecast',
+  path: '/forecast',
+  getParentRoute: () => AdminRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/profile': typeof ProfileRoute
   '/saved': typeof SavedRoute
+  '/admin/forecast': typeof AdminForecastRoute
+  '/admin/health': typeof AdminHealthRoute
+  '/admin/provider-sync': typeof AdminProviderSyncRoute
+  '/admin/validation': typeof AdminValidationRoute
   '/debug/parking': typeof DebugParkingRoute
+  '/admin/': typeof AdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/profile': typeof ProfileRoute
   '/saved': typeof SavedRoute
+  '/admin/forecast': typeof AdminForecastRoute
+  '/admin/health': typeof AdminHealthRoute
+  '/admin/provider-sync': typeof AdminProviderSyncRoute
+  '/admin/validation': typeof AdminValidationRoute
   '/debug/parking': typeof DebugParkingRoute
+  '/admin': typeof AdminIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/profile': typeof ProfileRoute
   '/saved': typeof SavedRoute
+  '/admin/forecast': typeof AdminForecastRoute
+  '/admin/health': typeof AdminHealthRoute
+  '/admin/provider-sync': typeof AdminProviderSyncRoute
+  '/admin/validation': typeof AdminValidationRoute
   '/debug/parking': typeof DebugParkingRoute
+  '/admin/': typeof AdminIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/profile' | '/saved' | '/debug/parking'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/profile'
+    | '/saved'
+    | '/admin/forecast'
+    | '/admin/health'
+    | '/admin/provider-sync'
+    | '/admin/validation'
+    | '/debug/parking'
+    | '/admin/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/profile' | '/saved' | '/debug/parking'
-  id: '__root__' | '/' | '/profile' | '/saved' | '/debug/parking'
+  to:
+    | '/'
+    | '/profile'
+    | '/saved'
+    | '/admin/forecast'
+    | '/admin/health'
+    | '/admin/provider-sync'
+    | '/admin/validation'
+    | '/debug/parking'
+    | '/admin'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/profile'
+    | '/saved'
+    | '/admin/forecast'
+    | '/admin/health'
+    | '/admin/provider-sync'
+    | '/admin/validation'
+    | '/debug/parking'
+    | '/admin/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRouteWithChildren
   ProfileRoute: typeof ProfileRoute
   SavedRoute: typeof SavedRoute
   DebugParkingRoute: typeof DebugParkingRoute
@@ -85,12 +169,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/debug/parking': {
       id: '/debug/parking'
@@ -99,11 +197,58 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DebugParkingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/validation': {
+      id: '/admin/validation'
+      path: '/validation'
+      fullPath: '/admin/validation'
+      preLoaderRoute: typeof AdminValidationRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/provider-sync': {
+      id: '/admin/provider-sync'
+      path: '/provider-sync'
+      fullPath: '/admin/provider-sync'
+      preLoaderRoute: typeof AdminProviderSyncRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/health': {
+      id: '/admin/health'
+      path: '/health'
+      fullPath: '/admin/health'
+      preLoaderRoute: typeof AdminHealthRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/forecast': {
+      id: '/admin/forecast'
+      path: '/forecast'
+      fullPath: '/admin/forecast'
+      preLoaderRoute: typeof AdminForecastRouteImport
+      parentRoute: typeof AdminRoute
+    }
   }
 }
 
+interface AdminRouteChildren {
+  AdminForecastRoute: typeof AdminForecastRoute
+  AdminHealthRoute: typeof AdminHealthRoute
+  AdminProviderSyncRoute: typeof AdminProviderSyncRoute
+  AdminValidationRoute: typeof AdminValidationRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminForecastRoute: AdminForecastRoute,
+  AdminHealthRoute: AdminHealthRoute,
+  AdminProviderSyncRoute: AdminProviderSyncRoute,
+  AdminValidationRoute: AdminValidationRoute,
+  AdminIndexRoute: AdminIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRouteWithChildren,
   ProfileRoute: ProfileRoute,
   SavedRoute: SavedRoute,
   DebugParkingRoute: DebugParkingRoute,

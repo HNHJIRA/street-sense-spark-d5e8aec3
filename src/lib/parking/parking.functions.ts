@@ -377,12 +377,13 @@ export const syncProvider = createServerFn({ method: "POST" })
       citySlug: z.string().min(1).max(64),
       minLng: z.number(), minLat: z.number(),
       maxLng: z.number(), maxLat: z.number(),
+      force: z.boolean().optional(),
     }).parse(input),
   )
   .handler(async ({ data }): Promise<SyncRunResult> => {
     const w = Math.abs(data.maxLng - data.minLng);
     const h = Math.abs(data.maxLat - data.minLat);
-    if (w * h > 0.05) return { imported: 0, skipped: 0, provider: "unknown", error: "Zoom in to load detailed street data." };
+    if (!data.force && w * h > 0.05) return { imported: 0, skipped: 0, provider: "unknown", error: "Zoom in to load detailed street data." };
 
     const { getProviderForCity } = await import("./providers/registry.server");
     const provider = getProviderForCity(data.citySlug);
