@@ -131,7 +131,7 @@ export function MapView({ token, city }: MapViewProps) {
 
         L.control.zoom({ position: "topright" }).addTo(map);
         L.tileLayer(
-          `https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/512/{z}/{x}/{y}@2x?access_token=${token}`,
+          `https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/512/{z}/{x}/{y}@2x?access_token=${token}`,
           { tileSize: 512, zoomOffset: -1, maxZoom: 20 },
         ).addTo(map);
 
