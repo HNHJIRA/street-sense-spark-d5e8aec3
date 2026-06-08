@@ -4,6 +4,7 @@
 // these collections into per-user tables.
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import { DEFAULT_ALERT_SETTINGS, type AlertSettings, type AlertType } from "@/lib/parking/alerts";
 
 export interface SavedSpot {
   id: string;
