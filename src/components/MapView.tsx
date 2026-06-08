@@ -268,8 +268,13 @@ export function MapView({ token, city }: MapViewProps) {
 
             mapRef.current = map;
             setReady(true);
+            // Force resize in case the container measured 0px during construction
+            // (e.g., suspense fallback flicker). Tiles only fetch once sized.
+            window.requestAnimationFrame(() => map.resize());
+            window.setTimeout(() => map.resize(), 250);
             updateSource();
             void loadBbox();
+
           } catch (err) {
             console.error("[MapView] style.load handler failed", err);
             setMapError(true);
