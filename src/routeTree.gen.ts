@@ -18,9 +18,12 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as DebugParkingRouteImport } from './routes/debug.parking'
 import { Route as AdminValidationRouteImport } from './routes/admin.validation'
+import { Route as AdminReportsRouteImport } from './routes/admin.reports'
 import { Route as AdminProviderSyncRouteImport } from './routes/admin.provider-sync'
 import { Route as AdminHealthRouteImport } from './routes/admin.health'
 import { Route as AdminForecastRouteImport } from './routes/admin.forecast'
+import { Route as AdminBetaReadinessRouteImport } from './routes/admin.beta-readiness'
+import { Route as AdminAnalyticsRouteImport } from './routes/admin.analytics'
 
 const SessionRoute = SessionRouteImport.update({
   id: '/session',
@@ -67,6 +70,11 @@ const AdminValidationRoute = AdminValidationRouteImport.update({
   path: '/validation',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminReportsRoute = AdminReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminProviderSyncRoute = AdminProviderSyncRouteImport.update({
   id: '/provider-sync',
   path: '/provider-sync',
@@ -82,6 +90,16 @@ const AdminForecastRoute = AdminForecastRouteImport.update({
   path: '/forecast',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminBetaReadinessRoute = AdminBetaReadinessRouteImport.update({
+  id: '/beta-readiness',
+  path: '/beta-readiness',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAnalyticsRoute = AdminAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => AdminRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -90,9 +108,12 @@ export interface FileRoutesByFullPath {
   '/saved': typeof SavedRoute
   '/scan': typeof ScanRoute
   '/session': typeof SessionRoute
+  '/admin/analytics': typeof AdminAnalyticsRoute
+  '/admin/beta-readiness': typeof AdminBetaReadinessRoute
   '/admin/forecast': typeof AdminForecastRoute
   '/admin/health': typeof AdminHealthRoute
   '/admin/provider-sync': typeof AdminProviderSyncRoute
+  '/admin/reports': typeof AdminReportsRoute
   '/admin/validation': typeof AdminValidationRoute
   '/debug/parking': typeof DebugParkingRoute
   '/admin/': typeof AdminIndexRoute
@@ -103,9 +124,12 @@ export interface FileRoutesByTo {
   '/saved': typeof SavedRoute
   '/scan': typeof ScanRoute
   '/session': typeof SessionRoute
+  '/admin/analytics': typeof AdminAnalyticsRoute
+  '/admin/beta-readiness': typeof AdminBetaReadinessRoute
   '/admin/forecast': typeof AdminForecastRoute
   '/admin/health': typeof AdminHealthRoute
   '/admin/provider-sync': typeof AdminProviderSyncRoute
+  '/admin/reports': typeof AdminReportsRoute
   '/admin/validation': typeof AdminValidationRoute
   '/debug/parking': typeof DebugParkingRoute
   '/admin': typeof AdminIndexRoute
@@ -118,9 +142,12 @@ export interface FileRoutesById {
   '/saved': typeof SavedRoute
   '/scan': typeof ScanRoute
   '/session': typeof SessionRoute
+  '/admin/analytics': typeof AdminAnalyticsRoute
+  '/admin/beta-readiness': typeof AdminBetaReadinessRoute
   '/admin/forecast': typeof AdminForecastRoute
   '/admin/health': typeof AdminHealthRoute
   '/admin/provider-sync': typeof AdminProviderSyncRoute
+  '/admin/reports': typeof AdminReportsRoute
   '/admin/validation': typeof AdminValidationRoute
   '/debug/parking': typeof DebugParkingRoute
   '/admin/': typeof AdminIndexRoute
@@ -134,9 +161,12 @@ export interface FileRouteTypes {
     | '/saved'
     | '/scan'
     | '/session'
+    | '/admin/analytics'
+    | '/admin/beta-readiness'
     | '/admin/forecast'
     | '/admin/health'
     | '/admin/provider-sync'
+    | '/admin/reports'
     | '/admin/validation'
     | '/debug/parking'
     | '/admin/'
@@ -147,9 +177,12 @@ export interface FileRouteTypes {
     | '/saved'
     | '/scan'
     | '/session'
+    | '/admin/analytics'
+    | '/admin/beta-readiness'
     | '/admin/forecast'
     | '/admin/health'
     | '/admin/provider-sync'
+    | '/admin/reports'
     | '/admin/validation'
     | '/debug/parking'
     | '/admin'
@@ -161,9 +194,12 @@ export interface FileRouteTypes {
     | '/saved'
     | '/scan'
     | '/session'
+    | '/admin/analytics'
+    | '/admin/beta-readiness'
     | '/admin/forecast'
     | '/admin/health'
     | '/admin/provider-sync'
+    | '/admin/reports'
     | '/admin/validation'
     | '/debug/parking'
     | '/admin/'
@@ -244,6 +280,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminValidationRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/reports': {
+      id: '/admin/reports'
+      path: '/reports'
+      fullPath: '/admin/reports'
+      preLoaderRoute: typeof AdminReportsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/provider-sync': {
       id: '/admin/provider-sync'
       path: '/provider-sync'
@@ -265,21 +308,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminForecastRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/beta-readiness': {
+      id: '/admin/beta-readiness'
+      path: '/beta-readiness'
+      fullPath: '/admin/beta-readiness'
+      preLoaderRoute: typeof AdminBetaReadinessRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/analytics': {
+      id: '/admin/analytics'
+      path: '/analytics'
+      fullPath: '/admin/analytics'
+      preLoaderRoute: typeof AdminAnalyticsRouteImport
+      parentRoute: typeof AdminRoute
+    }
   }
 }
 
 interface AdminRouteChildren {
+  AdminAnalyticsRoute: typeof AdminAnalyticsRoute
+  AdminBetaReadinessRoute: typeof AdminBetaReadinessRoute
   AdminForecastRoute: typeof AdminForecastRoute
   AdminHealthRoute: typeof AdminHealthRoute
   AdminProviderSyncRoute: typeof AdminProviderSyncRoute
+  AdminReportsRoute: typeof AdminReportsRoute
   AdminValidationRoute: typeof AdminValidationRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminAnalyticsRoute: AdminAnalyticsRoute,
+  AdminBetaReadinessRoute: AdminBetaReadinessRoute,
   AdminForecastRoute: AdminForecastRoute,
   AdminHealthRoute: AdminHealthRoute,
   AdminProviderSyncRoute: AdminProviderSyncRoute,
+  AdminReportsRoute: AdminReportsRoute,
   AdminValidationRoute: AdminValidationRoute,
   AdminIndexRoute: AdminIndexRoute,
 }

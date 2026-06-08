@@ -10,6 +10,9 @@ const TABS = [
   { to: "/admin/provider-sync", label: "Provider Sync" },
   { to: "/admin/validation", label: "Validation" },
   { to: "/admin/forecast", label: "Forecast" },
+  { to: "/admin/analytics", label: "Analytics" },
+  { to: "/admin/reports", label: "Reports" },
+  { to: "/admin/beta-readiness", label: "Beta Readiness" },
 ] as const;
 
 function AdminLayout() {
