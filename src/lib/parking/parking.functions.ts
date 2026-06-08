@@ -501,3 +501,180 @@ export const importOsmStreets = createServerFn({ method: "POST" })
 
     return { imported, skipped: ways.length - imported };
   });
+
+// ---------- Seattle SDOT Blockface importer ----------
+// Pulls real on-street parking blockfaces from Seattle's official ArcGIS
+// FeatureServer (PARKING_CATEGORY per blockface). This is the same source
+// quality used by ParkUsher — every block has a classification, so the map
+// fills in end-to-end instead of the sparse OSM coverage.
+
+const SDOT_PARKING_CATEGORIES_URL =
+  "https://services.arcgis.com/ZOyb2t4B0UYuYNYH/arcgis/rest/services/Parking_Categories/FeatureServer/0/query";
+
+interface SdotProps {
+  OBJECTID: number;
+  UNITDESC?: string | null;
+  SIDE?: string | null;
+  PARKING_CATEGORY?: string | null;
+  TOTAL_SPACES?: number | null;
+}
+
+function sdotCategoryToCode(cat: string | null | undefined): { code: string; priority: number; notes: string } {
+  const c = (cat ?? "").trim().toLowerCase();
+  if (!c || c === "unrestricted parking" || c === "unrestricted")
+    return { code: "allowed", priority: 1000, notes: "Unrestricted on-street parking." };
+  if (c === "paid parking")
+    return { code: "metered", priority: 50, notes: "Paid / metered parking." };
+  if (c.includes("restricted parking zone") || c === "rpz")
+    return { code: "permit", priority: 50, notes: "Restricted Parking Zone (permit)." };
+  if (c.includes("time limited"))
+    return { code: "time_limited", priority: 60, notes: "Time-limited parking." };
+  if (c.includes("no parking"))
+    return { code: "no_parking", priority: 20, notes: "Posted: no parking." };
+  if (c.includes("bus"))
+    return { code: "bus_lane", priority: 15, notes: "Bus / transit zone." };
+  if (c.includes("load"))
+    return { code: "loading_zone", priority: 30, notes: "Loading zone." };
+  if (c.includes("carpool"))
+    return { code: "permit", priority: 50, notes: "Carpool parking." };
+  return { code: "allowed", priority: 1000, notes: cat ?? "On-street parking." };
+}
+
+function sdotSide(side: string | null | undefined): "left" | "right" {
+  const s = (side ?? "").toUpperCase();
+  if (s === "W" || s === "S") return "left";
+  return "right";
+}
+
+export const importSeattleBlockface = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z.object({
+      citySlug: z.string().min(1).max(64),
+      minLng: z.number(), minLat: z.number(),
+      maxLng: z.number(), maxLat: z.number(),
+    }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const w = Math.abs(data.maxLng - data.minLng);
+    const h = Math.abs(data.maxLat - data.minLat);
+    if (w * h > 0.05) return { imported: 0, skipped: 0, error: "Zoom in to load detailed street data." };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const admin = supabaseAdmin as unknown as {
+      from: (t: string) => any;
+      rpc: (n: string, a?: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
+    };
+
+    const { data: city } = await admin
+      .from("cities")
+      .select("id")
+      .eq("slug", data.citySlug)
+      .maybeSingle();
+    if (!city) throw new Error("City not found");
+
+    // Page through ArcGIS — default transfer cap is ~2000.
+    interface Feat { type: "Feature"; geometry: { type: "LineString"; coordinates: [number, number][] } | { type: "MultiLineString"; coordinates: [number, number][][] }; properties: SdotProps }
+    const features: Feat[] = [];
+    const pageSize = 2000;
+    for (let offset = 0; offset < 20000; offset += pageSize) {
+      const params = new URLSearchParams({
+        where: "1=1",
+        outFields: "OBJECTID,UNITDESC,SIDE,PARKING_CATEGORY,TOTAL_SPACES",
+        geometry: `${data.minLng},${data.minLat},${data.maxLng},${data.maxLat}`,
+        geometryType: "esriGeometryEnvelope",
+        inSR: "4326",
+        spatialRel: "esriSpatialRelIntersects",
+        outSR: "4326",
+        resultRecordCount: String(pageSize),
+        resultOffset: String(offset),
+        f: "geojson",
+      });
+      const res = await fetch(`${SDOT_PARKING_CATEGORIES_URL}?${params.toString()}`);
+      if (!res.ok) {
+        if (offset === 0) return { imported: 0, skipped: 0, error: `SDOT ${res.status}` };
+        break;
+      }
+      const json = await res.json() as { features?: Feat[]; properties?: { exceededTransferLimit?: boolean } };
+      const batch = json.features ?? [];
+      features.push(...batch);
+      if (batch.length < pageSize && !json.properties?.exceededTransferLimit) break;
+    }
+
+    if (features.length === 0) return { imported: 0, skipped: 0 };
+
+    type SegInsert = {
+      city_id: string;
+      external_id: string;
+      name: string;
+      side: string;
+      data_source: string;
+      geom: string;
+      metadata: Record<string, unknown>;
+    };
+    const classMap = new Map<string, ReturnType<typeof sdotCategoryToCode>>();
+    const segments: SegInsert[] = [];
+    for (const f of features) {
+      const p = f.properties ?? ({} as SdotProps);
+      const oid = p.OBJECTID;
+      if (!oid) continue;
+      // Normalize to a single LineString — pick the longest part of a MultiLineString.
+      let coords: [number, number][] = [];
+      if (f.geometry.type === "LineString") coords = f.geometry.coordinates;
+      else if (f.geometry.type === "MultiLineString") {
+        const parts = f.geometry.coordinates;
+        coords = parts.reduce((a, b) => (b.length > a.length ? b : a), parts[0] ?? []);
+      }
+      if (!coords || coords.length < 2) continue;
+      const external_id = `sdot:blockface/${oid}`;
+      segments.push({
+        city_id: city.id as string,
+        external_id,
+        name: (p.UNITDESC ?? "Unnamed block").toString(),
+        side: sdotSide(p.SIDE),
+        data_source: "sdot",
+        geom: JSON.stringify({ type: "LineString", coordinates: coords }),
+        metadata: {
+          parking_category: p.PARKING_CATEGORY ?? null,
+          total_spaces: p.TOTAL_SPACES ?? null,
+          sdot_side: p.SIDE ?? null,
+          sdot_objectid: oid,
+        },
+      });
+      classMap.set(external_id, sdotCategoryToCode(p.PARKING_CATEGORY));
+    }
+
+    const chunkSize = 200;
+    let imported = 0;
+    const insertedIds: { id: string; external_id: string; classification: ReturnType<typeof sdotCategoryToCode> }[] = [];
+    for (let i = 0; i < segments.length; i += chunkSize) {
+      const chunk = segments.slice(i, i + chunkSize);
+      const { data: ins, error } = await admin.rpc("upsert_osm_segments", { p_rows: chunk });
+      if (error) return { imported, skipped: segments.length - imported, error: `Blockface import failed: ${(error as { message?: string }).message}` };
+      const rows = (ins ?? []) as Array<{ segment_id: string; segment_external_id: string }>;
+      for (const r of rows) {
+        const c = classMap.get(r.segment_external_id);
+        if (c) insertedIds.push({ id: r.segment_id, external_id: r.segment_external_id, classification: c });
+      }
+      imported += rows.length;
+    }
+
+    if (insertedIds.length) {
+      const ids = insertedIds.map((r) => r.id);
+      for (let i = 0; i < ids.length; i += 500) {
+        const slice = ids.slice(i, i + 500);
+        await admin.from("parking_rules").delete().in("street_segment_id", slice);
+        const rules = insertedIds
+          .filter((r) => slice.includes(r.id))
+          .map((r) => ({
+            street_segment_id: r.id,
+            priority: r.classification.priority,
+            restriction_code: r.classification.code,
+            days_of_week: [0, 1, 2, 3, 4, 5, 6],
+            notes: r.classification.notes,
+          }));
+        if (rules.length) await admin.from("parking_rules").insert(rules);
+      }
+    }
+
+    return { imported, skipped: segments.length - imported };
+  });
