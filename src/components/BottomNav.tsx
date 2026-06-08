@@ -29,7 +29,7 @@ export function BottomNav() {
   ];
 
   return (
-    <nav className="pointer-events-auto fixed inset-x-0 bottom-0 z-30 safe-bottom">
+    <nav className="pointer-events-auto fixed inset-x-0 bottom-0 z-30 safe-bottom safe-x">
       <div className="mx-auto max-w-md px-3">
         <div className="flex items-center justify-between rounded-3xl border border-border bg-surface/85 px-2 py-2 backdrop-blur-xl shadow-[0_20px_60px_-20px_rgba(0,0,0,0.7)]">
           {tabs.map((t) => {
