@@ -265,11 +265,12 @@ export function MapView({ token, city }: MapViewProps) {
           window.clearTimeout(moveTimer);
           moveTimer = window.setTimeout(() => { void loadBbox(); }, 350);
         });
-
+        // Note: an additional non-fatal error logger is wired earlier; the
+        // 401 token failure surfaces a friendly fallback UI.
         map.on("error", (e: any) => {
-          // Token / style failures
           if (e?.error?.status === 401) setMapError(true);
         });
+
       } catch {
         if (!disposed) setMapError(true);
       }
