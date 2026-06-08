@@ -10,6 +10,7 @@ import { ForecastSheet } from "@/components/ForecastSheet";
 import { SearchSheet } from "@/components/SearchSheet";
 import { ParkHereButton } from "@/components/ParkHereButton";
 import { ActiveSessionWidget } from "@/components/ActiveSessionWidget";
+import { Onboarding } from "@/components/Onboarding";
 import { useAppStore } from "@/stores/app-store";
 
 const cityOpts = queryOptions({
@@ -93,6 +94,7 @@ function HomePage() {
         <SearchSheet token={tokenQuery.data.token} />
         <ForecastSheet />
         <StreetSheet timezone={city.timezone} restrictionTypes={city.restrictionTypes} cityId={city.id} />
+        <Onboarding />
       </div>
     </div>
   );
