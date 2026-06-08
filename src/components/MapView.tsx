@@ -107,84 +107,61 @@ export function MapView({ token, city }: MapViewProps) {
     }
   }, [city.id, city.slug, fetchSegments, queryClient, runImport, updateSource]);
 
-  // Init map once
+  // Init map once with raster tiles so it works without WebGL.
   useEffect(() => {
     if (!container.current || mapRef.current) return;
-    const supported = mapboxgl.supported();
-    setWebglOk(supported);
-    if (!supported) return;
-
-    mapboxgl.accessToken = token;
-    let map: mapboxgl.Map;
+    let map: L.Map;
     try {
-      map = new mapboxgl.Map({
-        container: container.current,
-        style: "mapbox://styles/mapbox/dark-v11",
-        center: city.center,
+      map = L.map(container.current, {
+        center: [city.center[1], city.center[0]],
         zoom: Math.max(15, city.default_zoom),
+        zoomControl: false,
         attributionControl: false,
-        pitchWithRotate: false,
       });
     } catch {
-      setWebglOk(false);
+      setMapError(true);
       return;
     }
-    map.addControl(new mapboxgl.NavigationControl({ showCompass: false, visualizePitch: false }), "top-right");
-    map.addControl(new mapboxgl.GeolocateControl({ trackUserLocation: true, showUserHeading: true }), "top-right");
+
+    L.control.zoom({ position: "topright" }).addTo(map);
+    L.tileLayer(
+      `https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/512/{z}/{x}/{y}@2x?access_token=${token}`,
+      { tileSize: 512, zoomOffset: -1, maxZoom: 20 },
+    ).addTo(map);
+
+    segmentLayerRef.current = L.geoJSON<LineString>(undefined, {
+      style: (feature) => ({
+        color: COLOR_HEX[(feature?.properties?.color as ParkingColor | undefined) ?? "green"],
+        weight: 7,
+        opacity: 0.95,
+        lineCap: "round",
+        lineJoin: "round",
+      }),
+      onEachFeature: (feature, layer) => {
+        layer.on("click", () => {
+          const id = feature.properties?.segmentId as string | undefined;
+          if (id) selectSegment(id);
+        });
+      },
+    }).addTo(map);
 
     let moveTimer: number | undefined;
-
-    map.on("load", () => {
-      map.addSource("segments", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
-      map.addLayer({
-        id: "segments-line-casing",
-        type: "line",
-        source: "segments",
-        paint: {
-          "line-color": "#0b1020",
-          "line-width": ["interpolate", ["linear"], ["zoom"], 12, 4, 16, 9, 19, 16],
-          "line-opacity": 0.7,
-        },
-      });
-      map.addLayer({
-        id: "segments-line",
-        type: "line",
-        source: "segments",
-        paint: {
-          "line-color": [
-            "match",
-            ["get", "color"],
-            "green", COLOR_HEX.green,
-            "yellow", COLOR_HEX.yellow,
-            "red", COLOR_HEX.red,
-            "#7c8597",
-          ],
-          "line-width": ["interpolate", ["linear"], ["zoom"], 12, 2, 16, 6, 19, 11],
-          "line-opacity": 0.95,
-        },
-      });
-      map.on("click", "segments-line", (e) => {
-        const f = e.features?.[0];
-        const id = f?.properties?.segmentId as string | undefined;
-        if (id) selectSegment(id);
-      });
-      map.on("mouseenter", "segments-line", () => { map.getCanvas().style.cursor = "pointer"; });
-      map.on("mouseleave", "segments-line", () => { map.getCanvas().style.cursor = ""; });
-
-      // Initial load
-      void loadBbox();
-    });
-
     map.on("moveend", () => {
       window.clearTimeout(moveTimer);
       moveTimer = window.setTimeout(() => { void loadBbox(); }, 350);
     });
 
     mapRef.current = map;
+    window.setTimeout(() => {
+      map.invalidateSize();
+      void loadBbox();
+    }, 0);
+
     return () => {
       window.clearTimeout(moveTimer);
       map.remove();
       mapRef.current = null;
+      segmentLayerRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, city.id]);
@@ -192,18 +169,14 @@ export function MapView({ token, city }: MapViewProps) {
   // Fly to from search
   useEffect(() => {
     if (!flyTo || !mapRef.current) return;
-    mapRef.current.flyTo({
-      center: [flyTo.lng, flyTo.lat],
-      zoom: flyTo.zoom ?? 16,
-      duration: 1200,
-    });
+    mapRef.current.flyTo([flyTo.lat, flyTo.lng], flyTo.zoom ?? 16, { duration: 1.2 });
     setFlyTo(null);
   }, [flyTo, setFlyTo]);
 
   return (
     <>
       <div ref={container} className="absolute inset-0" />
-      {webglOk === false && (
+      {mapError && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-background p-6 text-center">
           <div className="max-w-sm">
             <h2 className="font-display text-lg font-bold">Map can't render here</h2>
