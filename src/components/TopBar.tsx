@@ -48,7 +48,7 @@ export function TopBar({ cityName, now, timezone, isForecast }: TopBarProps) {
             <span className="text-xs font-semibold tracking-wide">{cityName}</span>
           </div>
           <div className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 backdrop-blur-xl ${isForecast ? "border-park-yellow/40 bg-park-yellow-soft text-park-yellow" : "border-border bg-surface/80 text-foreground"}`}>
-            <span className="text-xs font-semibold">
+            <span className="text-xs font-semibold" suppressHydrationWarning>
               {isForecast ? "Forecast • " : "Live • "}
               {formatDay(now, timezone)} · {formatTime(now, timezone)}
             </span>
