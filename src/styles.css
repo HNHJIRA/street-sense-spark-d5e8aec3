@@ -114,6 +114,25 @@
   display: none !important;
 }
 
-/* Safe-area helpers for mobile */
-.safe-top { padding-top: max(env(safe-area-inset-top), 1rem); }
-.safe-bottom { padding-bottom: max(env(safe-area-inset-bottom), 1rem); }
+/* Safe-area helpers for iOS/Android device insets (notch, home indicator, rounded corners). */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+/* Padding helpers — apply the inset as padding (use on a wrapper). */
+.safe-top    { padding-top: max(var(--safe-top), 0.75rem); }
+.safe-bottom { padding-bottom: max(var(--safe-bottom), 0.75rem); }
+.safe-x      { padding-left: max(var(--safe-left), 0px); padding-right: max(var(--safe-right), 0px); }
+
+/* Positioning helpers — push fixed/absolute UI off the device chrome. */
+.inset-safe  { top: var(--safe-top); right: var(--safe-right); bottom: var(--safe-bottom); left: var(--safe-left); }
+.top-safe    { top: var(--safe-top); }
+.bottom-safe { bottom: var(--safe-bottom); }
+
+/* Full-height that respects insets. */
+.h-screen-safe     { height: calc(100dvh - var(--safe-top) - var(--safe-bottom)); }
+.min-h-screen-safe { min-height: calc(100dvh - var(--safe-top) - var(--safe-bottom)); }
+
