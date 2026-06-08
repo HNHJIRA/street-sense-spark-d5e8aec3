@@ -144,8 +144,46 @@ export const useDeviceStore = create<DeviceState>()(
       clearSearchHistory: () => set({ searchHistory: [] }),
 
       startSession: (s) =>
-        set({ activeSession: { ...s, id: uid(), startedAt: new Date().toISOString() } }),
-      endSession: () => set({ activeSession: null }),
+        set({
+          activeSession: { ...s, id: uid(), startedAt: new Date().toISOString() },
+          deliveredAlertIds: [], // reset per-session dedupe
+        }),
+      endSession: () => set({ activeSession: null, deliveredAlertIds: [] }),
+
+      setAlertSetting: (key, value) =>
+        set((s) => ({ alertSettings: { ...s.alertSettings, [key]: value } })),
+
+      recordNotification: ({ alertId, ...n }) =>
+        set((s) => {
+          if (s.deliveredAlertIds.includes(alertId)) return s;
+          const entry: NotificationLogItem = {
+            ...n,
+            id: uid(),
+            deliveredAt: new Date().toISOString(),
+          };
+          return {
+            notificationHistory: [entry, ...s.notificationHistory].slice(0, 100),
+            deliveredAlertIds: [...s.deliveredAlertIds, alertId].slice(-50),
+          };
+        }),
+      clearNotificationHistory: () => set({ notificationHistory: [] }),
+      hasDeliveredAlert: (alertId) => get().deliveredAlertIds.includes(alertId),
+    }),
+    {
+      name: "parkclear-device-v1",
+      storage: createJSONStorage(() => (typeof window !== "undefined" ? window.localStorage : undefined as any)),
+      partialize: (s) => ({
+        savedSpots: s.savedSpots,
+        favorites: s.favorites,
+        searchHistory: s.searchHistory,
+        activeSession: s.activeSession,
+        alertSettings: s.alertSettings,
+        notificationHistory: s.notificationHistory,
+        deliveredAlertIds: s.deliveredAlertIds,
+      }),
+    },
+  ),
+);
     }),
     {
       name: "parkclear-device-v1",
