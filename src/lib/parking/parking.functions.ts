@@ -1,10 +1,33 @@
 // Server functions for the parking map.
-// All Supabase admin and Overpass access is kept inside .handler() to keep
+// All supabaseAdmin + external API access stays inside .handler() to keep
 // the service-role import out of the client bundle.
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { LineString } from "geojson";
-import type { RestrictionType, ParkingColor } from "./types";
+import type {
+  RestrictionType,
+  ParkingColor,
+  ParkingRule,
+  ParkingEvent,
+  StreetSegment,
+} from "./types";
+import { evaluateRulesAt } from "./engine";
+
+// ---------- Shared admin helper ----------
+
+interface AdminClient {
+  from: (t: string) => any;
+  rpc: (n: string, a?: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
+}
+async function getAdmin(): Promise<AdminClient> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  return supabaseAdmin as unknown as AdminClient;
+}
+
+async function loadRestrictionTypes(admin: AdminClient): Promise<RestrictionType[]> {
+  const { data } = await admin.from("restriction_types").select("code, label, color, description");
+  return (data ?? []) as RestrictionType[];
+}
 
 // ---------- Mapbox token ----------
 
@@ -32,12 +55,7 @@ export const getCityInfo = createServerFn({ method: "GET" })
     z.object({ citySlug: z.string().min(1).max(64) }).parse(input),
   )
   .handler(async ({ data }): Promise<CityInfo> => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const admin = supabaseAdmin as unknown as {
-      from: (t: string) => any;
-      rpc: (n: string, a?: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
-    };
-
+    const admin = await getAdmin();
     const { data: cityRow, error: cityErr } = await admin
       .from("cities")
       .select("id, slug, name, timezone, default_zoom")
@@ -54,10 +72,7 @@ export const getCityInfo = createServerFn({ method: "GET" })
       } catch { /* ignore */ }
     }
 
-    const { data: types } = await admin
-      .from("restriction_types")
-      .select("code, label, color, description");
-
+    const types = await loadRestrictionTypes(admin);
     const { count } = (await admin
       .from("street_segments")
       .select("id", { count: "exact", head: true })
@@ -70,12 +85,12 @@ export const getCityInfo = createServerFn({ method: "GET" })
       timezone: cityRow.timezone,
       center,
       default_zoom: Number(cityRow.default_zoom ?? 14),
-      restrictionTypes: (types ?? []) as RestrictionType[],
+      restrictionTypes: types,
       segmentCount: count ?? 0,
     };
   });
 
-// ---------- Viewport segments ----------
+// ---------- Viewport segments (time-aware) ----------
 
 export interface SegmentLite {
   id: string;
@@ -85,68 +100,102 @@ export interface SegmentLite {
   restriction_code: string;
   color: ParkingColor;
   label: string;
+  data_source: string;
+  /** ISO timestamp at which the current restriction ends, if any. */
+  allowed_until: string | null;
+}
+
+interface BboxRow {
+  id: string; name: string; side: string; geojson: string;
+  data_source: string; metadata: Record<string, unknown>;
+  rules: ParkingRule[] | null;
 }
 
 export const getSegmentsInBbox = createServerFn({ method: "GET" })
   .inputValidator((input: unknown) =>
     z.object({
       cityId: z.string().uuid(),
-      minLng: z.number(),
-      minLat: z.number(),
-      maxLng: z.number(),
-      maxLat: z.number(),
+      minLng: z.number(), minLat: z.number(),
+      maxLng: z.number(), maxLat: z.number(),
+      /** Optional ISO timestamp for forecast mode. Defaults to "now". */
+      at: z.string().datetime().optional().nullable(),
+      timezone: z.string().min(1).max(64).default("America/Los_Angeles"),
     }).parse(input),
   )
   .handler(async ({ data }): Promise<SegmentLite[]> => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const admin = supabaseAdmin as unknown as {
-      rpc: (n: string, a?: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
-    };
-    const { data: rows, error } = await admin.rpc("segments_in_bbox", {
+    const admin = await getAdmin();
+    const { data: rows, error } = await admin.rpc("segments_in_bbox_with_rules", {
       p_city_id: data.cityId,
-      p_min_lng: data.minLng,
-      p_min_lat: data.minLat,
-      p_max_lng: data.maxLng,
-      p_max_lat: data.maxLat,
+      p_min_lng: data.minLng, p_min_lat: data.minLat,
+      p_max_lng: data.maxLng, p_max_lat: data.maxLat,
     });
     if (error) throw new Error((error as { message?: string }).message ?? "Failed to load segments");
-    const list = (rows ?? []) as Array<{
-      id: string; name: string; side: string; geojson: string;
-      restriction_code: string; color: ParkingColor; label: string;
-    }>;
+
+    const restrictionTypes = await loadRestrictionTypes(admin);
+    const when = data.at ? new Date(data.at) : new Date();
+    const list = (rows ?? []) as BboxRow[];
     const out: SegmentLite[] = [];
+
     for (const r of list) {
+      let coords: [number, number][] = [];
       try {
         const g = JSON.parse(r.geojson) as LineString;
         if (!Array.isArray(g.coordinates) || g.coordinates.length < 2) continue;
-        out.push({
-          id: r.id,
-          name: r.name,
-          side: r.side,
-          coordinates: g.coordinates as [number, number][],
-          restriction_code: r.restriction_code,
-          color: r.color,
-          label: r.label,
-        });
-      } catch { /* skip malformed */ }
+        coords = g.coordinates as [number, number][];
+      } catch { continue; }
+
+      const seg: StreetSegment = {
+        id: r.id, name: r.name, side: r.side, neighborhood: null,
+        coordinates: coords,
+        rules: (r.rules ?? []) as ParkingRule[],
+        events: [],
+      };
+      const status = evaluateRulesAt(seg, restrictionTypes, when, data.timezone);
+      out.push({
+        id: r.id,
+        name: r.name,
+        side: r.side,
+        coordinates: coords,
+        restriction_code: status.code,
+        color: status.color,
+        label: status.label,
+        data_source: r.data_source,
+        allowed_until: status.allowed_until,
+      });
     }
     return out;
   });
 
-// ---------- Segment details (for the bottom sheet) ----------
+// ---------- Segment details (time-aware) ----------
+
+export interface SegmentDetails {
+  id: string;
+  name: string;
+  side: string;
+  neighborhood: string | null;
+  data_source: string;
+  source_label: string;
+  rules: ParkingRule[];
+  events: ParkingEvent[];
+  metadata: Record<string, unknown>;
+}
+
+const SOURCE_LABELS: Record<string, string> = {
+  sdot: "Seattle SDOT Blockface",
+  osm: "OpenStreetMap",
+  seed: "Demo data",
+  curbiq: "CurbIQ",
+};
 
 export const getSegmentDetails = createServerFn({ method: "GET" })
   .inputValidator((input: unknown) =>
     z.object({ id: z.string().uuid() }).parse(input),
   )
-  .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const admin = supabaseAdmin as unknown as {
-      from: (t: string) => any;
-    };
+  .handler(async ({ data }): Promise<SegmentDetails> => {
+    const admin = await getAdmin();
     const { data: seg } = await admin
       .from("street_segments")
-      .select("id, name, side, metadata")
+      .select("id, name, side, metadata, data_source")
       .eq("id", data.id)
       .maybeSingle();
     if (!seg) throw new Error("Segment not found");
@@ -159,17 +208,21 @@ export const getSegmentDetails = createServerFn({ method: "GET" })
       .from("parking_events")
       .select("id, street_segment_id, restriction_code, starts_at, ends_at, reason")
       .eq("street_segment_id", data.id);
+    const src = seg.data_source as string;
     return {
       id: seg.id as string,
       name: seg.name as string,
       side: (seg.side ?? "both") as string,
       neighborhood: (seg.metadata?.neighborhood ?? null) as string | null,
-      rules: rules ?? [],
-      events: events ?? [],
+      data_source: src,
+      source_label: SOURCE_LABELS[src] ?? src,
+      metadata: (seg.metadata ?? {}) as Record<string, unknown>,
+      rules: (rules ?? []) as ParkingRule[],
+      events: (events ?? []) as ParkingEvent[],
     };
   });
 
-// ---------- "Can I park here?" — nearest segment by coordinates ----------
+// ---------- "Can I park here?" — nearest segment, time-aware ----------
 
 export interface ParkHereResult {
   found: boolean;
@@ -180,7 +233,12 @@ export interface ParkHereResult {
   restriction_code?: string;
   distance_m?: number;
   coordinates?: [number, number][];
+  allowed_until?: string | null;
+  permit_zone?: string | null;
+  time_limit_minutes?: number | null;
+  data_source?: string;
   message: string;
+  source: "gps" | "tap";
 }
 
 export const checkParkingHere = createServerFn({ method: "GET" })
@@ -189,185 +247,130 @@ export const checkParkingHere = createServerFn({ method: "GET" })
       cityId: z.string().uuid(),
       lng: z.number().min(-180).max(180),
       lat: z.number().min(-90).max(90),
+      at: z.string().datetime().optional().nullable(),
+      timezone: z.string().min(1).max(64).default("America/Los_Angeles"),
+      source: z.enum(["gps", "tap"]).default("gps"),
     }).parse(input),
   )
   .handler(async ({ data }): Promise<ParkHereResult> => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const admin = supabaseAdmin as unknown as {
-      rpc: (n: string, a?: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
-    };
-    const { data: rows, error } = await admin.rpc("nearest_segment", {
+    const admin = await getAdmin();
+    const { data: rows, error } = await admin.rpc("nearest_segment_full", {
       p_city_id: data.cityId,
-      p_lng: data.lng,
-      p_lat: data.lat,
+      p_lng: data.lng, p_lat: data.lat,
       p_max_meters: 80,
     });
     if (error) throw new Error((error as { message?: string }).message ?? "Lookup failed");
     const row = (rows as Array<{
-      id: string; name: string; geojson: string;
-      restriction_code: string; color: ParkingColor; label: string; distance_m: number;
+      id: string; name: string; side: string; geojson: string;
+      data_source: string; metadata: Record<string, unknown>;
+      rules: ParkingRule[] | null; distance_m: number;
     }> | null)?.[0];
     if (!row) {
-      return { found: false, message: "No mapped street nearby. Try moving closer to a street." };
+      return {
+        found: false,
+        source: data.source,
+        message: "No mapped street nearby. Try moving closer to a street.",
+      };
     }
     let coords: [number, number][] = [];
     try {
       const g = JSON.parse(row.geojson) as LineString;
       if (Array.isArray(g.coordinates)) coords = g.coordinates as [number, number][];
     } catch { /* ignore */ }
-    const msg = row.color === "green"
+
+    const restrictionTypes = await loadRestrictionTypes(admin);
+    const seg: StreetSegment = {
+      id: row.id, name: row.name, side: row.side, neighborhood: null,
+      coordinates: coords,
+      rules: (row.rules ?? []) as ParkingRule[],
+      events: [],
+    };
+    const when = data.at ? new Date(data.at) : new Date();
+    const status = evaluateRulesAt(seg, restrictionTypes, when, data.timezone);
+
+    const msg = status.color === "green"
       ? `Yes — you can park here on ${row.name}.`
-      : row.color === "yellow"
-        ? `Caution on ${row.name}: ${row.label.toLowerCase()}.`
-        : `No — ${row.label.toLowerCase()} on ${row.name}.`;
+      : status.color === "yellow"
+        ? `Caution on ${row.name}: ${status.label.toLowerCase()}.`
+        : `No — ${status.label.toLowerCase()} on ${row.name}.`;
+
     return {
       found: true,
+      source: data.source,
       segmentId: row.id,
       name: row.name,
-      color: row.color,
-      label: row.label,
-      restriction_code: row.restriction_code,
+      color: status.color,
+      label: status.label,
+      restriction_code: status.code,
       distance_m: row.distance_m,
       coordinates: coords,
+      allowed_until: status.allowed_until,
+      permit_zone: status.permit_zone,
+      time_limit_minutes: status.time_limit_minutes,
+      data_source: row.data_source,
       message: msg,
     };
   });
 
-// ---------- OSM (Overpass) importer ----------
+// ---------- Provider sync (Seattle SDOT Blockface and future providers) ----------
 
-type OsmTags = Record<string, string>;
-interface OsmWay {
-  type: "way";
-  id: number;
-  tags?: OsmTags;
-  geometry?: Array<{ lat: number; lon: number }>;
+export interface SyncRunResult {
+  imported: number;
+  skipped: number;
+  provider: string;
+  error?: string;
 }
 
-function decodeXml(value: string) {
-  return value
-    .replaceAll("&quot;", '"')
-    .replaceAll("&apos;", "'")
-    .replaceAll("&lt;", "<")
-    .replaceAll("&gt;", ">")
-    .replaceAll("&amp;", "&");
+async function recordSyncStart(
+  admin: AdminClient,
+  provider: string,
+  cityId: string,
+  bbox: { minLng: number; minLat: number; maxLng: number; maxLat: number },
+): Promise<string | null> {
+  const { data, error } = await admin.from("sync_logs").insert({
+    provider, city_id: cityId, status: "started",
+    bbox, imported: 0, skipped: 0,
+  }).select("id").maybeSingle();
+  if (error) return null;
+  return (data as { id: string } | null)?.id ?? null;
 }
 
-function xmlAttrs(source: string) {
-  const attrs: Record<string, string> = {};
-  for (const match of source.matchAll(/([\w:-]+)="([^"]*)"/g)) attrs[match[1]] = decodeXml(match[2]);
-  return attrs;
+async function recordSyncFinish(
+  admin: AdminClient, logId: string | null,
+  provider: string, cityId: string,
+  result: { imported: number; skipped: number; error?: string },
+  startedAt: number,
+) {
+  const status = result.error
+    ? (result.imported > 0 ? "partial" : "error")
+    : "success";
+  if (logId) {
+    await admin.from("sync_logs").update({
+      status,
+      imported: result.imported,
+      skipped: result.skipped,
+      error: result.error ?? null,
+      duration_ms: Date.now() - startedAt,
+      finished_at: new Date().toISOString(),
+    }).eq("id", logId);
+  }
+  const { count } = (await admin
+    .from("street_segments")
+    .select("id", { count: "exact", head: true })
+    .eq("city_id", cityId)
+    .eq("data_source", provider)) as unknown as { count: number };
+
+  const healthy = !result.error;
+  await admin.from("provider_health").upsert({
+    provider, city_id: cityId, healthy,
+    last_success_at: healthy ? new Date().toISOString() : undefined,
+    last_error_at: healthy ? undefined : new Date().toISOString(),
+    last_error: result.error ?? null,
+    segments_total: count ?? 0,
+  }, { onConflict: "provider,city_id" });
 }
 
-function parseOsmXml(xml: string): OsmWay[] {
-  const nodes = new Map<string, { lat: number; lon: number }>();
-  for (const match of xml.matchAll(/<node\b([^>]*)\/>/g)) {
-    const a = xmlAttrs(match[1]);
-    if (a.id && a.lat && a.lon) nodes.set(a.id, { lat: Number(a.lat), lon: Number(a.lon) });
-  }
-  const ways: OsmWay[] = [];
-  for (const match of xml.matchAll(/<way\b[^>]*id="(\d+)"[^>]*>([\s\S]*?)<\/way>/g)) {
-    const tags: OsmTags = {};
-    for (const tag of match[2].matchAll(/<tag\b([^>]*)\/>/g)) {
-      const a = xmlAttrs(tag[1]);
-      if (a.k && a.v) tags[a.k] = a.v;
-    }
-    if (!tags.highway || !HIGHWAY_KINDS.includes(tags.highway)) continue;
-    const geometry = Array.from(match[2].matchAll(/<nd\b[^>]*ref="(\d+)"[^>]*\/>/g))
-      .map((nd) => nodes.get(nd[1]))
-      .filter((p): p is { lat: number; lon: number } => Boolean(p));
-    if (geometry.length >= 2) ways.push({ type: "way", id: Number(match[1]), tags, geometry });
-  }
-  return ways;
-}
-
-async function fetchOsmMapBbox(minLng: number, minLat: number, maxLng: number, maxLat: number) {
-  const res = await fetch(
-    `https://api.openstreetmap.org/api/0.6/map?bbox=${minLng},${minLat},${maxLng},${maxLat}`,
-    { headers: { Accept: "application/xml", "User-Agent": "ParkClear real-time parking map" } },
-  );
-  if (!res.ok) throw new Error(`OSM ${res.status}`);
-  return parseOsmXml(await res.text());
-}
-
-async function fetchOsmMapSplit(minLng: number, minLat: number, maxLng: number, maxLat: number) {
-  const ways = new Map<number, OsmWay>();
-  let lastErr = "";
-  const cols = 4;
-  const rows = 2;
-  for (let x = 0; x < cols; x += 1) {
-    for (let y = 0; y < rows; y += 1) {
-      const aLng = minLng + ((maxLng - minLng) * x) / cols;
-      const bLng = minLng + ((maxLng - minLng) * (x + 1)) / cols;
-      const aLat = minLat + ((maxLat - minLat) * y) / rows;
-      const bLat = minLat + ((maxLat - minLat) * (y + 1)) / rows;
-      try {
-        const chunk = await fetchOsmMapBbox(aLng, aLat, bLng, bLat);
-        for (const way of chunk) ways.set(way.id, way);
-      } catch (e) {
-        lastErr = (e as Error).message;
-      }
-    }
-  }
-  if (ways.size === 0 && lastErr) throw new Error(lastErr);
-  return Array.from(ways.values());
-}
-
-const HIGHWAY_KINDS = [
-  "motorway", "trunk", "primary", "secondary", "tertiary",
-  "residential", "unclassified", "living_street", "service",
-  "primary_link", "secondary_link", "tertiary_link",
-];
-
-const NO_PARK_HIGHWAYS = new Set(["motorway", "trunk", "motorway_link", "trunk_link"]);
-
-function classifyRestriction(t: OsmTags): { code: string; priority: number; notes: string } {
-  const hwy = t.highway ?? "";
-  if (NO_PARK_HIGHWAYS.has(hwy)) {
-    return { code: "no_parking", priority: 10, notes: "Highway/freeway — no street parking." };
-  }
-
-  const sides = ["both", "left", "right"] as const;
-  const sideVals = sides.map((s) => t[`parking:${s}`]).filter(Boolean) as string[];
-  const noVals = sideVals.filter((v) => /^(no|no_parking|no_stopping|separate)$/.test(v));
-  const yesVals = sideVals.filter((v) => /^(lane|street_side|on_kerb|half_on_kerb|on_street|perpendicular|diagonal|parallel)$/.test(v));
-
-  // Conditions
-  const cond = [
-    t["parking:condition:both"],
-    t["parking:condition:left"],
-    t["parking:condition:right"],
-    t["parking:both:fee"],
-    t["parking:left:fee"],
-    t["parking:right:fee"],
-  ].filter(Boolean) as string[];
-
-  const hasFee = cond.some((v) => v === "yes" || v === "ticket" || v === "disc");
-  const hasResidents = cond.some((v) => v === "residents" || v === "customers");
-  const hasTimeLimit = Boolean(
-    t["parking:condition:both:time_interval"] ||
-    t["parking:condition:left:time_interval"] ||
-    t["parking:condition:right:time_interval"] ||
-    t["parking:condition:both:maxstay"] ||
-    t["maxstay"],
-  );
-
-  if (sideVals.length && noVals.length === sideVals.length) {
-    return { code: "no_parking", priority: 20, notes: "Posted: no parking." };
-  }
-  if (hasFee) return { code: "metered", priority: 50, notes: "Paid / metered parking." };
-  if (hasResidents) return { code: "permit", priority: 50, notes: "Permit / residents only." };
-  if (hasTimeLimit) return { code: "time_limited", priority: 60, notes: "Time-limited parking." };
-  if (yesVals.length || hwy === "residential" || hwy === "living_street" || hwy === "unclassified") {
-    return { code: "allowed", priority: 1000, notes: "On-street parking allowed." };
-  }
-  // Default fallback for arterials with no explicit tag: assume metered downtown
-  if (hwy === "primary" || hwy === "secondary" || hwy === "tertiary") {
-    return { code: "metered", priority: 70, notes: "Likely metered — verify posted signs." };
-  }
-  return { code: "allowed", priority: 1000, notes: "No restriction known." };
-}
-
-export const importOsmStreets = createServerFn({ method: "POST" })
+export const syncProvider = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     z.object({
       citySlug: z.string().min(1).max(64),
@@ -375,306 +378,149 @@ export const importOsmStreets = createServerFn({ method: "POST" })
       maxLng: z.number(), maxLat: z.number(),
     }).parse(input),
   )
-  .handler(async ({ data }) => {
-    // Guard: cap bbox area so a runaway query can't pull all of Seattle.
+  .handler(async ({ data }): Promise<SyncRunResult> => {
     const w = Math.abs(data.maxLng - data.minLng);
     const h = Math.abs(data.maxLat - data.minLat);
-    if (w * h > 0.05) return { imported: 0, skipped: 0, error: "Zoom in to load detailed street data." };
+    if (w * h > 0.05) return { imported: 0, skipped: 0, provider: "unknown", error: "Zoom in to load detailed street data." };
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const admin = supabaseAdmin as unknown as {
-      from: (t: string) => any;
-      rpc: (n: string, a?: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
-    };
+    const { getProviderForCity } = await import("./providers/registry.server");
+    const provider = getProviderForCity(data.citySlug);
+    if (!provider) {
+      return { imported: 0, skipped: 0, provider: "none", error: `No provider for city "${data.citySlug}"` };
+    }
 
-    const { data: city } = await admin
-      .from("cities")
-      .select("id")
-      .eq("slug", data.citySlug)
-      .maybeSingle();
+    const admin = await getAdmin();
+    const { data: city } = await admin.from("cities").select("id").eq("slug", data.citySlug).maybeSingle();
     if (!city) throw new Error("City not found");
 
-    // Overpass query — bbox order is (south, west, north, east).
-    const bbox = `${data.minLat},${data.minLng},${data.maxLat},${data.maxLng}`;
-    const filters = HIGHWAY_KINDS.map((h) => `way["highway"="${h}"](${bbox});`).join("");
-    const overpass = `[out:json][timeout:60];(${filters});out geom tags;`;
+    const bbox = { minLng: data.minLng, minLat: data.minLat, maxLng: data.maxLng, maxLat: data.maxLat };
+    const startedAt = Date.now();
+    const logId = await recordSyncStart(admin, provider.id, city.id, bbox);
 
-    const endpoints = [
-      "https://overpass-api.de/api/interpreter",
-      "https://overpass.kumi.systems/api/interpreter",
-    ];
-    let json: { elements?: OsmWay[] } | null = null;
-    let lastErr = "";
-    for (const ep of endpoints) {
-      try {
-        const res = await fetch(ep, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: `data=${encodeURIComponent(overpass)}`,
-        });
-        if (!res.ok) { lastErr = `Overpass ${res.status}`; continue; }
-        json = await res.json();
-        break;
-      } catch (e) {
-        lastErr = (e as Error).message;
+    try {
+      const normalized = await provider.fetchSegments(data.citySlug, bbox);
+      if (normalized.length === 0) {
+        const res = { imported: 0, skipped: 0 };
+        await recordSyncFinish(admin, logId, provider.id, city.id, res, startedAt);
+        return { ...res, provider: provider.id };
       }
-    }
-    let ways = (json?.elements ?? []).filter(
-      (e) => e.type === "way" && Array.isArray(e.geometry) && e.geometry.length >= 2,
-    );
-    if (ways.length === 0) {
-      try {
-        ways = await fetchOsmMapSplit(data.minLng, data.minLat, data.maxLng, data.maxLat);
-      } catch (e) {
-        if (!json) return { imported: 0, skipped: 0, error: `Real street data is temporarily rate limited. ${lastErr || (e as Error).message}` };
-      }
-    }
-    if (ways.length === 0) return { imported: 0, skipped: 0 };
 
-    // Build segment rows. Use ST_GeomFromGeoJSON for the LineString.
-    type SegInsert = {
-      city_id: string;
-      external_id: string;
-      name: string;
-      side: string;
-      data_source: string;
-      geom: string;
-      metadata: Record<string, unknown>;
-    };
-    const segments: SegInsert[] = ways.map((w) => {
-      const coords = w.geometry!.map((p) => [p.lon, p.lat] as [number, number]);
-      return {
-        city_id: city.id as string,
-        external_id: `osm:way/${w.id}`,
-        name: w.tags?.name ?? w.tags?.ref ?? "Unnamed street",
-        side: "both",
-        data_source: "osm",
-        geom: JSON.stringify({ type: "LineString", coordinates: coords }),
-        metadata: {
-          highway: w.tags?.highway ?? null,
-          oneway: w.tags?.oneway ?? null,
-          osm_id: w.id,
-        },
+      type SegInsert = {
+        city_id: string; external_id: string; name: string; side: string;
+        data_source: string; geom: string; metadata: Record<string, unknown>;
       };
-    });
+      const inserts: SegInsert[] = normalized.map((s) => ({
+        city_id: city.id as string,
+        external_id: s.external_id,
+        name: s.name,
+        side: s.side,
+        data_source: provider.id,
+        geom: JSON.stringify({ type: "LineString", coordinates: s.coordinates }),
+        metadata: s.metadata,
+      }));
 
-    // Upsert in chunks. Supabase has a payload size limit so we batch.
-    const chunkSize = 200;
-    let imported = 0;
-    const insertedIds: { id: string; external_id: string; classification: ReturnType<typeof classifyRestriction> }[] = [];
-    const classMap = new Map<string, ReturnType<typeof classifyRestriction>>();
-    for (const w of ways) classMap.set(`osm:way/${w.id}`, classifyRestriction(w.tags ?? {}));
+      const chunkSize = 200;
+      let imported = 0;
+      const insertedIds: { id: string; external_id: string }[] = [];
 
-    for (let i = 0; i < segments.length; i += chunkSize) {
-      const chunk = segments.slice(i, i + chunkSize);
-      // We need ST_GeomFromGeoJSON applied; easiest path: call a small SQL via rpc.
-      // Fallback: insert via PostgREST using a JSON column wrapper isn't possible for geometry,
-      // so we use a custom SQL RPC.
-      const { data: ins, error } = await admin.rpc("upsert_osm_segments", { p_rows: chunk });
-      if (error) return { imported, skipped: ways.length - imported, error: `Street import failed: ${(error as { message?: string }).message}` };
-      const rows = (ins ?? []) as Array<{ segment_id: string; segment_external_id: string }>;
-      for (const r of rows) {
-        const c = classMap.get(r.segment_external_id);
-        if (c) insertedIds.push({ id: r.segment_id, external_id: r.segment_external_id, classification: c });
+      for (let i = 0; i < inserts.length; i += chunkSize) {
+        const chunk = inserts.slice(i, i + chunkSize);
+        const { data: ins, error } = await admin.rpc("upsert_osm_segments", { p_rows: chunk });
+        if (error) {
+          const res = { imported, skipped: inserts.length - imported, error: `Segment upsert failed: ${(error as { message?: string }).message}` };
+          await recordSyncFinish(admin, logId, provider.id, city.id, res, startedAt);
+          return { ...res, provider: provider.id };
+        }
+        const rows = (ins ?? []) as Array<{ segment_id: string; segment_external_id: string }>;
+        for (const r of rows) insertedIds.push({ id: r.segment_id, external_id: r.segment_external_id });
+        imported += rows.length;
       }
-      imported += rows.length;
-    }
 
-    // Replace rules for these segments (delete then insert default rule).
-    if (insertedIds.length) {
+      // Replace rules per segment with the normalized rule set.
+      const rulesByExt = new Map(normalized.map((s) => [s.external_id, s.rules]));
       const ids = insertedIds.map((r) => r.id);
       for (let i = 0; i < ids.length; i += 500) {
         const slice = ids.slice(i, i + 500);
         await admin.from("parking_rules").delete().in("street_segment_id", slice);
-        const rules = insertedIds
+        const ruleRows = insertedIds
           .filter((r) => slice.includes(r.id))
-          .map((r) => ({
+          .flatMap((r) => (rulesByExt.get(r.external_id) ?? []).map((rule) => ({
             street_segment_id: r.id,
-            priority: r.classification.priority,
-            restriction_code: r.classification.code,
-            days_of_week: [0, 1, 2, 3, 4, 5, 6],
-            notes: r.classification.notes,
-          }));
-        if (rules.length) await admin.from("parking_rules").insert(rules);
+            priority: rule.priority,
+            restriction_code: rule.restriction_code,
+            days_of_week: rule.days_of_week,
+            time_start: rule.time_start,
+            time_end: rule.time_end,
+            permit_zone: rule.permit_zone,
+            time_limit_minutes: rule.time_limit_minutes,
+            effective_from: rule.effective_from,
+            effective_to: rule.effective_to,
+            notes: rule.notes,
+          })));
+        if (ruleRows.length) await admin.from("parking_rules").insert(ruleRows);
       }
-    }
 
-    return { imported, skipped: ways.length - imported };
+      const res = { imported, skipped: inserts.length - imported };
+      await recordSyncFinish(admin, logId, provider.id, city.id, res, startedAt);
+      return { ...res, provider: provider.id };
+    } catch (e) {
+      const res = { imported: 0, skipped: 0, error: (e as Error).message };
+      await recordSyncFinish(admin, logId, provider.id, city.id, res, startedAt);
+      return { ...res, provider: provider.id };
+    }
   });
 
-// ---------- Seattle SDOT Blockface importer ----------
-// Pulls real on-street parking blockfaces from Seattle's official ArcGIS
-// FeatureServer (PARKING_CATEGORY per blockface). This is the same source
-// quality used by ParkUsher — every block has a classification, so the map
-// fills in end-to-end instead of the sparse OSM coverage.
+/** Back-compat alias for the existing MapView import. */
+export const importSeattleBlockface = syncProvider;
 
-const SDOT_PARKING_CATEGORIES_URL =
-  "https://services.arcgis.com/ZOyb2t4B0UYuYNYH/arcgis/rest/services/Parking_Categories/FeatureServer/0/query";
+// ---------- Provider health + recent sync log readers ----------
 
-interface SdotProps {
-  OBJECTID: number;
-  UNITDESC?: string | null;
-  SIDE?: string | null;
-  PARKING_CATEGORY?: string | null;
-  TOTAL_SPACES?: number | null;
+export interface ProviderHealthRow {
+  provider: string;
+  city_slug: string | null;
+  city_name: string | null;
+  healthy: boolean;
+  last_success_at: string | null;
+  last_error_at: string | null;
+  last_error: string | null;
+  segments_total: number;
+  updated_at: string;
 }
 
-function sdotCategoryToCode(cat: string | null | undefined): { code: string; priority: number; notes: string } {
-  const c = (cat ?? "").trim().toLowerCase();
-  if (!c || c === "unrestricted parking" || c === "unrestricted")
-    return { code: "allowed", priority: 1000, notes: "Unrestricted on-street parking." };
-  if (c === "paid parking")
-    return { code: "metered", priority: 50, notes: "Paid / metered parking." };
-  if (c.includes("restricted parking zone") || c === "rpz")
-    return { code: "permit", priority: 50, notes: "Restricted Parking Zone (permit)." };
-  if (c.includes("time limited"))
-    return { code: "time_limited", priority: 60, notes: "Time-limited parking." };
-  if (c.includes("no parking"))
-    return { code: "no_parking", priority: 20, notes: "Posted: no parking." };
-  if (c.includes("bus"))
-    return { code: "bus_lane", priority: 15, notes: "Bus / transit zone." };
-  if (c.includes("load"))
-    return { code: "loading_zone", priority: 30, notes: "Loading zone." };
-  if (c.includes("carpool"))
-    return { code: "permit", priority: 50, notes: "Carpool parking." };
-  return { code: "allowed", priority: 1000, notes: cat ?? "On-street parking." };
-}
+export const getProviderHealth = createServerFn({ method: "GET" })
+  .handler(async (): Promise<ProviderHealthRow[]> => {
+    const admin = await getAdmin();
+    const { data: rows } = await admin
+      .from("provider_health")
+      .select("provider, healthy, last_success_at, last_error_at, last_error, segments_total, updated_at, city_id, cities(slug, name)")
+      .order("provider");
+    return ((rows ?? []) as any[]).map((r) => ({
+      provider: r.provider,
+      city_slug: r.cities?.slug ?? null,
+      city_name: r.cities?.name ?? null,
+      healthy: r.healthy,
+      last_success_at: r.last_success_at,
+      last_error_at: r.last_error_at,
+      last_error: r.last_error,
+      segments_total: r.segments_total,
+      updated_at: r.updated_at,
+    }));
+  });
 
-function sdotSide(side: string | null | undefined): "left" | "right" {
-  const s = (side ?? "").toUpperCase();
-  if (s === "W" || s === "S") return "left";
-  return "right";
-}
-
-export const importSeattleBlockface = createServerFn({ method: "POST" })
+export const getRecentSyncLogs = createServerFn({ method: "GET" })
   .inputValidator((input: unknown) =>
-    z.object({
-      citySlug: z.string().min(1).max(64),
-      minLng: z.number(), minLat: z.number(),
-      maxLng: z.number(), maxLat: z.number(),
-    }).parse(input),
+    z.object({ limit: z.number().int().min(1).max(100).default(20) }).parse(input ?? {}),
   )
   .handler(async ({ data }) => {
-    const w = Math.abs(data.maxLng - data.minLng);
-    const h = Math.abs(data.maxLat - data.minLat);
-    if (w * h > 0.05) return { imported: 0, skipped: 0, error: "Zoom in to load detailed street data." };
-
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const admin = supabaseAdmin as unknown as {
-      from: (t: string) => any;
-      rpc: (n: string, a?: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
-    };
-
-    const { data: city } = await admin
-      .from("cities")
-      .select("id")
-      .eq("slug", data.citySlug)
-      .maybeSingle();
-    if (!city) throw new Error("City not found");
-
-    // Page through ArcGIS — default transfer cap is ~2000.
-    interface Feat { type: "Feature"; geometry: { type: "LineString"; coordinates: [number, number][] } | { type: "MultiLineString"; coordinates: [number, number][][] }; properties: SdotProps }
-    const features: Feat[] = [];
-    const pageSize = 2000;
-    for (let offset = 0; offset < 20000; offset += pageSize) {
-      const params = new URLSearchParams({
-        where: "1=1",
-        outFields: "OBJECTID,UNITDESC,SIDE,PARKING_CATEGORY,TOTAL_SPACES",
-        geometry: `${data.minLng},${data.minLat},${data.maxLng},${data.maxLat}`,
-        geometryType: "esriGeometryEnvelope",
-        inSR: "4326",
-        spatialRel: "esriSpatialRelIntersects",
-        outSR: "4326",
-        resultRecordCount: String(pageSize),
-        resultOffset: String(offset),
-        f: "geojson",
-      });
-      const res = await fetch(`${SDOT_PARKING_CATEGORIES_URL}?${params.toString()}`);
-      if (!res.ok) {
-        if (offset === 0) return { imported: 0, skipped: 0, error: `SDOT ${res.status}` };
-        break;
-      }
-      const json = await res.json() as { features?: Feat[]; properties?: { exceededTransferLimit?: boolean } };
-      const batch = json.features ?? [];
-      features.push(...batch);
-      if (batch.length < pageSize && !json.properties?.exceededTransferLimit) break;
-    }
-
-    if (features.length === 0) return { imported: 0, skipped: 0 };
-
-    type SegInsert = {
-      city_id: string;
-      external_id: string;
-      name: string;
-      side: string;
-      data_source: string;
-      geom: string;
-      metadata: Record<string, unknown>;
-    };
-    const classMap = new Map<string, ReturnType<typeof sdotCategoryToCode>>();
-    const segments: SegInsert[] = [];
-    for (const f of features) {
-      const p = f.properties ?? ({} as SdotProps);
-      const oid = p.OBJECTID;
-      if (!oid) continue;
-      // Normalize to a single LineString — pick the longest part of a MultiLineString.
-      let coords: [number, number][] = [];
-      if (f.geometry.type === "LineString") coords = f.geometry.coordinates;
-      else if (f.geometry.type === "MultiLineString") {
-        const parts = f.geometry.coordinates;
-        coords = parts.reduce((a, b) => (b.length > a.length ? b : a), parts[0] ?? []);
-      }
-      if (!coords || coords.length < 2) continue;
-      const external_id = `sdot:blockface/${oid}`;
-      segments.push({
-        city_id: city.id as string,
-        external_id,
-        name: (p.UNITDESC ?? "Unnamed block").toString(),
-        side: sdotSide(p.SIDE),
-        data_source: "sdot",
-        geom: JSON.stringify({ type: "LineString", coordinates: coords }),
-        metadata: {
-          parking_category: p.PARKING_CATEGORY ?? null,
-          total_spaces: p.TOTAL_SPACES ?? null,
-          sdot_side: p.SIDE ?? null,
-          sdot_objectid: oid,
-        },
-      });
-      classMap.set(external_id, sdotCategoryToCode(p.PARKING_CATEGORY));
-    }
-
-    const chunkSize = 200;
-    let imported = 0;
-    const insertedIds: { id: string; external_id: string; classification: ReturnType<typeof sdotCategoryToCode> }[] = [];
-    for (let i = 0; i < segments.length; i += chunkSize) {
-      const chunk = segments.slice(i, i + chunkSize);
-      const { data: ins, error } = await admin.rpc("upsert_osm_segments", { p_rows: chunk });
-      if (error) return { imported, skipped: segments.length - imported, error: `Blockface import failed: ${(error as { message?: string }).message}` };
-      const rows = (ins ?? []) as Array<{ segment_id: string; segment_external_id: string }>;
-      for (const r of rows) {
-        const c = classMap.get(r.segment_external_id);
-        if (c) insertedIds.push({ id: r.segment_id, external_id: r.segment_external_id, classification: c });
-      }
-      imported += rows.length;
-    }
-
-    if (insertedIds.length) {
-      const ids = insertedIds.map((r) => r.id);
-      for (let i = 0; i < ids.length; i += 500) {
-        const slice = ids.slice(i, i + 500);
-        await admin.from("parking_rules").delete().in("street_segment_id", slice);
-        const rules = insertedIds
-          .filter((r) => slice.includes(r.id))
-          .map((r) => ({
-            street_segment_id: r.id,
-            priority: r.classification.priority,
-            restriction_code: r.classification.code,
-            days_of_week: [0, 1, 2, 3, 4, 5, 6],
-            notes: r.classification.notes,
-          }));
-        if (rules.length) await admin.from("parking_rules").insert(rules);
-      }
-    }
-
-    return { imported, skipped: segments.length - imported };
+    const admin = await getAdmin();
+    const { data: rows } = await admin
+      .from("sync_logs")
+      .select("id, provider, status, imported, skipped, error, duration_ms, started_at, finished_at")
+      .order("started_at", { ascending: false })
+      .limit(data.limit);
+    return (rows ?? []) as Array<{
+      id: string; provider: string; status: string;
+      imported: number; skipped: number; error: string | null;
+      duration_ms: number | null; started_at: string; finished_at: string | null;
+    }>;
   });
