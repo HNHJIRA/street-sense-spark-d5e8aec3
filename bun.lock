@@ -38,12 +38,14 @@
         "@tanstack/react-router": "^1.168.25",
         "@tanstack/react-start": "^1.167.50",
         "@tanstack/router-plugin": "^1.167.28",
+        "@types/leaflet": "^1.9.21",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "cmdk": "^1.1.1",
         "date-fns": "^4.1.0",
         "embla-carousel-react": "^8.6.0",
         "input-otp": "^1.4.2",
+        "leaflet": "^1.9.4",
         "lucide-react": "^0.575.0",
         "mapbox-gl": "^3.24.0",
         "react": "^19.2.0",
@@ -588,6 +590,8 @@
 
     "@types/json-schema": ["@types/json-schema@7.0.15", "", {}, "sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA=="],
 
+    "@types/leaflet": ["@types/leaflet@1.9.21", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@types/leaflet/-/leaflet-1.9.21.tgz", { "dependencies": { "@types/geojson": "*" } }, "sha512-TbAd9DaPGSnzp6QvtYngntMZgcRk+igFELwR2N99XZn7RXUdKgsXMR+28bUO0rPsWp8MIu/f47luLIQuSLYv/w=="],
+
     "@types/mapbox-gl": ["@types/mapbox-gl@3.5.0", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@types/mapbox-gl/-/mapbox-gl-3.5.0.tgz", { "dependencies": { "mapbox-gl": "*" } }, "sha512-3wVAUTC6q1UKatLP9YxFBnGJWi3neJUF9OKeyRdUf/BsYjZAP35xmZkL4zogVJbO3vdExuSVYCAkzUXjpjdhOg=="],
 
     "@types/node": ["@types/node@22.19.17", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-wGdMcf+vPYM6jikpS/qhg6WiqSV/OhG+jeeHT/KlVqxYfD40iYJf9/AE1uQxVWFvU7MipKRkRv8NSHiCGgPr8Q=="],
@@ -925,6 +929,8 @@
     "kdbush": ["kdbush@4.1.0", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/kdbush/-/kdbush-4.1.0.tgz", {}, "sha512-e9vurzrXJQrFX6ckpHP3bvj5l+9CnYzkxDNnNQ1h2QTqdWsUAJgXiKdGNcOa1EY85dU8KbQ+z/FdQdB7P+9yfQ=="],
 
     "keyv": ["keyv@4.5.4", "", { "dependencies": { "json-buffer": "3.0.1" } }, "sha512-oxVHkHR/EJf2CNXnWxRLW6mg7JyCCUcG0DtEGmL2ctUo1PNTin1PUil+r/+4r5MpVgC/fn1kjsx7mjSujKqIpw=="],
+
+    "leaflet": ["leaflet@1.9.4", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/leaflet/-/leaflet-1.9.4.tgz", {}, "sha512-nxS1ynzJOmOlHp+iL3FyWqK89GtNL8U8rvlMOsQdTTssxZwCXh8N2NB3GDQOL+YR3XnWyZAxwQixURb+FA74PA=="],
 
     "levn": ["levn@0.4.1", "", { "dependencies": { "prelude-ls": "^1.2.1", "type-check": "~0.4.0" } }, "sha512-+bT2uH4E5LGE7h/n3evcS/sQlJXCpIp6ym8OWJ5eV6+67Dsql/LaaT7qJBAt2rzfoa/5QBGBhxDix1dMt2kQKQ=="],
 

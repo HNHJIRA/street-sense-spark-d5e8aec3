@@ -179,6 +179,69 @@ interface OsmWay {
   geometry?: Array<{ lat: number; lon: number }>;
 }
 
+function decodeXml(value: string) {
+  return value
+    .replaceAll("&quot;", '"')
+    .replaceAll("&apos;", "'")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&amp;", "&");
+}
+
+function xmlAttrs(source: string) {
+  const attrs: Record<string, string> = {};
+  for (const match of source.matchAll(/([\w:-]+)="([^"]*)"/g)) attrs[match[1]] = decodeXml(match[2]);
+  return attrs;
+}
+
+function parseOsmXml(xml: string): OsmWay[] {
+  const nodes = new Map<string, { lat: number; lon: number }>();
+  for (const match of xml.matchAll(/<node\b([^>]*)\/>/g)) {
+    const a = xmlAttrs(match[1]);
+    if (a.id && a.lat && a.lon) nodes.set(a.id, { lat: Number(a.lat), lon: Number(a.lon) });
+  }
+  const ways: OsmWay[] = [];
+  for (const match of xml.matchAll(/<way\b[^>]*id="(\d+)"[^>]*>([\s\S]*?)<\/way>/g)) {
+    const tags: OsmTags = {};
+    for (const tag of match[2].matchAll(/<tag\b([^>]*)\/>/g)) {
+      const a = xmlAttrs(tag[1]);
+      if (a.k && a.v) tags[a.k] = a.v;
+    }
+    if (!tags.highway || !HIGHWAY_KINDS.includes(tags.highway)) continue;
+    const geometry = Array.from(match[2].matchAll(/<nd\b[^>]*ref="(\d+)"[^>]*\/>/g))
+      .map((nd) => nodes.get(nd[1]))
+      .filter((p): p is { lat: number; lon: number } => Boolean(p));
+    if (geometry.length >= 2) ways.push({ type: "way", id: Number(match[1]), tags, geometry });
+  }
+  return ways;
+}
+
+async function fetchOsmMapBbox(minLng: number, minLat: number, maxLng: number, maxLat: number) {
+  const res = await fetch(
+    `https://api.openstreetmap.org/api/0.6/map?bbox=${minLng},${minLat},${maxLng},${maxLat}`,
+    { headers: { Accept: "application/xml", "User-Agent": "ParkClear real-time parking map" } },
+  );
+  if (!res.ok) throw new Error(`OSM ${res.status}`);
+  return parseOsmXml(await res.text());
+}
+
+async function fetchOsmMapSplit(minLng: number, minLat: number, maxLng: number, maxLat: number) {
+  const ways = new Map<number, OsmWay>();
+  const cols = 4;
+  const rows = 2;
+  for (let x = 0; x < cols; x += 1) {
+    for (let y = 0; y < rows; y += 1) {
+      const aLng = minLng + ((maxLng - minLng) * x) / cols;
+      const bLng = minLng + ((maxLng - minLng) * (x + 1)) / cols;
+      const aLat = minLat + ((maxLat - minLat) * y) / rows;
+      const bLat = minLat + ((maxLat - minLat) * (y + 1)) / rows;
+      const chunk = await fetchOsmMapBbox(aLng, aLat, bLng, bLat);
+      for (const way of chunk) ways.set(way.id, way);
+    }
+  }
+  return Array.from(ways.values());
+}
+
 const HIGHWAY_KINDS = [
   "motorway", "trunk", "primary", "secondary", "tertiary",
   "residential", "unclassified", "living_street", "service",
@@ -286,11 +349,16 @@ export const importOsmStreets = createServerFn({ method: "POST" })
         lastErr = (e as Error).message;
       }
     }
-    if (!json) throw new Error(`Overpass unavailable: ${lastErr}`);
-
-    const ways = (json.elements ?? []).filter(
+    let ways = (json?.elements ?? []).filter(
       (e) => e.type === "way" && Array.isArray(e.geometry) && e.geometry.length >= 2,
     );
+    if (ways.length === 0) {
+      try {
+        ways = await fetchOsmMapSplit(data.minLng, data.minLat, data.maxLng, data.maxLat);
+      } catch (e) {
+        if (!json) throw new Error(`OSM unavailable: ${lastErr || (e as Error).message}`);
+      }
+    }
     if (ways.length === 0) return { imported: 0, skipped: 0 };
 
     // Build segment rows. Use ST_GeomFromGeoJSON for the LineString.

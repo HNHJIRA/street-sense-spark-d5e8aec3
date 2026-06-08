@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef } from "react";
-import mapboxgl from "mapbox-gl";
-import "mapbox-gl/dist/mapbox-gl.css";
+import { useCallback, useEffect, useRef, useState } from "react";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import type { Feature, FeatureCollection, LineString } from "geojson";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -41,12 +41,14 @@ function segmentToFeature(s: SegmentLite): Feature<LineString> {
 }
 
 export function MapView({ token, city }: MapViewProps) {
+  void token;
   const container = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<mapboxgl.Map | null>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const segmentLayerRef = useRef<L.GeoJSON<LineString> | null>(null);
   const featuresRef = useRef<Map<string, Feature<LineString>>>(new Map());
   const importingRef = useRef(false);
   const lastFetchKeyRef = useRef<string>("");
-  const webglOk = typeof window !== "undefined" && mapboxgl.supported();
+  const [mapError, setMapError] = useState(false);
 
   const queryClient = useQueryClient();
   const fetchSegments = useServerFn(getSegmentsInBbox);
@@ -57,22 +59,20 @@ export function MapView({ token, city }: MapViewProps) {
   const setFlyTo = useAppStore((s) => s.setFlyTo);
 
   const updateSource = useCallback(() => {
-    const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
-    const src = map.getSource("segments") as mapboxgl.GeoJSONSource | undefined;
-    if (!src) return;
+    const layer = segmentLayerRef.current;
+    if (!layer) return;
     const data: FeatureCollection<LineString> = {
       type: "FeatureCollection",
       features: Array.from(featuresRef.current.values()),
     };
-    src.setData(data);
+    layer.clearLayers();
+    layer.addData(data);
   }, []);
 
   const loadBbox = useCallback(async () => {
     const map = mapRef.current;
     if (!map) return;
     const b = map.getBounds();
-    if (!b) return;
     const minLng = b.getWest(), minLat = b.getSouth();
     const maxLng = b.getEast(), maxLat = b.getNorth();
     const w = maxLng - minLng, h = maxLat - minLat;
@@ -98,6 +98,7 @@ export function MapView({ token, city }: MapViewProps) {
         toast.success(`Imported ${res.imported} streets`, { id });
         // Force refetch by clearing the key memo.
         lastFetchKeyRef.current = "";
+        await queryClient.invalidateQueries({ queryKey: ["segments", city.id] });
         await loadBbox();
       } catch (e) {
         toast.error((e as Error).message, { id });
@@ -107,74 +108,61 @@ export function MapView({ token, city }: MapViewProps) {
     }
   }, [city.id, city.slug, fetchSegments, queryClient, runImport, updateSource]);
 
-  // Init map once
+  // Init map once with raster tiles so it works without WebGL.
   useEffect(() => {
-    if (!container.current || mapRef.current || !webglOk) return;
-    mapboxgl.accessToken = token;
-    const map = new mapboxgl.Map({
-      container: container.current,
-      style: "mapbox://styles/mapbox/dark-v11",
-      center: city.center,
-      zoom: Math.max(15, city.default_zoom),
-      attributionControl: false,
-      pitchWithRotate: false,
-    });
-    map.addControl(new mapboxgl.NavigationControl({ showCompass: false, visualizePitch: false }), "top-right");
-    map.addControl(new mapboxgl.GeolocateControl({ trackUserLocation: true, showUserHeading: true }), "top-right");
+    if (!container.current || mapRef.current) return;
+    let map: L.Map;
+    try {
+      map = L.map(container.current, {
+        center: [city.center[1], city.center[0]],
+        zoom: Math.max(15, city.default_zoom),
+        zoomControl: false,
+        attributionControl: false,
+      });
+    } catch {
+      setMapError(true);
+      return;
+    }
+
+    L.control.zoom({ position: "topright" }).addTo(map);
+    L.tileLayer(
+      `https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/512/{z}/{x}/{y}@2x?access_token=${token}`,
+      { tileSize: 512, zoomOffset: -1, maxZoom: 20 },
+    ).addTo(map);
+
+    segmentLayerRef.current = L.geoJSON(undefined, {
+      style: (feature) => ({
+        color: COLOR_HEX[(feature?.properties?.color as ParkingColor | undefined) ?? "green"],
+        weight: 7,
+        opacity: 0.95,
+        lineCap: "round",
+        lineJoin: "round",
+      }),
+      onEachFeature: (feature, layer) => {
+        layer.on("click", () => {
+          const id = feature.properties?.segmentId as string | undefined;
+          if (id) selectSegment(id);
+        });
+      },
+    }).addTo(map) as L.GeoJSON<LineString>;
 
     let moveTimer: number | undefined;
-
-    map.on("load", () => {
-      map.addSource("segments", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
-      map.addLayer({
-        id: "segments-line-casing",
-        type: "line",
-        source: "segments",
-        paint: {
-          "line-color": "#0b1020",
-          "line-width": ["interpolate", ["linear"], ["zoom"], 12, 4, 16, 9, 19, 16],
-          "line-opacity": 0.7,
-        },
-      });
-      map.addLayer({
-        id: "segments-line",
-        type: "line",
-        source: "segments",
-        paint: {
-          "line-color": [
-            "match",
-            ["get", "color"],
-            "green", COLOR_HEX.green,
-            "yellow", COLOR_HEX.yellow,
-            "red", COLOR_HEX.red,
-            "#7c8597",
-          ],
-          "line-width": ["interpolate", ["linear"], ["zoom"], 12, 2, 16, 6, 19, 11],
-          "line-opacity": 0.95,
-        },
-      });
-      map.on("click", "segments-line", (e) => {
-        const f = e.features?.[0];
-        const id = f?.properties?.segmentId as string | undefined;
-        if (id) selectSegment(id);
-      });
-      map.on("mouseenter", "segments-line", () => { map.getCanvas().style.cursor = "pointer"; });
-      map.on("mouseleave", "segments-line", () => { map.getCanvas().style.cursor = ""; });
-
-      // Initial load
-      void loadBbox();
-    });
-
     map.on("moveend", () => {
       window.clearTimeout(moveTimer);
       moveTimer = window.setTimeout(() => { void loadBbox(); }, 350);
     });
 
     mapRef.current = map;
+    window.setTimeout(() => {
+      map.invalidateSize();
+      void loadBbox();
+    }, 0);
+
     return () => {
       window.clearTimeout(moveTimer);
       map.remove();
       mapRef.current = null;
+      segmentLayerRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, city.id]);
@@ -182,18 +170,14 @@ export function MapView({ token, city }: MapViewProps) {
   // Fly to from search
   useEffect(() => {
     if (!flyTo || !mapRef.current) return;
-    mapRef.current.flyTo({
-      center: [flyTo.lng, flyTo.lat],
-      zoom: flyTo.zoom ?? 16,
-      duration: 1200,
-    });
+    mapRef.current.flyTo([flyTo.lat, flyTo.lng], flyTo.zoom ?? 16, { duration: 1.2 });
     setFlyTo(null);
   }, [flyTo, setFlyTo]);
 
   return (
     <>
       <div ref={container} className="absolute inset-0" />
-      {!webglOk && (
+      {mapError && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-background p-6 text-center">
           <div className="max-w-sm">
             <h2 className="font-display text-lg font-bold">Map can't render here</h2>
