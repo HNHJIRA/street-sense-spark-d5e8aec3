@@ -338,11 +338,8 @@ export function MapView({ token, city }: MapViewProps) {
 
   return (
     <>
-      <div
-        ref={container}
-        className="absolute inset-0 z-0"
-        style={{ minHeight: "100%", minWidth: "100%", background: "#1a1a1a" }}
-      />
+      <div ref={container} className="absolute inset-0 z-0 h-full w-full" />
+
 
 
       {ready && (
