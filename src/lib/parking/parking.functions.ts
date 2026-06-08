@@ -323,11 +323,21 @@ export const importOsmStreets = createServerFn({ method: "POST" })
         lastErr = (e as Error).message;
       }
     }
-    if (!json) throw new Error(`Overpass unavailable: ${lastErr}`);
-
-    const ways = (json.elements ?? []).filter(
+    let ways = (json?.elements ?? []).filter(
       (e) => e.type === "way" && Array.isArray(e.geometry) && e.geometry.length >= 2,
     );
+    if (ways.length === 0) {
+      try {
+        const res = await fetch(
+          `https://api.openstreetmap.org/api/0.6/map?bbox=${data.minLng},${data.minLat},${data.maxLng},${data.maxLat}`,
+          { headers: { Accept: "application/xml" } },
+        );
+        if (!res.ok) throw new Error(`OSM ${res.status}`);
+        ways = parseOsmXml(await res.text());
+      } catch (e) {
+        if (!json) throw new Error(`OSM unavailable: ${lastErr || (e as Error).message}`);
+      }
+    }
     if (ways.length === 0) return { imported: 0, skipped: 0 };
 
     // Build segment rows. Use ST_GeomFromGeoJSON for the LineString.
