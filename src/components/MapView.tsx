@@ -104,7 +104,7 @@ export function MapView({ token, city }: MapViewProps) {
       try {
         const res = await runImport({ data: { citySlug: city.slug, minLng, minLat, maxLng, maxLat } });
         if (res.error) { toast.message(res.error, { id }); return; }
-        toast.success(`Imported ${res.imported} streets`, { id });
+        toast.success(`Loaded ${res.imported} blockfaces`, { id });
         lastFetchKeyRef.current = "";
         await queryClient.invalidateQueries({ queryKey: ["segments", city.id] });
         await loadBbox();
