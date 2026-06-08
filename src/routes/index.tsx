@@ -1,29 +1,114 @@
+import { useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useSuspenseQuery, useQuery, queryOptions } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { getCityBundle, getMapboxToken } from "@/lib/parking/parking.functions";
+import { MapView } from "@/components/MapView";
+import { TopBar } from "@/components/TopBar";
+import { BottomNav } from "@/components/BottomNav";
+import { StreetSheet } from "@/components/StreetSheet";
+import { ForecastSheet } from "@/components/ForecastSheet";
+import { SearchSheet } from "@/components/SearchSheet";
+import { useAppStore } from "@/stores/app-store";
+
+const bundleOpts = queryOptions({
+  queryKey: ["parking", "bundle", "seattle"],
+  queryFn: () => getCityBundle({ data: { citySlug: "seattle" } }),
+  staleTime: 5 * 60 * 1000,
+});
+const tokenOpts = queryOptions({
+  queryKey: ["mapbox", "token"],
+  queryFn: () => getMapboxToken(),
+  staleTime: Infinity,
+});
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Your App" },
-      { name: "description", content: "Replace this with a one-sentence description of your app." },
-      { property: "og:title", content: "Your App" },
-      { property: "og:description", content: "Replace this with a one-sentence description of your app." },
+      { title: "ParkClear — Seattle parking map" },
+      { name: "description", content: "Real-time, color-coded street parking map for Seattle. See where you can park right now, or forecast a future time." },
+      { property: "og:title", content: "ParkClear — Seattle parking map" },
+      { property: "og:description", content: "See parking legality on every street in Seattle, at a glance." },
     ],
   }),
-  component: Index,
+  loader: ({ context }) => {
+    context.queryClient.ensureQueryData(bundleOpts);
+    context.queryClient.ensureQueryData(tokenOpts);
+  },
+  component: HomePage,
+  errorComponent: ({ error }) => (
+    <div className="flex min-h-screen items-center justify-center bg-background p-6 text-center">
+      <div>
+        <h1 className="text-lg font-bold">Couldn't load the parking map</h1>
+        <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
+      </div>
+    </div>
+  ),
+  notFoundComponent: () => null,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
-function Index() {
+function HomePage() {
+  const bundleQuery = useQuery(bundleOpts);
+  const tokenQuery = useSuspenseQuery(tokenOpts);
+
+  const forecastAt = useAppStore((s) => s.forecastAt);
+  const tick = useAppStore((s) => s.tick);
+  const bumpTick = useAppStore((s) => s.bumpTick);
+
+  useEffect(() => {
+    if (forecastAt) return;
+    const id = window.setInterval(bumpTick, 60_000);
+    return () => window.clearInterval(id);
+  }, [forecastAt, bumpTick]);
+
+  const now = forecastAt ?? new Date();
+  // Reference tick so the live clock recomputes
+  void tick;
+
+  if (!bundleQuery.data) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-sm text-muted-foreground">Loading parking data…</div>
+      </div>
+    );
+  }
+
+  const bundle = bundleQuery.data;
+
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
+    <div className="relative h-screen w-screen overflow-hidden bg-background">
+      <MapView token={tokenQuery.data.token} bundle={bundle} now={now} />
+      <TopBar
+        cityName={bundle.city.name}
+        now={now}
+        timezone={bundle.city.timezone}
+        isForecast={!!forecastAt}
       />
+      <Legend />
+      <BottomNav />
+      <SearchSheet token={tokenQuery.data.token} />
+      <ForecastSheet />
+      <StreetSheet bundle={bundle} now={now} />
     </div>
+  );
+}
+
+function Legend() {
+  return (
+    <div className="pointer-events-none fixed bottom-24 left-1/2 z-10 -translate-x-1/2 safe-bottom">
+      <div className="flex items-center gap-3 rounded-full border border-border bg-surface/85 px-4 py-2 backdrop-blur-xl">
+        <LegendDot color="bg-park-green" label="Allowed" />
+        <LegendDot color="bg-park-yellow" label="Restricted" />
+        <LegendDot color="bg-park-red" label="No parking" />
+      </div>
+    </div>
+  );
+}
+function LegendDot({ color, label }: { color: string; label: string }) {
+  return (
+    <span className="flex items-center gap-1.5 text-[11px] font-semibold">
+      <span className={`h-2.5 w-2.5 rounded-full ${color}`} />
+      {label}
+    </span>
   );
 }

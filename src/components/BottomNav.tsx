@@ -1,0 +1,62 @@
+import { Link, useRouterState } from "@tanstack/react-router";
+import { Bookmark, Clock, Map as MapIcon, Search, User } from "lucide-react";
+import { useAppStore } from "@/stores/app-store";
+import { cn } from "@/lib/utils";
+
+interface Tab {
+  id: string;
+  label: string;
+  icon: typeof MapIcon;
+  to?: string;
+  onClick?: () => void;
+  active?: boolean;
+}
+
+export function BottomNav() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const setSearchOpen = useAppStore((s) => s.setSearchOpen);
+  const setForecastOpen = useAppStore((s) => s.setForecastOpen);
+  const searchOpen = useAppStore((s) => s.searchOpen);
+  const forecastOpen = useAppStore((s) => s.forecastOpen);
+  const forecastAt = useAppStore((s) => s.forecastAt);
+
+  const tabs: Tab[] = [
+    { id: "home", label: "Map", icon: MapIcon, to: "/", active: pathname === "/" && !searchOpen && !forecastOpen },
+    { id: "search", label: "Search", icon: Search, onClick: () => { setSearchOpen(true); setForecastOpen(false); }, active: searchOpen },
+    { id: "forecast", label: "Forecast", icon: Clock, onClick: () => { setForecastOpen(true); setSearchOpen(false); }, active: forecastOpen || !!forecastAt },
+    { id: "saved", label: "Saved", icon: Bookmark, to: "/saved", active: pathname.startsWith("/saved") },
+    { id: "profile", label: "Profile", icon: User, to: "/profile", active: pathname.startsWith("/profile") },
+  ];
+
+  return (
+    <nav className="pointer-events-auto fixed inset-x-0 bottom-0 z-30 safe-bottom">
+      <div className="mx-auto max-w-md px-3">
+        <div className="flex items-center justify-between rounded-3xl border border-border bg-surface/85 px-2 py-2 backdrop-blur-xl shadow-[0_20px_60px_-20px_rgba(0,0,0,0.7)]">
+          {tabs.map((t) => {
+            const Icon = t.icon;
+            const inner = (
+              <button
+                type="button"
+                onClick={t.onClick}
+                className={cn(
+                  "flex flex-1 flex-col items-center gap-0.5 rounded-2xl px-2 py-2 text-[11px] font-medium transition",
+                  t.active ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <Icon className="h-5 w-5" strokeWidth={2.2} />
+                <span>{t.label}</span>
+              </button>
+            );
+            return t.to ? (
+              <Link key={t.id} to={t.to} className="flex-1">
+                {inner}
+              </Link>
+            ) : (
+              <div key={t.id} className="flex-1">{inner}</div>
+            );
+          })}
+        </div>
+      </div>
+    </nav>
+  );
+}
