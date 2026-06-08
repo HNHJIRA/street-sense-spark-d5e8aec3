@@ -50,11 +50,29 @@ export interface ParkingSession {
   sourceLabel: string | null;
 }
 
+export interface NotificationLogItem {
+  id: string;
+  sessionId: string;
+  type: AlertType;
+  label: string;
+  minutesBefore: number;
+  triggerAt: string;        // ISO when the alert was scheduled to fire
+  deliveredAt: string;      // ISO when it actually fired
+  deliveryStatus: "delivered" | "in_app_only" | "failed";
+  reason: string | null;
+}
+
 interface DeviceState {
   savedSpots: SavedSpot[];
   favorites: FavoritePlace[];
   searchHistory: SearchHistoryItem[];
   activeSession: ParkingSession | null;
+
+  alertSettings: AlertSettings;
+  notificationHistory: NotificationLogItem[];
+  // Per-session set of already-fired alert ids — keeps the scheduler idempotent
+  // across remounts and tab focuses.
+  deliveredAlertIds: string[];
 
   addSavedSpot: (spot: Omit<SavedSpot, "id" | "createdAt">) => void;
   removeSavedSpot: (id: string) => void;
@@ -70,6 +88,11 @@ interface DeviceState {
 
   startSession: (s: Omit<ParkingSession, "id" | "startedAt">) => void;
   endSession: () => void;
+
+  setAlertSetting: <K extends keyof AlertSettings>(key: K, value: AlertSettings[K]) => void;
+  recordNotification: (n: Omit<NotificationLogItem, "id" | "deliveredAt"> & { alertId: string }) => void;
+  clearNotificationHistory: () => void;
+  hasDeliveredAlert: (alertId: string) => boolean;
 }
 
 const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto
