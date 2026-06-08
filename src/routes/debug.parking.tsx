@@ -138,7 +138,11 @@ function DebugParkingPage() {
               </div>
 
               <Section title="1 · Raw source data (provider payload as stored)">
-                <Json value={r.raw_source} />
+                <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>{r.raw_source_json}</pre>
+              </Section>
+
+              <Section title="1b · Stored segment metadata">
+                <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>{r.segment.metadata_json}</pre>
               </Section>
 
               <Section title="2 · Normalization layer output">
