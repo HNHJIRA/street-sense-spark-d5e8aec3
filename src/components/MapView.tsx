@@ -160,6 +160,15 @@ export function MapView({ token, city }: MapViewProps) {
             attributionControl: false,
             antialias: true,
           });
+          map.dragRotate.enable();
+          map.touchZoomRotate.enable();
+          map.touchZoomRotate.enableRotation();
+          if ((map as any).touchPitch?.enable) (map as any).touchPitch.enable();
+          map.keyboard.enable();
+          map.addControl(
+            new mapboxgl.NavigationControl({ visualizePitch: true, showCompass: true, showZoom: true }),
+            "top-right"
+          );
         } catch (err) {
           // WebGL2 unavailable in this preview iframe → surface fallback UI.
           console.error("[MapView] mapbox-gl init failed", err);
