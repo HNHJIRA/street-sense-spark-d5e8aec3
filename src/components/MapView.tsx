@@ -193,19 +193,29 @@ export function MapView({ token, city }: MapViewProps) {
             "red", COLOR_HEX.red,
             COLOR_HEX.green,
           ];
+          // Thicker, saturated curb stripes — matches ParkUsher rendering.
           const widthExpr: any = [
             "interpolate", ["linear"], ["zoom"],
-            13, 1.5,
-            15, 3,
-            17, 5,
-            19, 8,
+            13, 1.8,
+            15, 3.5,
+            16, 4.5,
+            17, 6,
+            18, 8,
+            19, 11,
           ];
+          // Push lines out to the curb edge (further than lane center).
           const offsetBase: any = [
             "interpolate", ["linear"], ["zoom"],
-            13, 1, 15, 2.5, 17, 5, 19, 9,
+            13, 2,
+            15, 5,
+            16, 7,
+            17, 10,
+            18, 14,
+            19, 20,
           ];
 
-          // LEFT side: negative offset
+          // LEFT side: negative offset. Insert BELOW road labels so street
+          // names remain readable on top of the colored curb lines.
           map.addLayer({
             id: "seg-left",
             type: "line",
@@ -216,11 +226,11 @@ export function MapView({ token, city }: MapViewProps) {
               "line-color": colorExpr,
               "line-width": widthExpr,
               "line-offset": ["*", offsetBase, -1],
-              "line-opacity": 0.95,
+              "line-opacity": 1,
             },
-          });
+          }, labelId);
 
-          // RIGHT side: positive offset (also 'both' rendered here as second line)
+          // RIGHT side: positive offset.
           map.addLayer({
             id: "seg-right",
             type: "line",
@@ -231,9 +241,9 @@ export function MapView({ token, city }: MapViewProps) {
               "line-color": colorExpr,
               "line-width": widthExpr,
               "line-offset": offsetBase,
-              "line-opacity": 0.95,
+              "line-opacity": 1,
             },
-          });
+          }, labelId);
 
           map.on("click", ["seg-left", "seg-right"] as any, (e: any) => {
             const f = e.features?.[0];
