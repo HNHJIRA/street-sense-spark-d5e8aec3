@@ -184,16 +184,3 @@ export const useDeviceStore = create<DeviceState>()(
     },
   ),
 );
-    }),
-    {
-      name: "parkclear-device-v1",
-      storage: createJSONStorage(() => (typeof window !== "undefined" ? window.localStorage : undefined as any)),
-      partialize: (s) => ({
-        savedSpots: s.savedSpots,
-        favorites: s.favorites,
-        searchHistory: s.searchHistory,
-        activeSession: s.activeSession,
-      }),
-    },
-  ),
-);
