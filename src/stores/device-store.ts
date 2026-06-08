@@ -107,6 +107,10 @@ export const useDeviceStore = create<DeviceState>()(
       searchHistory: [],
       activeSession: null,
 
+      alertSettings: DEFAULT_ALERT_SETTINGS,
+      notificationHistory: [],
+      deliveredAlertIds: [],
+
       addSavedSpot: (spot) =>
         set((s) => ({
           savedSpots: [{ ...spot, id: uid(), createdAt: new Date().toISOString() }, ...s.savedSpots],
