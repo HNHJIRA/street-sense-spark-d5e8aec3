@@ -87,6 +87,7 @@ function HomePage() {
           isForecast={!!forecastAt}
         />
         <Legend />
+        <ActiveSessionWidget restrictionTypes={city.restrictionTypes} />
         <ParkHereButton cityId={city.id} timezone={city.timezone} />
         <BottomNav />
         <SearchSheet token={tokenQuery.data.token} />
