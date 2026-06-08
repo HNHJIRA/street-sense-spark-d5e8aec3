@@ -8,6 +8,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { StreetSheet } from "@/components/StreetSheet";
 import { ForecastSheet } from "@/components/ForecastSheet";
 import { SearchSheet } from "@/components/SearchSheet";
+import { ParkHereButton } from "@/components/ParkHereButton";
 import { useAppStore } from "@/stores/app-store";
 
 const cityOpts = queryOptions({
@@ -83,6 +84,7 @@ function HomePage() {
         isForecast={!!forecastAt}
       />
       <Legend />
+      <ParkHereButton cityId={city.id} />
       <BottomNav />
       <SearchSheet token={tokenQuery.data.token} />
       <ForecastSheet />
@@ -93,7 +95,7 @@ function HomePage() {
 
 function Legend() {
   return (
-    <div className="pointer-events-none fixed bottom-24 left-1/2 z-10 -translate-x-1/2 safe-bottom">
+    <div className="pointer-events-none fixed bottom-40 left-1/2 z-10 -translate-x-1/2 safe-bottom">
       <div className="flex items-center gap-3 rounded-full border border-border bg-surface/85 px-4 py-2 backdrop-blur-xl">
         <LegendDot color="bg-park-green" label="Allowed" />
         <LegendDot color="bg-park-yellow" label="Restricted" />

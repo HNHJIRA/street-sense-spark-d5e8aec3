@@ -169,6 +169,70 @@ export const getSegmentDetails = createServerFn({ method: "GET" })
     };
   });
 
+// ---------- "Can I park here?" — nearest segment by coordinates ----------
+
+export interface ParkHereResult {
+  found: boolean;
+  segmentId?: string;
+  name?: string;
+  color?: ParkingColor;
+  label?: string;
+  restriction_code?: string;
+  distance_m?: number;
+  coordinates?: [number, number][];
+  message: string;
+}
+
+export const checkParkingHere = createServerFn({ method: "GET" })
+  .inputValidator((input: unknown) =>
+    z.object({
+      cityId: z.string().uuid(),
+      lng: z.number().min(-180).max(180),
+      lat: z.number().min(-90).max(90),
+    }).parse(input),
+  )
+  .handler(async ({ data }): Promise<ParkHereResult> => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const admin = supabaseAdmin as unknown as {
+      rpc: (n: string, a?: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
+    };
+    const { data: rows, error } = await admin.rpc("nearest_segment", {
+      p_city_id: data.cityId,
+      p_lng: data.lng,
+      p_lat: data.lat,
+      p_max_meters: 80,
+    });
+    if (error) throw new Error((error as { message?: string }).message ?? "Lookup failed");
+    const row = (rows as Array<{
+      id: string; name: string; geojson: string;
+      restriction_code: string; color: ParkingColor; label: string; distance_m: number;
+    }> | null)?.[0];
+    if (!row) {
+      return { found: false, message: "No mapped street nearby. Try moving closer to a street." };
+    }
+    let coords: [number, number][] = [];
+    try {
+      const g = JSON.parse(row.geojson) as LineString;
+      if (Array.isArray(g.coordinates)) coords = g.coordinates as [number, number][];
+    } catch { /* ignore */ }
+    const msg = row.color === "green"
+      ? `Yes — you can park here on ${row.name}.`
+      : row.color === "yellow"
+        ? `Caution on ${row.name}: ${row.label.toLowerCase()}.`
+        : `No — ${row.label.toLowerCase()} on ${row.name}.`;
+    return {
+      found: true,
+      segmentId: row.id,
+      name: row.name,
+      color: row.color,
+      label: row.label,
+      restriction_code: row.restriction_code,
+      distance_m: row.distance_m,
+      coordinates: coords,
+      message: msg,
+    };
+  });
+
 // ---------- OSM (Overpass) importer ----------
 
 type OsmTags = Record<string, string>;

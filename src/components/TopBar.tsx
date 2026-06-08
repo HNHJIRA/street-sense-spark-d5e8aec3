@@ -10,19 +10,7 @@ interface TopBarProps {
 
 function formatTime(d: Date, tz: string) {
   return new Intl.DateTimeFormat("en-US", {
-    timeZone: tz,
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  }).format(d);
-}
-
-function formatDay(d: Date, tz: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: tz,
-    weekday: "short",
-    month: "short",
-    day: "numeric",
+    timeZone: tz, hour: "numeric", minute: "2-digit", hour12: true,
   }).format(d);
 }
 
@@ -32,37 +20,40 @@ export function TopBar({ cityName, now, timezone, isForecast }: TopBarProps) {
 
   return (
     <div className="pointer-events-none fixed inset-x-0 top-0 z-20 safe-top">
-      <div className="mx-auto max-w-md px-3">
+      <div className="mx-auto flex max-w-md items-center gap-2 px-3 pt-2">
+        <div className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-border bg-surface/90 px-3 py-1.5 backdrop-blur-xl shadow-lg">
+          <MapPin className="h-3.5 w-3.5 text-primary" strokeWidth={2.4} />
+          <span className="text-xs font-semibold">{cityName}</span>
+        </div>
+        <div
+          className={`pointer-events-auto flex items-center gap-1.5 rounded-full border px-3 py-1.5 backdrop-blur-xl shadow-lg ${
+            isForecast
+              ? "border-park-yellow/40 bg-park-yellow-soft text-park-yellow"
+              : "border-border bg-surface/90 text-foreground"
+          }`}
+        >
+          <span className="text-xs font-semibold">
+            {isForecast ? "Forecast" : "Live"}
+            {now ? ` · ${formatTime(now, timezone)}` : ""}
+          </span>
+          {isForecast && (
+            <button
+              type="button"
+              onClick={() => clearForecast(null)}
+              className="ml-1 rounded-full bg-park-yellow/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-park-yellow"
+            >
+              Live
+            </button>
+          )}
+        </div>
         <button
           type="button"
           onClick={() => setSearchOpen(true)}
-          className="pointer-events-auto flex w-full items-center gap-3 rounded-full border border-border bg-surface/90 px-4 py-3 text-left shadow-[0_20px_60px_-20px_rgba(0,0,0,0.6)] backdrop-blur-xl"
+          aria-label="Search"
+          className="pointer-events-auto ml-auto flex h-9 w-9 items-center justify-center rounded-full border border-border bg-surface/90 backdrop-blur-xl shadow-lg"
         >
-          <Search className="h-5 w-5 text-muted-foreground" strokeWidth={2.2} />
-          <span className="flex-1 text-sm text-muted-foreground">Search address, landmark, neighborhood…</span>
+          <Search className="h-4 w-4" strokeWidth={2.4} />
         </button>
-
-        <div className="pointer-events-auto mt-2 flex items-center gap-2">
-          <div className="flex items-center gap-1.5 rounded-full border border-border bg-surface/80 px-3 py-1.5 backdrop-blur-xl">
-            <MapPin className="h-3.5 w-3.5 text-primary" strokeWidth={2.4} />
-            <span className="text-xs font-semibold tracking-wide">{cityName}</span>
-          </div>
-          <div className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 backdrop-blur-xl ${isForecast ? "border-park-yellow/40 bg-park-yellow-soft text-park-yellow" : "border-border bg-surface/80 text-foreground"}`}>
-            <span className="text-xs font-semibold">
-              {isForecast ? "Forecast • " : "Live • "}
-              {now ? `${formatDay(now, timezone)} · ${formatTime(now, timezone)}` : "Syncing…"}
-            </span>
-            {isForecast && (
-              <button
-                type="button"
-                onClick={() => clearForecast(null)}
-                className="ml-1 rounded-full bg-park-yellow/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-park-yellow"
-              >
-                Live
-              </button>
-            )}
-          </div>
-        </div>
       </div>
     </div>
   );
