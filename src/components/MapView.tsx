@@ -95,6 +95,10 @@ export function MapView({ token, city }: MapViewProps) {
       const id = toast.loading("Loading real street data for this area…");
       try {
         const res = await runImport({ data: { citySlug: city.slug, minLng, minLat, maxLng, maxLat } });
+        if (res.error) {
+          toast.message(res.error, { id });
+          return;
+        }
         toast.success(`Imported ${res.imported} streets`, { id });
         // Force refetch by clearing the key memo.
         lastFetchKeyRef.current = "";
