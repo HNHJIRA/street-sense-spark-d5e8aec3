@@ -566,6 +566,72 @@ export type Database = {
           },
         ]
       }
+      usage_events: {
+        Row: {
+          device_id: string
+          event_name: string
+          id: string
+          occurred_at: string
+          properties: Json
+          surface: string | null
+        }
+        Insert: {
+          device_id: string
+          event_name: string
+          id?: string
+          occurred_at?: string
+          properties?: Json
+          surface?: string | null
+        }
+        Update: {
+          device_id?: string
+          event_name?: string
+          id?: string
+          occurred_at?: string
+          properties?: Json
+          surface?: string | null
+        }
+        Relationships: []
+      }
+      user_reports: {
+        Row: {
+          context: Json
+          created_at: string
+          device_id: string
+          id: string
+          message: string
+          report_type: string
+          scan_id: string | null
+          segment_id: string | null
+          status: string
+          surface: string
+        }
+        Insert: {
+          context?: Json
+          created_at?: string
+          device_id: string
+          id?: string
+          message: string
+          report_type: string
+          scan_id?: string | null
+          segment_id?: string | null
+          status?: string
+          surface: string
+        }
+        Update: {
+          context?: Json
+          created_at?: string
+          device_id?: string
+          id?: string
+          message?: string
+          report_type?: string
+          scan_id?: string | null
+          segment_id?: string | null
+          status?: string
+          surface?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       geography_columns: {
