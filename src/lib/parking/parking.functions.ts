@@ -217,7 +217,7 @@ export const getSegmentDetails = createServerFn({ method: "GET" })
       neighborhood: (seg.metadata?.neighborhood ?? null) as string | null,
       data_source: src,
       source_label: SOURCE_LABELS[src] ?? src,
-      metadata: (seg.metadata ?? {}) as Record<string, unknown>,
+      source_category: ((seg.metadata?.parking_category as string | undefined) ?? null) || null,
       rules: (rules ?? []) as ParkingRule[],
       events: (events ?? []) as ParkingEvent[],
     };
