@@ -129,21 +129,34 @@ export function MapView({ token, city }: MapViewProps) {
 
         mapboxgl.accessToken = token;
 
-        const map = new mapboxgl.Map({
-          container: container.current,
-          style: "mapbox://styles/mapbox/streets-v12",
-          center: city.center as [number, number],
-          zoom: Math.max(15.5, city.default_zoom),
-          pitch: 60,
-          bearing: -18,
-          maxBounds: BOUNDS,
-          minZoom: 12,
-          maxZoom: 20,
-          attributionControl: false,
-          antialias: true,
+        let map: MapboxGL.Map;
+        try {
+          map = new mapboxgl.Map({
+            container: container.current,
+            style: "mapbox://styles/mapbox/streets-v12",
+            center: city.center as [number, number],
+            zoom: Math.max(15.5, city.default_zoom),
+            pitch: 60,
+            bearing: -18,
+            maxBounds: BOUNDS,
+            minZoom: 12,
+            maxZoom: 20,
+            attributionControl: false,
+            antialias: true,
+          });
+        } catch (err) {
+          // WebGL2 unavailable in this preview iframe → surface fallback UI.
+          console.error("[MapView] mapbox-gl init failed", err);
+          setMapError(true);
+          return;
+        }
+
+        map.on("error", (e: any) => {
+          console.error("[MapView] mapbox error", e?.error ?? e);
         });
 
         map.on("style.load", () => {
+
           // 3D buildings layer (Apple Maps-like extrusions)
           const layers = map.getStyle()?.layers ?? [];
           const labelLayer = layers.find(
