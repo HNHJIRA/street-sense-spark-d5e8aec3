@@ -98,6 +98,7 @@ export function MapView({ token, city }: MapViewProps) {
         toast.success(`Imported ${res.imported} streets`, { id });
         // Force refetch by clearing the key memo.
         lastFetchKeyRef.current = "";
+        await queryClient.invalidateQueries({ queryKey: ["segments", city.id] });
         await loadBbox();
       } catch (e) {
         toast.error((e as Error).message, { id });
