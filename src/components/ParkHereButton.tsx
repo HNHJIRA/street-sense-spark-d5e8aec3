@@ -54,7 +54,7 @@ export function ParkHereButton({ cityId, timezone }: Props) {
   const [result, setResult] = useState<SegmentDecisionResult | null>(null);
   const [evaluatedAt, setEvaluatedAt] = useState<Date>(() => new Date());
   const [origin, setOrigin] = useState<{ lng: number; lat: number } | null>(null);
-  const [alts, setAlts] = useState<NearbyOption[] | null>(null);
+  const [alts, setAlts] = useState<RankedParkingOption[] | null>(null);
   const [altsLoading, setAltsLoading] = useState(false);
 
   const closeAll = () => {
@@ -76,12 +76,13 @@ export function ParkHereButton({ cityId, timezone }: Props) {
     if (!needAlts) return;
     setAltsLoading(true);
     try {
-      const opts = await findNearby({
+      const opts = await findRanked({
         data: {
           cityId, lng: from.lng, lat: from.lat,
-          radiusM: 100, limit: 8,
+          limit: 3,
           at: atIso, timezone,
           excludeSegmentId: res.segmentId ?? null,
+          includeLimited: true,
         },
       });
       setAlts(opts);
