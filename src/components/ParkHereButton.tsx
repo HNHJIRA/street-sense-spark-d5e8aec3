@@ -4,12 +4,12 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { checkParkingHere, type ParkHereResult } from "@/lib/parking/parking.functions";
 import { useAppStore } from "@/stores/app-store";
+import { useLocationStore } from "@/stores/location-store";
 import { cn } from "@/lib/utils";
 
 interface Props {
   cityId: string;
   timezone: string;
-  /** Map center fallback when GPS is unavailable. Provided by MapView via store. */
 }
 
 function formatTime(d: Date, tz: string) {
@@ -24,6 +24,10 @@ export function ParkHereButton({ cityId, timezone }: Props) {
   const selectSegment = useAppStore((s) => s.selectSegment);
   const mapCenter = useAppStore((s) => s.mapCenter);
   const forecastAt = useAppStore((s) => s.forecastAt);
+  // Read from the global LocationStore — single source of truth across pages.
+  const liveLocation = useLocationStore((s) => s.current);
+  const lastKnown = useLocationStore((s) => s.lastKnown);
+  const locStatus = useLocationStore((s) => s.status);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ParkHereResult | null>(null);
 
@@ -53,32 +57,27 @@ export function ParkHereButton({ cityId, timezone }: Props) {
   };
 
   const run = async () => {
-    if (!navigator.geolocation || !window.isSecureContext) {
-      // No GPS available — fall back to map center.
-      await runWithMapCenter();
+    // Prefer a live fix from the global service; fall back to last-known
+    // (offline support); finally fall back to map center.
+    const fix = liveLocation ?? lastKnown;
+    if (fix) {
+      setLoading(true);
+      try {
+        setFlyTo({ lat: fix.lat, lng: fix.lng, zoom: 18 });
+        const res = await queryAt(fix.lng, fix.lat, "gps");
+        setResult(res);
+        if (res.found && res.segmentId) selectSegment(res.segmentId);
+      } catch (e) {
+        toast.error((e as Error).message);
+      } finally {
+        setLoading(false);
+      }
       return;
     }
-    setLoading(true);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          const { latitude, longitude } = pos.coords;
-          setFlyTo({ lat: latitude, lng: longitude, zoom: 18 });
-          const res = await queryAt(longitude, latitude, "gps");
-          setResult(res);
-          if (res.found && res.segmentId) selectSegment(res.segmentId);
-        } catch (e) {
-          toast.error((e as Error).message);
-        } finally {
-          setLoading(false);
-        }
-      },
-      async () => {
-        // GPS denied or failed — fall back gracefully.
-        await runWithMapCenter();
-      },
-      { enableHighAccuracy: true, timeout: 8000 },
-    );
+    if (locStatus === "denied") {
+      toast.error("Location permission denied. Pan the map to a street and tap again.");
+    }
+    await runWithMapCenter();
   };
 
   return (

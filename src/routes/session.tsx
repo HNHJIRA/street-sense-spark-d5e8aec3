@@ -6,9 +6,11 @@ import { useEffect, useState } from "react";
 import { useQuery, useSuspenseQuery, queryOptions } from "@tanstack/react-query";
 import { Car, Clock, ShieldAlert, Timer, Database, MapPin, ArrowLeft, BellRing } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
+import { LocationStatusCard } from "@/components/LocationStatusCard";
 import { ParkingStatusCard } from "@/components/ParkingStatusCard";
 import { useDeviceStore } from "@/stores/device-store";
 import { useAppStore } from "@/stores/app-store";
+import { useLocationStore, haversineMeters, walkingMinutes } from "@/stores/location-store";
 import { getCityInfo, getSegmentDetails } from "@/lib/parking/parking.functions";
 import { evaluateRulesAt } from "@/lib/parking/engine";
 import { countdownTo, elapsedSince } from "@/lib/parking/countdown";
@@ -37,6 +39,9 @@ function SessionPage() {
   const selectSegment = useAppStore((s) => s.selectSegment);
   const navigate = useNavigate();
   const alertSettings = useDeviceStore((s) => s.alertSettings);
+  const liveLocation = useLocationStore((s) => s.current);
+  const lastKnownLocation = useLocationStore((s) => s.lastKnown);
+  const locStatus = useLocationStore((s) => s.status);
 
   const detailsQ = useQuery({
     queryKey: ["segment-details", session?.segmentId],
@@ -167,6 +172,40 @@ function SessionPage() {
           )}
           {sourceLabel && <Row icon={Database} label="Source provider" value={sourceLabel} />}
         </div>
+
+        {/* Walking distance from current GPS to parked vehicle, via global LocationStore. */}
+        {(() => {
+          const fix = liveLocation ?? lastKnownLocation;
+          let extra: React.ReactNode = null;
+          if (fix && session.coordinates) {
+            const meters = haversineMeters(
+              { lng: fix.lng, lat: fix.lat },
+              { lng: session.coordinates[0], lat: session.coordinates[1] },
+            );
+            const mins = walkingMinutes(meters);
+            extra = (
+              <div className="flex items-center justify-between">
+                <span className="font-semibold">Distance to your car</span>
+                <span>
+                  {meters < 1000 ? `${Math.round(meters)} m` : `${(meters / 1000).toFixed(1)} km`}
+                  {" · "}
+                  {mins} min walk
+                </span>
+              </div>
+            );
+          } else if (!session.coordinates) {
+            extra = <span className="opacity-80">No coordinates saved for this spot.</span>;
+          }
+          return (
+            <LocationStatusCard
+              live={liveLocation}
+              lastKnown={lastKnownLocation}
+              status={locStatus}
+              extra={extra}
+            />
+          );
+        })()}
+
 
         <UpcomingAlerts
           allowedUntil={allowedUntil}

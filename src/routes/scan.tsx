@@ -9,8 +9,10 @@ import {
   Clock, ShieldAlert, MapPin, Database, FileText,
 } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
+import { LocationStatusCard } from "@/components/LocationStatusCard";
 import { getCityInfo } from "@/lib/parking/parking.functions";
 import { scanSign, type SignScanResponse } from "@/lib/parking/scan.functions";
+import { useLocationStore } from "@/stores/location-store";
 import { cn } from "@/lib/utils";
 
 const cityOpts = queryOptions({
@@ -35,6 +37,11 @@ function ScanPage() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<SignScanResponse | null>(null);
 
+  // Global location store — single source of truth across pages.
+  const liveLocation = useLocationStore((s) => s.current);
+  const lastKnown = useLocationStore((s) => s.lastKnown);
+  const locStatus = useLocationStore((s) => s.status);
+
   const reset = () => {
     setResult(null); setPreviewUrl(null); setError(null);
     if (fileRef.current) fileRef.current.value = "";
@@ -53,14 +60,14 @@ function ScanPage() {
     setLoading(true);
     try {
       const base64 = await fileToBase64(file);
-      // Use last-known browser geolocation if available — fall back to null.
-      const coords = await getCurrentCoordsSafe();
+      // Use the global GPS store — live fix, then last-known, then null.
+      const fix = liveLocation ?? lastKnown;
       const res = await scan({
         data: {
           cityId: city.id, citySlug: city.slug, timezone: city.timezone,
           imageBase64: base64,
           mimeType: file.type || "image/jpeg",
-          lng: coords?.lng ?? null, lat: coords?.lat ?? null,
+          lng: fix?.lng ?? null, lat: fix?.lat ?? null,
         },
       });
       setResult(res);
@@ -88,6 +95,13 @@ function ScanPage() {
           Snap any posted sign. The AI extracts the rule, then the ParkClear engine answers
           <b> Can I park here?</b> using your location.
         </p>
+
+        {/* Global GPS status — same source of truth as map/session. */}
+        <LocationStatusCard
+          live={liveLocation}
+          lastKnown={lastKnown}
+          status={locStatus}
+        />
 
         {/* Capture / upload */}
         {!result && (
@@ -365,13 +379,3 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
-async function getCurrentCoordsSafe(): Promise<{ lng: number; lat: number } | null> {
-  if (typeof navigator === "undefined" || !navigator.geolocation) return null;
-  return new Promise((resolve) => {
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lng: pos.coords.longitude, lat: pos.coords.latitude }),
-      () => resolve(null),
-      { timeout: 4000, maximumAge: 60_000, enableHighAccuracy: false },
-    );
-  });
-}
