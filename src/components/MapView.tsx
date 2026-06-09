@@ -201,11 +201,17 @@ export function MapView({ token, city }: MapViewProps) {
             toast.error(msg);
           });
           geolocate.on("geolocate", (pos: GeolocationPosition) => {
-            console.info("[MapView] geolocate", {
+            // Mirror fixes into the global store so non-map screens can read
+            // them. Global LocationService is the primary writer; this is a
+            // belt-and-suspenders update for when the user actively triggers
+            // GeolocateControl.
+            useLocationStore.getState().setFix({
               lat: pos.coords.latitude,
               lng: pos.coords.longitude,
-              accuracy_m: pos.coords.accuracy,
-              ts: new Date(pos.timestamp).toISOString(),
+              accuracy: Number.isFinite(pos.coords.accuracy) ? pos.coords.accuracy : null,
+              heading: Number.isFinite(pos.coords.heading ?? NaN) ? pos.coords.heading : null,
+              speed: Number.isFinite(pos.coords.speed ?? NaN) ? pos.coords.speed : null,
+              timestamp: pos.timestamp || Date.now(),
             });
           });
         } catch (err) {
