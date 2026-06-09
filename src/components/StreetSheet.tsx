@@ -10,6 +10,9 @@ import { useAppStore } from "@/stores/app-store";
 import { useDeviceStore } from "@/stores/device-store";
 import { cn } from "@/lib/utils";
 import { DayPlannerCard } from "@/components/DayPlannerCard";
+import { RiskBadge } from "@/components/RiskBadge";
+import { scoreConfidence } from "@/lib/parking/confidence";
+
 
 
 interface StreetSheetProps {
@@ -169,6 +172,25 @@ export function StreetSheet({ timezone, restrictionTypes, cityId, citySlug }: St
                 {data?.source_label && <Row icon={Database} label="Source" value={data.source_label} />}
               </div>
             )}
+
+            {data && segment && status && (() => {
+              const conf = scoreConfidence({
+                matchedRule: !!status.rule_id || !!status.event_id,
+                conflictCount: 0,
+                dataSource: data.data_source,
+                ruleCount: data.rules.length,
+                lastSyncedAt: null,
+              });
+              return (
+                <div className="mt-3">
+                  <RiskBadge
+                    segment={segment}
+                    confidence_score={conf.score}
+                  />
+                </div>
+              );
+            })()}
+
 
             {/* Manual Test: evaluate this exact segment, no GPS needed */}
             {data && (

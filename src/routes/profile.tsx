@@ -14,9 +14,11 @@ function ProfilePage() {
   const savedCount = useDeviceStore((s) => s.savedSpots.length);
   const favCount = useDeviceStore((s) => s.favorites.length);
   const histCount = useDeviceStore((s) => s.searchHistory.length);
+  const parkingHistCount = useDeviceStore((s) => s.parkingHistory.length);
   const hasSession = useDeviceStore((s) => !!s.activeSession);
   const session = useDeviceStore((s) => s.activeSession);
   const clearHistory = useDeviceStore((s) => s.clearSearchHistory);
+
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -53,6 +55,10 @@ function ProfilePage() {
           <StatCard to="/saved" icon={Bookmark} label="Saved spots" value={mounted ? savedCount : 0} />
           <StatCard to="/saved" icon={Heart} label="Favorites" value={mounted ? favCount : 0} />
         </div>
+        <div className="mt-2">
+          <StatCard to="/history" icon={Car} label="Parking history" value={mounted ? parkingHistCount : 0} />
+        </div>
+
 
         <div className="mt-6 space-y-2">
           <Row icon={MapPin} label="Current city" value="Seattle, WA" />
