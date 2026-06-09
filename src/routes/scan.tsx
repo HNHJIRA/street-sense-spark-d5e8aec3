@@ -174,7 +174,12 @@ function ScanPage() {
 function ScanResult({
   result, previewUrl, onReset,
 }: { result: SignScanResponse; previewUrl: string | null; onReset: () => void }) {
-  const s = result.summary;
+  // When the AI detected directional arrows on the sign block, expose a
+  // Left / Both / Right selector so the user picks which side of the post
+  // they're parked on. Default to "both" — that's the conservative composite.
+  const [side, setSide] = useState<"left" | "both" | "right">("both");
+  const sideEval = result.sides ? result.sides[side] : null;
+  const s = sideEval?.summary ?? result.summary;
 
   const palette =
     s.status === "YES"
