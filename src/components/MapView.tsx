@@ -135,16 +135,20 @@ export function MapView({ token, city }: MapViewProps) {
 
     const radius = metersToPixels(Math.max(10, loc.accuracy ?? 30), loc.lat, map.getZoom());
     const diameter = Math.max(28, Math.min(260, radius * 2));
-    const accuracyEl = accuracyMarkerRef.current.getElement();
+    const accuracyMarker = accuracyMarkerRef.current;
+    const userMarker = userMarkerRef.current;
+    if (!accuracyMarker || !userMarker) return;
+
+    const accuracyEl = accuracyMarker.getElement();
     accuracyEl.style.width = `${diameter}px`;
     accuracyEl.style.height = `${diameter}px`;
-    accuracyMarkerRef.current.setLngLat(lngLat);
+    accuracyMarker.setLngLat(lngLat);
 
-    const dotEl = userMarkerRef.current.getElement();
+    const dotEl = userMarker.getElement();
     const headingEl = dotEl.querySelector<HTMLElement>("[data-heading='true']");
     if (headingEl) headingEl.style.display = typeof loc.heading === "number" ? "block" : "none";
-    userMarkerRef.current.setLngLat(lngLat);
-    userMarkerRef.current.setRotation(typeof loc.heading === "number" ? loc.heading : 0);
+    userMarker.setLngLat(lngLat);
+    userMarker.setRotation(typeof loc.heading === "number" ? loc.heading : 0);
   }, []);
 
   const updateSource = useCallback(() => {
