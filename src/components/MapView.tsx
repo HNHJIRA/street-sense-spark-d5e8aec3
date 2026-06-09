@@ -12,6 +12,7 @@ import {
   type CityInfo,
   type SegmentLite,
 } from "@/lib/parking/parking.functions";
+import { getAvailabilityBlocksInBbox, type AvailabilityBlock } from "@/lib/parking/la-express.functions";
 import type { ParkingColor } from "@/lib/parking/types";
 import { useAppStore } from "@/stores/app-store";
 import { useLocationStore } from "@/stores/location-store";
@@ -46,6 +47,30 @@ function segmentToFeature(s: SegmentLite): Feature<LineString> {
       side: s.side,
       label: s.label,
       restriction_code: s.restriction_code,
+      sourceType: "legal",
+    },
+  };
+}
+
+function availabilityBlockToFeature(block: AvailabilityBlock): Feature<LineString> {
+  const coords = block.coordinates.length >= 2
+    ? block.coordinates
+    : [block.coordinates[0], block.coordinates[0]].filter(Boolean) as [number, number][];
+  return {
+    type: "Feature",
+    id: block.id,
+    geometry: { type: "LineString", coordinates: coords },
+    properties: {
+      segmentId: block.id,
+      name: block.name,
+      color: block.color,
+      side: "both",
+      label: `${block.vacant}/${block.vacant + block.occupied} open`,
+      vacant: block.vacant,
+      occupied: block.occupied,
+      ratio: block.ratio,
+      updatedAt: block.updatedAt,
+      sourceType: "availability",
     },
   };
 }
@@ -68,6 +93,7 @@ export function MapView({ token, city }: MapViewProps) {
 
   const queryClient = useQueryClient();
   const fetchSegments = useServerFn(getSegmentsInBbox);
+  const fetchAvailabilityBlocks = useServerFn(getAvailabilityBlocksInBbox);
   const runImport = useServerFn(importSeattleBlockface);
 
   const selectSegment = useAppStore((s) => s.selectSegment);
@@ -76,6 +102,7 @@ export function MapView({ token, city }: MapViewProps) {
   const setMapCenter = useAppStore((s) => s.setMapCenter);
   const forecastAt = useAppStore((s) => s.forecastAt);
   const forecastAtIso = forecastAt ? forecastAt.toISOString() : null;
+  const mapMode = useAppStore((s) => s.mapMode);
   const locationFix = useLocationStore((s) => s.current ?? s.lastKnown);
 
   const syncUserLocationMarker = useCallback((loc: { lng: number; lat: number; accuracy: number | null; heading: number | null } | null) => {
@@ -166,11 +193,22 @@ export function MapView({ token, city }: MapViewProps) {
     const maxLng = b.getEast(), maxLat = b.getNorth();
     const w = maxLng - minLng, h = maxLat - minLat;
     if (w * h > 0.05) return;
-    // Include forecastAt in the cache key so changing the forecast time
-    // re-fetches with engine-evaluated colors at that timestamp.
-    const key = `${minLng.toFixed(3)},${minLat.toFixed(3)},${maxLng.toFixed(3)},${maxLat.toFixed(3)}|${forecastAtIso ?? "live"}`;
+    // Include mode + forecastAt in the cache key so changing either repaints.
+    const key = `${mapMode}|${minLng.toFixed(3)},${minLat.toFixed(3)},${maxLng.toFixed(3)},${maxLat.toFixed(3)}|${forecastAtIso ?? "live"}`;
     if (key === lastFetchKeyRef.current) return;
     lastFetchKeyRef.current = key;
+
+    if (mapMode === "available") {
+      const blocks = city.slug === "los-angeles" ? await queryClient.fetchQuery({
+        queryKey: ["la-availability-blocks", key],
+        queryFn: () => fetchAvailabilityBlocks({ data: { minLng, minLat, maxLng, maxLat } }),
+        staleTime: 30_000,
+      }) : [];
+      featuresRef.current.clear();
+      for (const block of blocks) featuresRef.current.set(block.id, availabilityBlockToFeature(block));
+      updateSource();
+      return;
+    }
 
     const segs = await queryClient.fetchQuery({
       queryKey: ["segments", city.id, key],
@@ -203,7 +241,7 @@ export function MapView({ token, city }: MapViewProps) {
         importingRef.current = false;
       }
     }
-  }, [city.id, city.slug, city.timezone, fetchSegments, forecastAtIso, queryClient, runImport, updateSource]);
+  }, [city.id, city.slug, city.timezone, fetchAvailabilityBlocks, fetchSegments, forecastAtIso, mapMode, queryClient, runImport, updateSource]);
 
   useEffect(() => {
     if (!container.current || mapRef.current) return;
