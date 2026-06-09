@@ -1,10 +1,8 @@
-// Admin trigger to populate LA-region cities. Because each city sync makes
-// many external HTTP calls to municipal open-data feeds, doing all four
-// cities + LA Express inventory + occupancy in one request reliably exceeds
-// the 60s edge-worker timeout (500 RUNTIME_ERROR / "upstream request
-// timeout"). The endpoint now accepts a `?city=<slug>` query param so each
-// city can be triggered independently, and runs the city's providers in
-// parallel via Promise.allSettled.
+// Admin trigger to populate LA-region cities. A naked GET must stay cheap:
+// starting the full provider + meter sync in the background still consumes
+// server request CPU and can be killed before a response is flushed. Run one
+// bounded city sync explicitly with `?city=<slug>&wait=1`; LA Express meter
+// inventory/occupancy is opt-in via `includeMeters=1`.
 import { createFileRoute } from "@tanstack/react-router";
 import { syncLaMeterInventory, syncLaMeterOccupancy } from "@/lib/parking/la-express.functions";
 import { syncAllProvidersForCity } from "@/lib/parking/parking.functions";
@@ -30,41 +28,46 @@ async function run({ request }: { request: Request }) {
   const url = new URL(request.url);
   const city = url.searchParams.get("city");
   const wait = url.searchParams.get("wait") === "1";
-  const skipMeters = url.searchParams.get("skipMeters") === "1";
-  const cities = city ? [city] : Object.keys(CITY_BBOXES);
+  const includeMeters = url.searchParams.get("includeMeters") === "1" && url.searchParams.get("skipMeters") !== "1";
 
-  // The full sync chain makes many external HTTP calls and reliably exceeds
-  // the preview proxy's ~30s timeout (502 Bad Gateway) and even the worker's
-  // 60s cap. By default we kick the work off and return 202 immediately;
-  // pass `?wait=1` (and ideally a single `?city=`) to await the result.
-  const work = (async () => {
-    const out: Record<string, unknown> = {};
-    out.providerRuns = Object.fromEntries(
-      await Promise.all(cities.map(async (c) => [c, await syncCity(c)] as const)),
-    );
-    if (!skipMeters && (!city || city === "los-angeles")) {
-      try { out.inv = await syncLaMeterInventory(); } catch (e) { out.inv = { error: (e as Error).message }; }
-      try { out.occ = await syncLaMeterOccupancy(); } catch (e) { out.occ = { error: (e as Error).message }; }
-    }
-    return out;
-  })();
+  if (!city) {
+    return new Response(JSON.stringify({
+      ok: true,
+      started: false,
+      message: "No sync started. Pass ?city=los-angeles&wait=1, ?city=santa-monica&wait=1, ?city=west-hollywood&wait=1, or ?city=pasadena&wait=1.",
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+  }
 
-  if (wait) {
-    const result = await work;
-    return new Response(JSON.stringify({ ok: true, ...result }), {
-      status: 200, headers: { "Content-Type": "application/json" },
+  if (!CITY_BBOXES[city]) {
+    return new Response(JSON.stringify({ ok: false, error: `Unknown city: ${city}` }), {
+      status: 400, headers: { "Content-Type": "application/json" },
     });
   }
 
-  // Fire-and-forget: log eventual outcome so it shows up in server logs.
-  work.then(
-    (r) => console.log("[sync-la] completed", JSON.stringify(r).slice(0, 2000)),
-    (e) => console.error("[sync-la] failed", e),
-  );
-  return new Response(
-    JSON.stringify({ ok: true, accepted: true, cities, hint: "Add ?wait=1 to block on results (may time out)." }),
-    { status: 202, headers: { "Content-Type": "application/json" } },
-  );
+  if (!wait) {
+    return new Response(JSON.stringify({
+      ok: true,
+      started: false,
+      city,
+      message: "Sync not started without wait=1; background work is disabled to prevent request CPU timeouts.",
+    }), { status: 202, headers: { "Content-Type": "application/json" } });
+  }
+
+  try {
+    const out: Record<string, unknown> = {};
+    out.providerRun = await syncCity(city);
+    if (includeMeters && city === "los-angeles") {
+      try { out.inv = await syncLaMeterInventory(); } catch (e) { out.inv = { error: (e as Error).message }; }
+      try { out.occ = await syncLaMeterOccupancy(); } catch (e) { out.occ = { error: (e as Error).message }; }
+    }
+    return new Response(JSON.stringify({ ok: true, ...out }), {
+      status: 200, headers: { "Content-Type": "application/json" },
+    });
+  } catch (e) {
+    return new Response(JSON.stringify({ ok: false, city, error: (e as Error).message }), {
+      status: 500, headers: { "Content-Type": "application/json" },
+    });
+  }
 }
 
 export const Route = createFileRoute("/api/public/admin/sync-la")({
