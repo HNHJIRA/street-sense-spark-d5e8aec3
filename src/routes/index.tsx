@@ -8,6 +8,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { StreetSheet } from "@/components/StreetSheet";
 import { ForecastSheet } from "@/components/ForecastSheet";
 import { SearchSheet } from "@/components/SearchSheet";
+import { DestinationParkingSheet } from "@/components/DestinationParkingSheet";
 import { ParkHereButton } from "@/components/ParkHereButton";
 import { ActiveSessionWidget } from "@/components/ActiveSessionWidget";
 import { Onboarding } from "@/components/Onboarding";
