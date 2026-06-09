@@ -161,8 +161,6 @@ export function ParkHereButton({ cityId, timezone }: Props) {
     setAlts(null);
   };
 
-  const verdict = result?.decision?.verdict ?? "UNKNOWN";
-
   return (
     <>
       <div
