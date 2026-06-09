@@ -20,6 +20,7 @@ import { Route as DebugParkingRouteImport } from './routes/debug.parking'
 import { Route as AdminValidationRouteImport } from './routes/admin.validation'
 import { Route as AdminReportsRouteImport } from './routes/admin.reports'
 import { Route as AdminProviderSyncRouteImport } from './routes/admin.provider-sync'
+import { Route as AdminLaCoverageRouteImport } from './routes/admin.la-coverage'
 import { Route as AdminHealthRouteImport } from './routes/admin.health'
 import { Route as AdminForecastRouteImport } from './routes/admin.forecast'
 import { Route as AdminBetaReadinessRouteImport } from './routes/admin.beta-readiness'
@@ -80,6 +81,11 @@ const AdminProviderSyncRoute = AdminProviderSyncRouteImport.update({
   path: '/provider-sync',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminLaCoverageRoute = AdminLaCoverageRouteImport.update({
+  id: '/la-coverage',
+  path: '/la-coverage',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminHealthRoute = AdminHealthRouteImport.update({
   id: '/health',
   path: '/health',
@@ -112,6 +118,7 @@ export interface FileRoutesByFullPath {
   '/admin/beta-readiness': typeof AdminBetaReadinessRoute
   '/admin/forecast': typeof AdminForecastRoute
   '/admin/health': typeof AdminHealthRoute
+  '/admin/la-coverage': typeof AdminLaCoverageRoute
   '/admin/provider-sync': typeof AdminProviderSyncRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/validation': typeof AdminValidationRoute
@@ -128,6 +135,7 @@ export interface FileRoutesByTo {
   '/admin/beta-readiness': typeof AdminBetaReadinessRoute
   '/admin/forecast': typeof AdminForecastRoute
   '/admin/health': typeof AdminHealthRoute
+  '/admin/la-coverage': typeof AdminLaCoverageRoute
   '/admin/provider-sync': typeof AdminProviderSyncRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/validation': typeof AdminValidationRoute
@@ -146,6 +154,7 @@ export interface FileRoutesById {
   '/admin/beta-readiness': typeof AdminBetaReadinessRoute
   '/admin/forecast': typeof AdminForecastRoute
   '/admin/health': typeof AdminHealthRoute
+  '/admin/la-coverage': typeof AdminLaCoverageRoute
   '/admin/provider-sync': typeof AdminProviderSyncRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/validation': typeof AdminValidationRoute
@@ -165,6 +174,7 @@ export interface FileRouteTypes {
     | '/admin/beta-readiness'
     | '/admin/forecast'
     | '/admin/health'
+    | '/admin/la-coverage'
     | '/admin/provider-sync'
     | '/admin/reports'
     | '/admin/validation'
@@ -181,6 +191,7 @@ export interface FileRouteTypes {
     | '/admin/beta-readiness'
     | '/admin/forecast'
     | '/admin/health'
+    | '/admin/la-coverage'
     | '/admin/provider-sync'
     | '/admin/reports'
     | '/admin/validation'
@@ -198,6 +209,7 @@ export interface FileRouteTypes {
     | '/admin/beta-readiness'
     | '/admin/forecast'
     | '/admin/health'
+    | '/admin/la-coverage'
     | '/admin/provider-sync'
     | '/admin/reports'
     | '/admin/validation'
@@ -294,6 +306,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminProviderSyncRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/la-coverage': {
+      id: '/admin/la-coverage'
+      path: '/la-coverage'
+      fullPath: '/admin/la-coverage'
+      preLoaderRoute: typeof AdminLaCoverageRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/health': {
       id: '/admin/health'
       path: '/health'
@@ -330,6 +349,7 @@ interface AdminRouteChildren {
   AdminBetaReadinessRoute: typeof AdminBetaReadinessRoute
   AdminForecastRoute: typeof AdminForecastRoute
   AdminHealthRoute: typeof AdminHealthRoute
+  AdminLaCoverageRoute: typeof AdminLaCoverageRoute
   AdminProviderSyncRoute: typeof AdminProviderSyncRoute
   AdminReportsRoute: typeof AdminReportsRoute
   AdminValidationRoute: typeof AdminValidationRoute
@@ -341,6 +361,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminBetaReadinessRoute: AdminBetaReadinessRoute,
   AdminForecastRoute: AdminForecastRoute,
   AdminHealthRoute: AdminHealthRoute,
+  AdminLaCoverageRoute: AdminLaCoverageRoute,
   AdminProviderSyncRoute: AdminProviderSyncRoute,
   AdminReportsRoute: AdminReportsRoute,
   AdminValidationRoute: AdminValidationRoute,
@@ -361,13 +382,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

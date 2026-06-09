@@ -20,11 +20,19 @@ const SOURCE_LABELS: Record<string, string> = {
   osm: "OpenStreetMap",
   seed: "Demo data",
   curbiq: "CurbIQ",
+  "la-dot": "LADOT Open Data",
+  "santa-monica-opendata": "Santa Monica Open Data",
+  "weho-opendata": "West Hollywood Open Data",
+  "pasadena-opendata": "Pasadena Open Data",
 };
 
 // City bbox defaults for "full-city" admin syncs.
 const CITY_BBOX: Record<string, { minLng: number; minLat: number; maxLng: number; maxLat: number }> = {
-  seattle: { minLng: -122.460, minLat: 47.480, maxLng: -122.220, maxLat: 47.740 },
+  seattle:         { minLng: -122.460, minLat: 47.480, maxLng: -122.220, maxLat: 47.740 },
+  "los-angeles":   { minLng: -118.670, minLat: 33.700, maxLng: -118.150, maxLat: 34.340 },
+  "santa-monica":  { minLng: -118.530, minLat: 33.990, maxLng: -118.440, maxLat: 34.060 },
+  "west-hollywood":{ minLng: -118.400, minLat: 34.070, maxLng: -118.330, maxLat: 34.110 },
+  pasadena:        { minLng: -118.200, minLat: 34.110, maxLng: -118.060, maxLat: 34.220 },
 };
 
 // ----------------- Provider registry (multi-city readiness) -----------------

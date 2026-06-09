@@ -938,6 +938,22 @@ export type Database = {
       }
       geomfromewkt: { Args: { "": string }; Returns: unknown }
       gettransactionid: { Args: never; Returns: unknown }
+      la_area_counts: {
+        Args: {
+          p_city_id: string
+          p_max_lat: number
+          p_max_lng: number
+          p_min_lat: number
+          p_min_lng: number
+        }
+        Returns: {
+          metered: number
+          permit: number
+          segments: number
+          sweeping: number
+          unknown: number
+        }[]
+      }
       longtransactionsenabled: { Args: never; Returns: boolean }
       nearest_segment: {
         Args: {
