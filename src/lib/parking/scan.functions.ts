@@ -389,7 +389,7 @@ export const scanSign = createServerFn({ method: "POST" })
       segment: segmentInfo,
       validations,
       source_label: SOURCE_LABELS[segmentSource] ?? segmentSource,
-      scanned_at: now.toISOString(),
+      scanned_at: scannedAt.toISOString(),
     };
   });
 
