@@ -7,6 +7,7 @@ export const Route = createFileRoute("/admin")({
 
 const TABS = [
   { to: "/admin/health", label: "Health" },
+  { to: "/admin/accuracy", label: "Accuracy" },
   { to: "/admin/provider-sync", label: "Provider Sync" },
   { to: "/admin/validation", label: "Validation" },
   { to: "/admin/forecast", label: "Forecast" },

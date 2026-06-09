@@ -45,7 +45,7 @@ export interface SignScanInput {
 }
 
 export interface SignScanValidation {
-  outcome: "match" | "conflict" | "unmatched" | "no_sdot";
+  outcome: "match" | "conflict" | "unmatched" | "no_sdot" | "out_of_range" | "no_gps";
   matched_rule_id: string | null;
   confidence: number;
   detail: string;
@@ -109,13 +109,21 @@ function validateAgainstSdot(
   aiRules: NormalizedRule[],
   sdotRules: ParkingRule[],
   overallConfidence: number,
+  matchStatus: "matched" | "out_of_range" | "no_gps" | "no_segment_data",
 ): SignScanValidation[] {
   if (sdotRules.length === 0) {
+    const outcome: SignScanValidation["outcome"] =
+      matchStatus === "out_of_range" ? "out_of_range" :
+      matchStatus === "no_gps" ? "no_gps" : "no_sdot";
+    const reason =
+      matchStatus === "out_of_range" ? "GPS is outside the selected city's coverage (no segment within 80m)." :
+      matchStatus === "no_gps" ? "No GPS captured — cannot cross-check against street data." :
+      "Nearest segment has no SDOT rules on file.";
     return aiRules.map((r) => ({
-      outcome: "no_sdot",
+      outcome,
       matched_rule_id: null,
       confidence: overallConfidence,
-      detail: `Sign rule "${r.restriction_code}" — no SDOT data on file to compare.`,
+      detail: `Sign rule "${r.restriction_code}" — ${reason}`,
     }));
   }
   const out: SignScanValidation[] = [];
@@ -145,6 +153,7 @@ function validateAgainstSdot(
   }
   return out;
 }
+
 
 const SOURCE_LABELS: Record<string, string> = {
   sdot: "Seattle SDOT Blockface",
@@ -310,6 +319,15 @@ export const scanSign = createServerFn({ method: "POST" })
       signedUrl = signed.data?.signedUrl ?? null;
     }
 
+    const matchStatus: "matched" | "out_of_range" | "no_gps" | "no_segment_data" =
+      data.lng == null || data.lat == null
+        ? "no_gps"
+        : segmentDbId == null
+          ? "out_of_range"
+          : sdotRules.length === 0
+            ? "no_segment_data"
+            : "matched";
+
     await admin.from("parking_sign_scans").insert({
       id: scanId,
       city_id: data.cityId,
@@ -317,7 +335,11 @@ export const scanSign = createServerFn({ method: "POST" })
       lng: data.lng, lat: data.lat,
       decision,
       overall_confidence: ai.overall_confidence,
+      verdict: verdictFromColor(decision.color),
+      nearest_distance_m: segmentInfo?.distance_m ?? null,
+      match_status: matchStatus,
     });
+
 
     if (uploadOk) {
       await admin.from("parking_sign_images").insert({
@@ -352,7 +374,7 @@ export const scanSign = createServerFn({ method: "POST" })
       );
     }
 
-    const validations = validateAgainstSdot(aiRules, sdotRules, ai.overall_confidence);
+    const validations = validateAgainstSdot(aiRules, sdotRules, ai.overall_confidence, matchStatus);
     if (validations.length > 0) {
       await admin.from("scan_validation_results").insert(
         validations.map((v) => ({
@@ -373,6 +395,10 @@ export const scanSign = createServerFn({ method: "POST" })
       aiConfidence: ai.overall_confidence,
       signCount: ai.sign_count,
     });
+
+    // Persist the summary on the scan row for the accuracy dashboard.
+    await admin.from("parking_sign_scans").update({ summary }).eq("id", scanId);
+
 
     return {
       scan_id: scanId,
