@@ -5,7 +5,7 @@ import type { Feature, FeatureCollection, LineString } from "geojson";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
-import { Sliders, Info, LocateFixed, Plus, Minus } from "lucide-react";
+import { Sliders, Info, LocateFixed, Plus, Minus, Globe2 } from "lucide-react";
 import {
   getSegmentsInBbox,
   importSeattleBlockface,
@@ -33,6 +33,17 @@ const BOUNDS: [[number, number], [number, number]] = [
   [-122.224, 47.734],
 ];
 
+const EARTH_CIRCUMFERENCE_M = 40_075_016.686;
+
+function isInsideBounds(loc: { lng: number; lat: number }, bounds: [[number, number], [number, number]]) {
+  return loc.lng >= bounds[0][0] && loc.lng <= bounds[1][0] && loc.lat >= bounds[0][1] && loc.lat <= bounds[1][1];
+}
+
+function metersToPixels(meters: number, lat: number, zoom: number) {
+  const safeCos = Math.max(0.15, Math.cos((lat * Math.PI) / 180));
+  return (meters * 512 * 2 ** zoom) / (EARTH_CIRCUMFERENCE_M * safeCos);
+}
+
 function segmentToFeature(s: SegmentLite): Feature<LineString> {
   return {
     type: "Feature",
@@ -53,11 +64,17 @@ export function MapView({ token, city }: MapViewProps) {
   const container = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapboxGL.Map | null>(null);
   const geolocateRef = useRef<MapboxGL.GeolocateControl | null>(null);
+  const markerCtorRef = useRef<any>(null);
+  const userMarkerRef = useRef<MapboxGL.Marker | null>(null);
+  const accuracyMarkerRef = useRef<MapboxGL.Marker | null>(null);
+  const lastLocationRef = useRef<{ lng: number; lat: number; accuracy: number | null; heading: number | null } | null>(null);
+  const globeFrameRef = useRef<number | null>(null);
   const featuresRef = useRef<Map<string, Feature<LineString>>>(new Map());
   const importingRef = useRef(false);
   const lastFetchKeyRef = useRef<string>("");
   const [mapError, setMapError] = useState(false);
   const [ready, setReady] = useState(false);
+  const [globeMode, setGlobeMode] = useState(false);
 
   const queryClient = useQueryClient();
   const fetchSegments = useServerFn(getSegmentsInBbox);
@@ -69,6 +86,74 @@ export function MapView({ token, city }: MapViewProps) {
   const setMapCenter = useAppStore((s) => s.setMapCenter);
   const forecastAt = useAppStore((s) => s.forecastAt);
   const forecastAtIso = forecastAt ? forecastAt.toISOString() : null;
+  const locationFix = useLocationStore((s) => s.current ?? s.lastKnown);
+
+  const syncUserLocationMarker = useCallback((loc: { lng: number; lat: number; accuracy: number | null; heading: number | null } | null) => {
+    const map = mapRef.current;
+    const MarkerCtor = markerCtorRef.current as any;
+    if (!map || !MarkerCtor || !loc) return;
+
+    lastLocationRef.current = loc;
+    const lngLat: [number, number] = [loc.lng, loc.lat];
+
+    if (!accuracyMarkerRef.current) {
+      const el = document.createElement("div");
+      el.style.position = "absolute";
+      el.style.borderRadius = "9999px";
+      el.style.background = "rgba(37, 99, 235, 0.14)";
+      el.style.border = "2px solid rgba(37, 99, 235, 0.32)";
+      el.style.pointerEvents = "none";
+      el.style.transform = "translate(-50%, -50%)";
+      el.style.zIndex = "40";
+      accuracyMarkerRef.current = new MarkerCtor({ element: el, anchor: "center" }).setLngLat(lngLat).addTo(map);
+    }
+
+    if (!userMarkerRef.current) {
+      const el = document.createElement("div");
+      el.style.position = "relative";
+      el.style.width = "24px";
+      el.style.height = "24px";
+      el.style.borderRadius = "9999px";
+      el.style.background = "#2563eb";
+      el.style.border = "4px solid white";
+      el.style.boxShadow = "0 0 0 2px rgba(37,99,235,.35), 0 8px 24px rgba(15,23,42,.35)";
+      el.style.pointerEvents = "none";
+      el.style.zIndex = "50";
+
+      const heading = document.createElement("div");
+      heading.dataset.heading = "true";
+      heading.style.position = "absolute";
+      heading.style.left = "50%";
+      heading.style.top = "-15px";
+      heading.style.width = "0";
+      heading.style.height = "0";
+      heading.style.borderLeft = "6px solid transparent";
+      heading.style.borderRight = "6px solid transparent";
+      heading.style.borderBottom = "15px solid #2563eb";
+      heading.style.transform = "translateX(-50%)";
+      heading.style.filter = "drop-shadow(0 1px 1px rgba(15,23,42,.35))";
+      el.appendChild(heading);
+
+      userMarkerRef.current = new MarkerCtor({ element: el, anchor: "center", rotationAlignment: "map" }).setLngLat(lngLat).addTo(map);
+    }
+
+    const radius = metersToPixels(Math.max(10, loc.accuracy ?? 30), loc.lat, map.getZoom());
+    const diameter = Math.max(28, Math.min(260, radius * 2));
+    const accuracyMarker = accuracyMarkerRef.current;
+    const userMarker = userMarkerRef.current;
+    if (!accuracyMarker || !userMarker) return;
+
+    const accuracyEl = accuracyMarker.getElement();
+    accuracyEl.style.width = `${diameter}px`;
+    accuracyEl.style.height = `${diameter}px`;
+    accuracyMarker.setLngLat(lngLat);
+
+    const dotEl = userMarker.getElement();
+    const headingEl = dotEl.querySelector<HTMLElement>("[data-heading='true']");
+    if (headingEl) headingEl.style.display = typeof loc.heading === "number" ? "block" : "none";
+    userMarker.setLngLat(lngLat);
+    userMarker.setRotation(typeof loc.heading === "number" ? loc.heading : 0);
+  }, []);
 
   const updateSource = useCallback(() => {
     const map = mapRef.current;
@@ -168,12 +253,12 @@ export function MapView({ token, city }: MapViewProps) {
             zoom: Math.max(15.5, city.default_zoom),
             pitch: 60,
             bearing: -18,
-            maxBounds: BOUNDS,
             minZoom: 12,
             maxZoom: 20,
             attributionControl: false,
             antialias: true,
           });
+          markerCtorRef.current = mapboxgl.Marker;
           map.dragRotate.enable();
           map.touchZoomRotate.enable();
           map.touchZoomRotate.enableRotation();
@@ -335,6 +420,7 @@ export function MapView({ token, city }: MapViewProps) {
             // (e.g., suspense fallback flicker). Tiles only fetch once sized.
             window.requestAnimationFrame(() => map.resize());
             window.setTimeout(() => map.resize(), 250);
+            syncUserLocationMarker(lastLocationRef.current);
             updateSource();
             void loadBbox();
 
@@ -395,16 +481,72 @@ export function MapView({ token, city }: MapViewProps) {
     void loadBbox();
   }, [forecastAtIso, ready, loadBbox]);
 
+  useEffect(() => {
+    if (!ready || !locationFix) return;
+    syncUserLocationMarker({
+      lng: locationFix.lng,
+      lat: locationFix.lat,
+      accuracy: locationFix.accuracy,
+      heading: locationFix.heading,
+    });
+  }, [locationFix, ready, syncUserLocationMarker]);
+
+  useEffect(() => {
+    const map = mapRef.current as any;
+    if (!ready || !map) return;
+    if (globeFrameRef.current) window.cancelAnimationFrame(globeFrameRef.current);
+
+    if (!globeMode) {
+      map.setProjection?.({ name: "mercator" });
+      map.setFog?.(null);
+      globeFrameRef.current = null;
+      return;
+    }
+
+    map.setProjection?.({ name: "globe" });
+    map.setFog?.({ color: "rgb(236, 232, 226)", "high-color": "rgb(186, 210, 235)", "horizon-blend": 0.02 });
+    map.easeTo({ zoom: Math.max(15.5, map.getZoom()), pitch: 60, duration: 500 });
+
+    const rotate = () => {
+      map.rotateTo((map.getBearing() + 0.12) % 360, { duration: 0 });
+      globeFrameRef.current = window.requestAnimationFrame(rotate);
+    };
+    globeFrameRef.current = window.requestAnimationFrame(rotate);
+    return () => {
+      if (globeFrameRef.current) window.cancelAnimationFrame(globeFrameRef.current);
+      globeFrameRef.current = null;
+    };
+  }, [city.center, globeMode, locationFix, ready]);
+
   const zoomIn = () => mapRef.current?.zoomIn();
   const zoomOut = () => mapRef.current?.zoomOut();
+  const toggleGlobe = () => setGlobeMode((v) => !v);
   const locate = () => {
+    const loc = useLocationStore.getState().current ?? useLocationStore.getState().lastKnown;
     if (geolocateRef.current) {
       geolocateRef.current.trigger();
+    }
+    if (loc && mapRef.current) {
+      syncUserLocationMarker({ lng: loc.lng, lat: loc.lat, accuracy: loc.accuracy, heading: loc.heading });
+      if (!isInsideBounds(loc, BOUNDS)) toast.message("Showing your GPS location outside Seattle coverage.");
+      mapRef.current.flyTo({ center: [loc.lng, loc.lat], zoom: 17, pitch: 60, duration: 1200, essential: true });
+      return;
+    }
+    if (useLocationStore.getState().status === "denied") {
+      toast.error("Location permission is denied. Enable location for this site in browser settings.");
       return;
     }
     if (!navigator.geolocation || !mapRef.current) return;
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        useLocationStore.getState().setFix({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: Number.isFinite(pos.coords.accuracy) ? pos.coords.accuracy : null,
+          heading: Number.isFinite(pos.coords.heading ?? NaN) ? pos.coords.heading : null,
+          speed: Number.isFinite(pos.coords.speed ?? NaN) ? pos.coords.speed : null,
+          timestamp: pos.timestamp || Date.now(),
+        });
         mapRef.current?.flyTo({
           center: [pos.coords.longitude, pos.coords.latitude],
           zoom: 17, pitch: 60, duration: 1200,
@@ -435,6 +577,7 @@ export function MapView({ token, city }: MapViewProps) {
           <MapBtn onClick={() => toast.message("Tap any colored line for details")} ariaLabel="Info">
             <Info className="h-5 w-5" />
           </MapBtn>
+          <MapBtn onClick={toggleGlobe} ariaLabel="Rotate globe"><Globe2 className="h-5 w-5" /></MapBtn>
           <MapBtn onClick={locate} ariaLabel="My location"><LocateFixed className="h-5 w-5" /></MapBtn>
         </div>
       )}
