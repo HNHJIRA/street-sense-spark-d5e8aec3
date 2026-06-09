@@ -50,6 +50,13 @@ export interface ParkingSession {
   sourceLabel: string | null;
 }
 
+export interface ParkingHistoryEntry extends ParkingSession {
+  endedAt: string;       // ISO when session ended
+  durationMinutes: number;
+  outcome: "completed" | "expired"; // expired = ended after allowed_until
+}
+
+
 export interface NotificationLogItem {
   id: string;
   sessionId: string;
@@ -69,6 +76,8 @@ interface DeviceState {
   favorites: FavoritePlace[];
   searchHistory: SearchHistoryItem[];
   activeSession: ParkingSession | null;
+  parkingHistory: ParkingHistoryEntry[];
+
 
   alertSettings: AlertSettings;
   notificationHistory: NotificationLogItem[];
@@ -93,6 +102,8 @@ interface DeviceState {
 
   startSession: (s: Omit<ParkingSession, "id" | "startedAt">) => void;
   endSession: () => void;
+  clearParkingHistory: () => void;
+
 
   setAlertSetting: <K extends keyof AlertSettings>(key: K, value: AlertSettings[K]) => void;
   recordNotification: (n: Omit<NotificationLogItem, "id" | "deliveredAt"> & { alertId: string }) => void;
@@ -114,6 +125,8 @@ export const useDeviceStore = create<DeviceState>()(
       favorites: [],
       searchHistory: [],
       activeSession: null,
+      parkingHistory: [],
+
 
       alertSettings: DEFAULT_ALERT_SETTINGS,
       notificationHistory: [],
@@ -159,7 +172,28 @@ export const useDeviceStore = create<DeviceState>()(
           activeSession: { ...s, id: uid(), startedAt: new Date().toISOString() },
           deliveredAlertIds: [],
         }),
-      endSession: () => set({ activeSession: null, deliveredAlertIds: [] }),
+      endSession: () =>
+        set((s) => {
+          const active = s.activeSession;
+          if (!active) return { activeSession: null, deliveredAlertIds: [] };
+          const endedAt = new Date().toISOString();
+          const durationMinutes = Math.max(
+            1,
+            Math.round((Date.parse(endedAt) - Date.parse(active.startedAt)) / 60_000),
+          );
+          const outcome: ParkingHistoryEntry["outcome"] =
+            active.initialAllowedUntil && Date.parse(endedAt) > Date.parse(active.initialAllowedUntil)
+              ? "expired"
+              : "completed";
+          const entry: ParkingHistoryEntry = { ...active, endedAt, durationMinutes, outcome };
+          return {
+            activeSession: null,
+            deliveredAlertIds: [],
+            parkingHistory: [entry, ...s.parkingHistory].slice(0, 50),
+          };
+        }),
+      clearParkingHistory: () => set({ parkingHistory: [] }),
+
 
       setAlertSetting: (key, value) =>
         set((s) => ({ alertSettings: { ...s.alertSettings, [key]: value } })),
@@ -190,6 +224,8 @@ export const useDeviceStore = create<DeviceState>()(
         favorites: s.favorites,
         searchHistory: s.searchHistory,
         activeSession: s.activeSession,
+        parkingHistory: s.parkingHistory,
+
         alertSettings: s.alertSettings,
         notificationHistory: s.notificationHistory,
         deliveredAlertIds: s.deliveredAlertIds,
