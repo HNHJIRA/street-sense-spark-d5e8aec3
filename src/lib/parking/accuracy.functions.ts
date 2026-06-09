@@ -95,28 +95,47 @@ export const getAccuracyReport = createServerFn({ method: "GET" }).handler(async
   const cityRows = (cities ?? []) as { id: string; slug: string; name: string }[];
   const byCity: AccuracyReport["rules"]["byCity"] = [];
   for (const c of cityRows) {
-    const { data: agg } = await admin.rpc("city_rule_coverage", { p_city_id: c.id }).catch(() => ({ data: null }));
-    void agg;
     const { count: segCount } = await admin.from("street_segments")
       .select("id", { count: "exact", head: true }).eq("city_id", c.id);
     const { data: ruleCounts } = await admin.from("street_segments")
       .select("id, parking_rules(id)").eq("city_id", c.id).limit(20000);
-    let totalRules = 0, one = 0, zero = 0;
+    let totalRules = 0, one = 0, zero = 0, twoPlus = 0;
+    const depth: Record<string, number> = { "0": 0, "1": 0, "2": 0, "3": 0, "4": 0, "5+": 0 };
     for (const s of ((ruleCounts ?? []) as { parking_rules: { id: string }[] }[])) {
       const n = s.parking_rules?.length ?? 0;
       totalRules += n;
-      if (n === 0) zero += 1;
-      else if (n === 1) one += 1;
+      if (n === 0) { zero += 1; depth["0"] += 1; }
+      else if (n === 1) { one += 1; depth["1"] += 1; }
+      else {
+        twoPlus += 1;
+        depth[n >= 5 ? "5+" : String(n)] += 1;
+      }
     }
+    const segs = segCount ?? 0;
     byCity.push({
       city: c.name,
-      segments: segCount ?? 0,
+      segments: segs,
       rules: totalRules,
-      rulesPerSegment: segCount ? Math.round((totalRules / segCount) * 100) / 100 : 0,
+      rulesPerSegment: segs ? Math.round((totalRules / segs) * 100) / 100 : 0,
       oneRuleSegments: one,
       zeroRuleSegments: zero,
+      twoPlusSegments: twoPlus,
+      multiRulePct: segs ? Math.round((twoPlus / segs) * 1000) / 10 : 0,
+      depth,
     });
   }
+
+  // -- Rules by data_source
+  const { data: srcRows } = await admin.from("parking_rules").select("data_source").limit(50000);
+  const srcMap = new Map<string, number>();
+  for (const r of ((srcRows ?? []) as { data_source: string | null }[])) {
+    const k = r.data_source ?? "unknown";
+    srcMap.set(k, (srcMap.get(k) ?? 0) + 1);
+  }
+  const bySource = Array.from(srcMap.entries())
+    .map(([data_source, rules]) => ({ data_source, rules }))
+    .sort((a, b) => b.rules - a.rules);
+
 
   // -- Global restriction distribution
   const { data: restr } = await admin.rpc("restriction_distribution").catch(() => ({ data: null }));
