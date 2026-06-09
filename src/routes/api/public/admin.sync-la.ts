@@ -29,34 +29,42 @@ async function syncCity(slug: string) {
 async function run({ request }: { request: Request }) {
   const url = new URL(request.url);
   const city = url.searchParams.get("city");
+  const wait = url.searchParams.get("wait") === "1";
   const skipMeters = url.searchParams.get("skipMeters") === "1";
+  const cities = city ? [city] : Object.keys(CITY_BBOXES);
 
-  const payload: Record<string, unknown> = {};
-
-  if (city) {
-    payload.providerRuns = { [city]: await syncCity(city) };
-  } else {
-    // Run all four cities in parallel; each city runs its providers in series internally.
-    const entries = Object.keys(CITY_BBOXES);
-    const settled = await Promise.allSettled(entries.map(syncCity));
-    payload.providerRuns = Object.fromEntries(
-      entries.map((c, i) => [
-        c,
-        settled[i].status === "fulfilled"
-          ? (settled[i] as PromiseFulfilledResult<unknown>).value
-          : { error: (settled[i] as PromiseRejectedResult).reason?.message ?? "failed" },
-      ]),
+  // The full sync chain makes many external HTTP calls and reliably exceeds
+  // the preview proxy's ~30s timeout (502 Bad Gateway) and even the worker's
+  // 60s cap. By default we kick the work off and return 202 immediately;
+  // pass `?wait=1` (and ideally a single `?city=`) to await the result.
+  const work = (async () => {
+    const out: Record<string, unknown> = {};
+    out.providerRuns = Object.fromEntries(
+      await Promise.all(cities.map(async (c) => [c, await syncCity(c)] as const)),
     );
+    if (!skipMeters && (!city || city === "los-angeles")) {
+      try { out.inv = await syncLaMeterInventory(); } catch (e) { out.inv = { error: (e as Error).message }; }
+      try { out.occ = await syncLaMeterOccupancy(); } catch (e) { out.occ = { error: (e as Error).message }; }
+    }
+    return out;
+  })();
+
+  if (wait) {
+    const result = await work;
+    return new Response(JSON.stringify({ ok: true, ...result }), {
+      status: 200, headers: { "Content-Type": "application/json" },
+    });
   }
 
-  if (!skipMeters && (!city || city === "los-angeles")) {
-    try { payload.inv = await syncLaMeterInventory(); } catch (e) { payload.inv = { error: (e as Error).message }; }
-    try { payload.occ = await syncLaMeterOccupancy(); } catch (e) { payload.occ = { error: (e as Error).message }; }
-  }
-
-  return new Response(JSON.stringify({ ok: true, ...payload }), {
-    status: 200, headers: { "Content-Type": "application/json" },
-  });
+  // Fire-and-forget: log eventual outcome so it shows up in server logs.
+  work.then(
+    (r) => console.log("[sync-la] completed", JSON.stringify(r).slice(0, 2000)),
+    (e) => console.error("[sync-la] failed", e),
+  );
+  return new Response(
+    JSON.stringify({ ok: true, accepted: true, cities, hint: "Add ?wait=1 to block on results (may time out)." }),
+    { status: 202, headers: { "Content-Type": "application/json" } },
+  );
 }
 
 export const Route = createFileRoute("/api/public/admin/sync-la")({
