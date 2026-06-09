@@ -130,15 +130,19 @@ function HomePage() {
 }
 
 function Legend() {
+  const mapMode = useAppStore((s) => s.mapMode);
+  const labels = mapMode === "available"
+    ? ["Likely open", "Tight", "Full"]
+    : ["Allowed", "Restricted", "No parking"];
   return (
     <div
       className="pointer-events-none absolute left-1/2 z-10 -translate-x-1/2"
       style={{ bottom: "calc(var(--safe-bottom) + 11rem)" }}
     >
       <div className="flex items-center gap-3 rounded-full border border-border bg-surface/85 px-4 py-2 backdrop-blur-xl">
-        <LegendDot color="bg-park-green" label="Allowed" />
-        <LegendDot color="bg-park-yellow" label="Restricted" />
-        <LegendDot color="bg-park-red" label="No parking" />
+        <LegendDot color="bg-park-green" label={labels[0]} />
+        <LegendDot color="bg-park-yellow" label={labels[1]} />
+        <LegendDot color="bg-park-red" label={labels[2]} />
       </div>
     </div>
   );
