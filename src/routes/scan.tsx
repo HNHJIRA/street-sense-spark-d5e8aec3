@@ -9,6 +9,7 @@ import {
   Clock, ShieldAlert, MapPin, Database, FileText,
 } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
+import { LocationStatusCard } from "@/components/LocationStatusCard";
 import { getCityInfo } from "@/lib/parking/parking.functions";
 import { scanSign, type SignScanResponse } from "@/lib/parking/scan.functions";
 import { useLocationStore, formatLocationAge } from "@/stores/location-store";
