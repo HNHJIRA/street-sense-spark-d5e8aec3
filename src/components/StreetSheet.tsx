@@ -35,6 +35,8 @@ export function StreetSheet({ timezone, restrictionTypes, cityId }: StreetSheetP
   const selectedSegmentId = useAppStore((s) => s.selectedSegmentId);
   const selectSegment = useAppStore((s) => s.selectSegment);
   const forecastAt = useAppStore((s) => s.forecastAt);
+  const requestCheckSegment = useAppStore((s) => s.requestCheckSegment);
+
 
   const addSavedSpot = useDeviceStore((s) => s.addSavedSpot);
   const addFavorite = useDeviceStore((s) => s.addFavorite);
