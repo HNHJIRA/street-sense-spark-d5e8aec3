@@ -13,6 +13,7 @@ const TABS = [
   { to: "/admin/analytics", label: "Analytics" },
   { to: "/admin/reports", label: "Reports" },
   { to: "/admin/beta-readiness", label: "Beta Readiness" },
+  { to: "/admin/la-coverage", label: "LA Coverage" },
 ] as const;
 
 function AdminLayout() {
