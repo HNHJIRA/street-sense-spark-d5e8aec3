@@ -30,6 +30,9 @@ interface ClockState {
     coordinates: [number, number][];
   } | null;
   setRecommendedHighlight: (v: ClockState["recommendedHighlight"]) => void;
+  /** Destination chosen from search — opens DestinationParkingSheet with ranked parking near it. */
+  destination: { name: string; placeName: string; lng: number; lat: number } | null;
+  setDestination: (v: ClockState["destination"]) => void;
 }
 
 export const useAppStore = create<ClockState>((set) => ({
@@ -53,4 +56,6 @@ export const useAppStore = create<ClockState>((set) => ({
   requestCheckSegment: (id) => set({ pendingCheckSegmentId: id }),
   recommendedHighlight: null,
   setRecommendedHighlight: (v) => set({ recommendedHighlight: v }),
+  destination: null,
+  setDestination: (v) => set({ destination: v }),
 }));

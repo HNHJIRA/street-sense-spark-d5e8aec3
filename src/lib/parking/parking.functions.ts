@@ -670,3 +670,135 @@ export const findNearbyAvailable = createServerFn({ method: "GET" })
     });
     return out.slice(0, data.limit);
   });
+
+// ---------- Ranked parking recommendations (Phase 2) ----------
+//
+// Expands search radius (100 → 250 → 500m) until at least N candidates are
+// found, evaluates each via evaluateRulesAt(), and ranks them with a 0-100
+// parking score so the UI can answer "Where should I park?" — not just
+// "Can I park here?". Still uses the single rules engine.
+
+import { computeParkingScore, type ParkingScore } from "./score";
+import { scoreConfidence } from "./confidence";
+import { buildParkingDecision } from "./decision";
+
+export interface RankedParkingOption {
+  segmentId: string;
+  name: string;
+  side: string;
+  color: ParkingColor;
+  label: string;
+  restriction_code: string;
+  distance_m: number;
+  walking_seconds: number;
+  coordinates: [number, number][];
+  allowed_until: string | null;
+  permit_zone: string | null;
+  time_limit_minutes: number | null;
+  time_remaining_ms: number | null;
+  data_source: string;
+  confidence_score: number;
+  confidence_level: "high" | "medium" | "low";
+  parking_score: number;
+  score_parts: ParkingScore["parts"];
+  /** "100m" | "250m" | "500m" — which expansion tier this came from. */
+  search_tier_m: number;
+}
+
+export const findRankedParking = createServerFn({ method: "GET" })
+  .inputValidator((input: unknown) =>
+    z.object({
+      cityId: z.string().uuid(),
+      lng: z.number().min(-180).max(180),
+      lat: z.number().min(-90).max(90),
+      at: z.string().datetime().optional().nullable(),
+      timezone: z.string().min(1).max(64).default("America/Los_Angeles"),
+      limit: z.number().int().min(1).max(10).default(5),
+      excludeSegmentId: z.string().uuid().optional().nullable(),
+      /** Include yellow (LIMITED) spots in results (default true). */
+      includeLimited: z.boolean().default(true),
+    }).parse(input),
+  )
+  .handler(async ({ data }): Promise<RankedParkingOption[]> => {
+    const admin = await getAdmin();
+    const restrictionTypes = await loadRestrictionTypes(admin);
+    const when = data.at ? new Date(data.at) : new Date();
+    const tiers = [100, 250, 500];
+
+    let rawRows: Array<{
+      id: string; name: string; side: string; geojson: string;
+      data_source: string; metadata: Record<string, unknown>;
+      rules: ParkingRule[] | null; distance_m: number;
+    }> = [];
+    let tierUsed = tiers[0];
+
+    for (const radius of tiers) {
+      const { data: rows, error } = await admin.rpc("nearest_segments_full", {
+        p_city_id: data.cityId,
+        p_lng: data.lng, p_lat: data.lat,
+        p_max_meters: radius,
+        p_limit: Math.max(20, data.limit * 4),
+      });
+      if (error) throw new Error((error as { message?: string }).message ?? "Lookup failed");
+      rawRows = (rows ?? []) as typeof rawRows;
+      tierUsed = radius;
+      // Quick acceptance heuristic: have at least `limit` candidates with rules.
+      const usable = rawRows.filter((r) => (r.rules?.length ?? 0) > 0).length;
+      if (usable >= data.limit) break;
+    }
+
+    const out: RankedParkingOption[] = [];
+    for (const r of rawRows) {
+      if (data.excludeSegmentId && r.id === data.excludeSegmentId) continue;
+      let coords: [number, number][] = [];
+      try {
+        const g = JSON.parse(r.geojson) as LineString;
+        if (Array.isArray(g.coordinates)) coords = g.coordinates as [number, number][];
+      } catch { /* ignore */ }
+      const seg: StreetSegment = {
+        id: r.id, name: r.name, side: r.side, neighborhood: null,
+        coordinates: coords, rules: (r.rules ?? []) as ParkingRule[], events: [],
+      };
+      const decision = buildParkingDecision(seg, restrictionTypes, when, data.timezone);
+      if (decision.status.color === "red") continue;
+      if (!data.includeLimited && decision.status.color === "yellow") continue;
+
+      const confidence = scoreConfidence({
+        matchedRule: decision.status.rule_id != null || decision.status.event_id != null,
+        conflictCount: 0,
+        dataSource: r.data_source,
+        ruleCount: seg.rules.length,
+        lastSyncedAt: null,
+      });
+      const score = computeParkingScore({
+        distance_m: r.distance_m,
+        time_remaining_ms: decision.time_remaining_ms,
+        confidence_score: confidence.score,
+        color: decision.status.color,
+      });
+
+      out.push({
+        segmentId: r.id,
+        name: r.name,
+        side: r.side,
+        color: decision.status.color,
+        label: decision.status.label,
+        restriction_code: decision.status.code,
+        distance_m: r.distance_m,
+        walking_seconds: Math.round(r.distance_m / 1.33),
+        coordinates: coords,
+        allowed_until: decision.status.allowed_until,
+        permit_zone: decision.status.permit_zone,
+        time_limit_minutes: decision.status.time_limit_minutes,
+        time_remaining_ms: decision.time_remaining_ms,
+        data_source: r.data_source,
+        confidence_score: confidence.score,
+        confidence_level: confidence.level,
+        parking_score: score.score,
+        score_parts: score.parts,
+        search_tier_m: tierUsed,
+      });
+    }
+    out.sort((a, b) => b.parking_score - a.parking_score);
+    return out.slice(0, data.limit);
+  });

@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { Loader2, Navigation, ScanLine, Footprints, ArrowRight } from "lucide-react";
+import { Loader2, Navigation, ScanLine, Footprints, ArrowRight, Sparkles } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
-  findNearbyAvailable,
-  type NearbyOption,
+  findRankedParking,
+  type RankedParkingOption,
 } from "@/lib/parking/parking.functions";
+import { scoreBadgeClass } from "@/lib/parking/score";
 import {
   getDecisionForSegment,
   getDecisionAt,
@@ -35,7 +36,7 @@ function formatWalk(seconds: number) {
 export function ParkHereButton({ cityId, timezone }: Props) {
   const checkAt = useServerFn(getDecisionAt);
   const checkSeg = useServerFn(getDecisionForSegment);
-  const findNearby = useServerFn(findNearbyAvailable);
+  const findRanked = useServerFn(findRankedParking);
 
   const setFlyTo = useAppStore((s) => s.setFlyTo);
   const selectSegment = useAppStore((s) => s.selectSegment);
@@ -53,7 +54,7 @@ export function ParkHereButton({ cityId, timezone }: Props) {
   const [result, setResult] = useState<SegmentDecisionResult | null>(null);
   const [evaluatedAt, setEvaluatedAt] = useState<Date>(() => new Date());
   const [origin, setOrigin] = useState<{ lng: number; lat: number } | null>(null);
-  const [alts, setAlts] = useState<NearbyOption[] | null>(null);
+  const [alts, setAlts] = useState<RankedParkingOption[] | null>(null);
   const [altsLoading, setAltsLoading] = useState(false);
 
   const closeAll = () => {
@@ -75,12 +76,13 @@ export function ParkHereButton({ cityId, timezone }: Props) {
     if (!needAlts) return;
     setAltsLoading(true);
     try {
-      const opts = await findNearby({
+      const opts = await findRanked({
         data: {
           cityId, lng: from.lng, lat: from.lat,
-          radiusM: 100, limit: 8,
+          limit: 3,
           at: atIso, timezone,
           excludeSegmentId: res.segmentId ?? null,
+          includeLimited: true,
         },
       });
       setAlts(opts);
@@ -146,7 +148,7 @@ export function ParkHereButton({ cityId, timezone }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingCheckSegmentId]);
 
-  const viewOnMap = (opt: NearbyOption) => {
+  const viewOnMap = (opt: RankedParkingOption) => {
     const mid = opt.coordinates[Math.floor(opt.coordinates.length / 2)] ?? opt.coordinates[0];
     if (mid) setFlyTo({ lng: mid[0], lat: mid[1], zoom: 18 });
     if (origin && mid) {
@@ -213,30 +215,39 @@ export function ParkHereButton({ cityId, timezone }: Props) {
                 {(altsLoading || (alts && alts.length > 0)) && (
                   <div className="mt-4">
                     <div className="mb-2 flex items-center justify-between">
-                      <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                        Nearest available parking
+                      <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                        <Sparkles className="h-3 w-3" /> Where should I park?
                       </div>
-                      <div className="text-[10px] text-muted-foreground">within 100 m</div>
+                      {alts && alts[0] && (
+                        <div className="text-[10px] text-muted-foreground">within {alts[0].search_tier_m} m</div>
+                      )}
                     </div>
                     {altsLoading && (
                       <div className="flex items-center gap-2 rounded-2xl bg-surface px-3 py-3 text-xs text-muted-foreground">
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Searching nearby…
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Searching nearby (100 → 250 → 500 m)…
                       </div>
                     )}
-                    {!altsLoading && (alts ?? []).map((opt) => (
+                    {!altsLoading && (alts ?? []).map((opt, idx) => (
                       <button
                         key={opt.segmentId}
                         type="button"
                         onClick={() => viewOnMap(opt)}
-                        className="mt-1.5 flex w-full items-center gap-3 rounded-2xl bg-surface px-3 py-2.5 text-left transition active:scale-[0.99]"
+                        className={cn(
+                          "mt-1.5 flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition active:scale-[0.99]",
+                          idx === 0 ? "border border-primary/40 bg-primary/5" : "bg-surface",
+                        )}
                       >
                         <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", {
                           "bg-park-green": opt.color === "green",
                           "bg-park-yellow": opt.color === "yellow",
-                          "bg-park-red": opt.color === "red",
                         })} />
                         <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm font-semibold">{opt.name}</div>
+                          <div className="flex items-center gap-1.5">
+                            {idx === 0 && (
+                              <span className="rounded-full bg-primary px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary-foreground">Best</span>
+                            )}
+                            <div className="truncate text-sm font-semibold">{opt.name}</div>
+                          </div>
                           <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
                             <span>{Math.round(opt.distance_m)} m</span>
                             <span>·</span>
@@ -248,12 +259,21 @@ export function ParkHereButton({ cityId, timezone }: Props) {
                             <div className="text-[10px] text-muted-foreground">until {formatTime(new Date(opt.allowed_until), timezone)}</div>
                           )}
                         </div>
+                        <div
+                          className={cn(
+                            "shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-bold tabular-nums",
+                            scoreBadgeClass(opt.parking_score),
+                          )}
+                          title="Parking quality score"
+                        >
+                          {opt.parking_score}
+                        </div>
                         <ArrowRight className="h-4 w-4 text-muted-foreground" />
                       </button>
                     ))}
                     {!altsLoading && alts && alts.length === 0 && (
                       <div className="rounded-2xl bg-surface px-3 py-3 text-xs text-muted-foreground">
-                        No open parking found within 100 m right now.
+                        No legal parking found within 500 m right now.
                       </div>
                     )}
                   </div>
