@@ -171,59 +171,26 @@ function ScanPage() {
 }
 
 function ScanResult({
-  result, previewUrl, timezone, onReset,
-}: { result: SignScanResponse; previewUrl: string | null; timezone: string; onReset: () => void }) {
+  result, previewUrl, onReset,
+}: { result: SignScanResponse; previewUrl: string | null; onReset: () => void }) {
   const s = result.summary;
   const tone =
-    s.status === "YES" ? { border: "border-park-green/60 bg-park-green-soft", accent: "text-park-green" }
-    : s.status === "NO" ? { border: "border-park-red/60 bg-park-red-soft", accent: "text-park-red" }
-    : s.status === "LIMITED" ? { border: "border-park-yellow/60 bg-park-yellow-soft", accent: "text-park-yellow" }
-    : { border: "border-border bg-surface", accent: "text-foreground" };
-  const StatusIcon =
-    s.status === "YES" ? CheckCircle2
-    : s.status === "NO" ? XCircle
-    : s.status === "LIMITED" ? AlertTriangle
-    : ShieldAlert;
-
-  // Find the next "allowed" change to surface a clear "until when".
-  const nextAllowed = s.timeline.find((t) => t.status === "YES" && t.when !== "now");
-  const nextRestricted = s.timeline.find((t) => t.status !== "YES" && t.when !== "now");
-  const untilLabel =
-    s.status === "YES" && nextRestricted ? `Until ${nextRestricted.when_label}`
-    : s.status === "NO" && nextAllowed ? `Until ${nextAllowed.when_label}`
-    : s.time_guidance;
+    s.status === "YES" ? "text-park-green"
+    : s.status === "NO" ? "text-park-red"
+    : s.status === "LIMITED" ? "text-park-yellow"
+    : "text-foreground";
 
   return (
     <div className="mt-5 space-y-4">
-      {/* AI summary — the only thing the driver needs. */}
-      <div className={cn("rounded-3xl border-2 p-6 text-foreground", tone.border)}>
-        <div className="flex items-center gap-3">
-          <StatusIcon className={cn("h-8 w-8", tone.accent)} />
-          <div className="min-w-0">
-            <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-              Can I park here?
-            </div>
-            <div className={cn("font-display text-4xl font-extrabold leading-none", tone.accent)}>
-              {s.status}
-            </div>
-          </div>
-          <span className="ml-auto rounded-full bg-background/70 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-foreground">
-            {s.confidence}
-          </span>
+      <div className="rounded-3xl border border-border bg-surface p-6">
+        <div className="mb-3 flex items-center gap-2">
+          <span className={cn("font-display text-2xl font-extrabold", tone)}>{s.status}</span>
+          <span className="text-xs text-muted-foreground">— AI summary</span>
         </div>
-
-        <p className="mt-4 text-base font-semibold leading-snug text-foreground">{s.plain}</p>
-
-        <div className="mt-4 flex flex-wrap gap-2 text-xs">
-          <span className="inline-flex items-center gap-1 rounded-full bg-background/70 px-3 py-1.5 font-semibold text-foreground">
-            <ShieldAlert className="h-3.5 w-3.5" /> {s.reason}
-          </span>
-          {untilLabel && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-background/70 px-3 py-1.5 font-semibold text-foreground">
-              <Clock className="h-3.5 w-3.5" /> {untilLabel}
-            </span>
-          )}
-        </div>
+        <p className="text-base font-semibold leading-relaxed text-foreground">
+          {s.plain}
+          {s.time_guidance ? ` ${s.time_guidance}` : ""}
+        </p>
       </div>
 
       {previewUrl && (
