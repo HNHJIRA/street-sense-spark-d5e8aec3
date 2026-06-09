@@ -5,8 +5,7 @@ import { useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
 import {
-  Camera, Upload, Loader2, ArrowLeft, ScanLine, CheckCircle2, AlertTriangle, XCircle,
-  Clock, ShieldAlert,
+  Camera, Upload, Loader2, ArrowLeft, ScanLine,
 } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
 import { LocationStatusCard } from "@/components/LocationStatusCard";
