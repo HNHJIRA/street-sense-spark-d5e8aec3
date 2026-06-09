@@ -228,7 +228,7 @@ export function ParkHereButton({ cityId, timezone }: Props) {
                 {result.found && (
                   <div className="mt-3 grid grid-cols-1 gap-1.5 text-xs">
                     {result.name && (
-                      <DetailRow icon={MapPin} label="Street" value={`${result.name}${result.side && result.side !== "both" ? ` (${result.side})` : ""}`} />
+                      <DetailRow icon={MapPin} label="Street" value={result.name} />
                     )}
                     <DetailRow icon={ShieldQuestion} label="Status" value={result.label ?? "—"} />
                     {result.allowed_until && (
