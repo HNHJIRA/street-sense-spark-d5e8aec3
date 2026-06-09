@@ -12,7 +12,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { LocationStatusCard } from "@/components/LocationStatusCard";
 import { getCityInfo } from "@/lib/parking/parking.functions";
 import { scanSign, type SignScanResponse } from "@/lib/parking/scan.functions";
-import { useLocationStore, formatLocationAge } from "@/stores/location-store";
+import { useLocationStore } from "@/stores/location-store";
 import { cn } from "@/lib/utils";
 
 const cityOpts = queryOptions({
