@@ -371,13 +371,3 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
-async function getCurrentCoordsSafe(): Promise<{ lng: number; lat: number } | null> {
-  if (typeof navigator === "undefined" || !navigator.geolocation) return null;
-  return new Promise((resolve) => {
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lng: pos.coords.longitude, lat: pos.coords.latitude }),
-      () => resolve(null),
-      { timeout: 4000, maximumAge: 60_000, enableHighAccuracy: false },
-    );
-  });
-}
