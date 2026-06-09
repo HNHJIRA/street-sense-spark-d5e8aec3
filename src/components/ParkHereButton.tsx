@@ -215,30 +215,39 @@ export function ParkHereButton({ cityId, timezone }: Props) {
                 {(altsLoading || (alts && alts.length > 0)) && (
                   <div className="mt-4">
                     <div className="mb-2 flex items-center justify-between">
-                      <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                        Nearest available parking
+                      <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                        <Sparkles className="h-3 w-3" /> Where should I park?
                       </div>
-                      <div className="text-[10px] text-muted-foreground">within 100 m</div>
+                      {alts && alts[0] && (
+                        <div className="text-[10px] text-muted-foreground">within {alts[0].search_tier_m} m</div>
+                      )}
                     </div>
                     {altsLoading && (
                       <div className="flex items-center gap-2 rounded-2xl bg-surface px-3 py-3 text-xs text-muted-foreground">
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Searching nearby…
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Searching nearby (100 → 250 → 500 m)…
                       </div>
                     )}
-                    {!altsLoading && (alts ?? []).map((opt) => (
+                    {!altsLoading && (alts ?? []).map((opt, idx) => (
                       <button
                         key={opt.segmentId}
                         type="button"
                         onClick={() => viewOnMap(opt)}
-                        className="mt-1.5 flex w-full items-center gap-3 rounded-2xl bg-surface px-3 py-2.5 text-left transition active:scale-[0.99]"
+                        className={cn(
+                          "mt-1.5 flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition active:scale-[0.99]",
+                          idx === 0 ? "border border-primary/40 bg-primary/5" : "bg-surface",
+                        )}
                       >
                         <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", {
                           "bg-park-green": opt.color === "green",
                           "bg-park-yellow": opt.color === "yellow",
-                          "bg-park-red": opt.color === "red",
                         })} />
                         <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm font-semibold">{opt.name}</div>
+                          <div className="flex items-center gap-1.5">
+                            {idx === 0 && (
+                              <span className="rounded-full bg-primary px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary-foreground">Best</span>
+                            )}
+                            <div className="truncate text-sm font-semibold">{opt.name}</div>
+                          </div>
                           <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
                             <span>{Math.round(opt.distance_m)} m</span>
                             <span>·</span>
@@ -250,12 +259,21 @@ export function ParkHereButton({ cityId, timezone }: Props) {
                             <div className="text-[10px] text-muted-foreground">until {formatTime(new Date(opt.allowed_until), timezone)}</div>
                           )}
                         </div>
+                        <div
+                          className={cn(
+                            "shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-bold tabular-nums",
+                            scoreBadgeClass(opt.parking_score),
+                          )}
+                          title="Parking quality score"
+                        >
+                          {opt.parking_score}
+                        </div>
                         <ArrowRight className="h-4 w-4 text-muted-foreground" />
                       </button>
                     ))}
                     {!altsLoading && alts && alts.length === 0 && (
                       <div className="rounded-2xl bg-surface px-3 py-3 text-xs text-muted-foreground">
-                        No open parking found within 100 m right now.
+                        No legal parking found within 500 m right now.
                       </div>
                     )}
                   </div>
