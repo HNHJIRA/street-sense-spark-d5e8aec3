@@ -504,12 +504,11 @@ export function MapView({ token, city }: MapViewProps) {
     }
 
     map.setProjection?.({ name: "globe" });
-    map.setFog?.({ color: "rgb(186, 210, 235)", "high-color": "rgb(36, 92, 180)", "horizon-blend": 0.04 });
-    map.easeTo({ center: locationFix ? [locationFix.lng, locationFix.lat] : city.center, zoom: 1.8, pitch: 0, bearing: 0, duration: 900 });
+    map.setFog?.({ color: "rgb(236, 232, 226)", "high-color": "rgb(186, 210, 235)", "horizon-blend": 0.02 });
+    map.easeTo({ zoom: Math.max(15.5, map.getZoom()), pitch: 60, duration: 500 });
 
     const rotate = () => {
-      const current = map.getCenter();
-      map.setCenter([current.lng + 0.025, current.lat]);
+      map.rotateTo((map.getBearing() + 0.12) % 360, { duration: 0 });
       globeFrameRef.current = window.requestAnimationFrame(rotate);
     };
     globeFrameRef.current = window.requestAnimationFrame(rotate);
