@@ -64,7 +64,7 @@ export function MapView({ token, city }: MapViewProps) {
   const container = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapboxGL.Map | null>(null);
   const geolocateRef = useRef<MapboxGL.GeolocateControl | null>(null);
-  const markerCtorRef = useRef<typeof MapboxGL.Marker | null>(null);
+  const markerCtorRef = useRef<any>(null);
   const userMarkerRef = useRef<MapboxGL.Marker | null>(null);
   const accuracyMarkerRef = useRef<MapboxGL.Marker | null>(null);
   const lastLocationRef = useRef<{ lng: number; lat: number; accuracy: number | null; heading: number | null } | null>(null);
@@ -102,6 +102,7 @@ export function MapView({ token, city }: MapViewProps) {
       el.style.border = "2px solid rgba(37, 99, 235, 0.32)";
       el.style.pointerEvents = "none";
       el.style.transform = "translate(-50%, -50%)";
+      el.style.zIndex = "40";
       accuracyMarkerRef.current = new MarkerCtor({ element: el, anchor: "center" }).setLngLat(lngLat).addTo(map);
     }
 
@@ -115,6 +116,7 @@ export function MapView({ token, city }: MapViewProps) {
       el.style.border = "4px solid white";
       el.style.boxShadow = "0 0 0 2px rgba(37,99,235,.35), 0 8px 24px rgba(15,23,42,.35)";
       el.style.pointerEvents = "none";
+      el.style.zIndex = "50";
 
       const heading = document.createElement("div");
       heading.dataset.heading = "true";
