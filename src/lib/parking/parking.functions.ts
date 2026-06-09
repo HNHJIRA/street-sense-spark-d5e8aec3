@@ -526,3 +526,157 @@ export const getRecentSyncLogs = createServerFn({ method: "GET" })
       duration_ms: number | null; started_at: string; finished_at: string | null;
     }>;
   });
+
+// ---------- Manual segment check (Mode 3) ----------
+
+export const checkParkingForSegment = createServerFn({ method: "GET" })
+  .inputValidator((input: unknown) =>
+    z.object({
+      segmentId: z.string().uuid(),
+      at: z.string().datetime().optional().nullable(),
+      timezone: z.string().min(1).max(64).default("America/Los_Angeles"),
+    }).parse(input),
+  )
+  .handler(async ({ data }): Promise<ParkHereResult> => {
+    const admin = await getAdmin();
+    const { data: seg } = await admin
+      .from("street_segments")
+      .select("id, name, side, data_source, metadata")
+      .eq("id", data.segmentId)
+      .maybeSingle();
+    if (!seg) {
+      return { found: false, source: "tap", message: "Segment not found." };
+    }
+    const [{ data: rules }, { data: geomRow }] = await Promise.all([
+      admin.from("parking_rules")
+        .select("id, street_segment_id, priority, restriction_code, days_of_week, time_start, time_end, permit_zone, time_limit_minutes, effective_from, effective_to, notes")
+        .eq("street_segment_id", data.segmentId)
+        .order("priority", { ascending: true }),
+      admin.rpc("segment_geojson", { p_id: data.segmentId }).then((r: any) => ({ data: r.data })).catch(() => ({ data: null })),
+    ]);
+    let coords: [number, number][] = [];
+    try {
+      if (typeof geomRow === "string") {
+        const g = JSON.parse(geomRow) as LineString;
+        if (Array.isArray(g.coordinates)) coords = g.coordinates as [number, number][];
+      }
+    } catch { /* ignore */ }
+    const restrictionTypes = await loadRestrictionTypes(admin);
+    const segObj: StreetSegment = {
+      id: seg.id as string, name: seg.name as string,
+      side: (seg.side ?? "both") as string, neighborhood: null,
+      coordinates: coords,
+      rules: (rules ?? []) as ParkingRule[],
+      events: [],
+    };
+    const when = data.at ? new Date(data.at) : new Date();
+    const status = evaluateRulesAt(segObj, restrictionTypes, when, data.timezone);
+    const msg = status.color === "green"
+      ? `Yes — you can park here on ${seg.name}.`
+      : status.color === "yellow"
+        ? `Caution on ${seg.name}: ${status.label.toLowerCase()}.`
+        : `No — ${status.label.toLowerCase()} on ${seg.name}.`;
+    return {
+      found: true,
+      source: "tap",
+      segmentId: seg.id as string,
+      name: seg.name as string,
+      color: status.color,
+      label: status.label,
+      restriction_code: status.code,
+      distance_m: 0,
+      coordinates: coords,
+      allowed_until: status.allowed_until,
+      permit_zone: status.permit_zone,
+      time_limit_minutes: status.time_limit_minutes,
+      data_source: seg.data_source as string,
+      message: msg,
+    };
+  });
+
+// ---------- Nearby alternatives (Mode 2) ----------
+
+export interface NearbyOption {
+  segmentId: string;
+  name: string;
+  side: string;
+  color: ParkingColor;
+  label: string;
+  restriction_code: string;
+  distance_m: number;
+  walking_seconds: number;
+  coordinates: [number, number][];
+  allowed_until: string | null;
+  permit_zone: string | null;
+  time_limit_minutes: number | null;
+  data_source: string;
+}
+
+export const findNearbyAvailable = createServerFn({ method: "GET" })
+  .inputValidator((input: unknown) =>
+    z.object({
+      cityId: z.string().uuid(),
+      lng: z.number().min(-180).max(180),
+      lat: z.number().min(-90).max(90),
+      radiusM: z.number().min(10).max(500).default(100),
+      limit: z.number().int().min(1).max(20).default(8),
+      at: z.string().datetime().optional().nullable(),
+      timezone: z.string().min(1).max(64).default("America/Los_Angeles"),
+      excludeSegmentId: z.string().uuid().optional().nullable(),
+    }).parse(input),
+  )
+  .handler(async ({ data }): Promise<NearbyOption[]> => {
+    const admin = await getAdmin();
+    const { data: rows, error } = await admin.rpc("nearest_segments_full", {
+      p_city_id: data.cityId,
+      p_lng: data.lng, p_lat: data.lat,
+      p_max_meters: data.radiusM,
+      p_limit: data.limit + 2,
+    });
+    if (error) throw new Error((error as { message?: string }).message ?? "Lookup failed");
+    const restrictionTypes = await loadRestrictionTypes(admin);
+    const when = data.at ? new Date(data.at) : new Date();
+    const list = (rows ?? []) as Array<{
+      id: string; name: string; side: string; geojson: string;
+      data_source: string; metadata: Record<string, unknown>;
+      rules: ParkingRule[] | null; distance_m: number;
+    }>;
+    const out: NearbyOption[] = [];
+    for (const r of list) {
+      if (data.excludeSegmentId && r.id === data.excludeSegmentId) continue;
+      let coords: [number, number][] = [];
+      try {
+        const g = JSON.parse(r.geojson) as LineString;
+        if (Array.isArray(g.coordinates)) coords = g.coordinates as [number, number][];
+      } catch { /* ignore */ }
+      const seg: StreetSegment = {
+        id: r.id, name: r.name, side: r.side, neighborhood: null,
+        coordinates: coords, rules: (r.rules ?? []) as ParkingRule[], events: [],
+      };
+      const status = evaluateRulesAt(seg, restrictionTypes, when, data.timezone);
+      if (status.color === "red") continue; // only return parkable candidates
+      out.push({
+        segmentId: r.id,
+        name: r.name,
+        side: r.side,
+        color: status.color,
+        label: status.label,
+        restriction_code: status.code,
+        distance_m: r.distance_m,
+        walking_seconds: Math.round(r.distance_m / 1.33), // ~4.8 km/h
+        coordinates: coords,
+        allowed_until: status.allowed_until,
+        permit_zone: status.permit_zone,
+        time_limit_minutes: status.time_limit_minutes,
+        data_source: r.data_source,
+      });
+    }
+    // Sort: green before yellow, then by distance
+    out.sort((a, b) => {
+      const colorRank = (c: ParkingColor) => (c === "green" ? 0 : c === "yellow" ? 1 : 2);
+      const cr = colorRank(a.color) - colorRank(b.color);
+      if (cr !== 0) return cr;
+      return a.distance_m - b.distance_m;
+    });
+    return out.slice(0, data.limit);
+  });
