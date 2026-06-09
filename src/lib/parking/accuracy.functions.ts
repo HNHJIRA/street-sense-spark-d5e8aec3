@@ -171,10 +171,11 @@ export const getAccuracyReport = createServerFn({ method: "GET" }).handler(async
     },
     providers,
     occupancy: {
-      rows: (occCount as unknown as { count?: number })?.count ?? 0,
+      rows: occCount,
       freshestEventTime: freshest,
       freshestAgeMinutes: freshest ? Math.round((now - new Date(freshest).getTime()) / 60000) : null,
-      spaces: (spaceCount as unknown as { count?: number })?.count ?? 0,
+      spaces: spaceCount,
+
     },
     rules: { byCity, byRestriction },
     seattleAudit,
