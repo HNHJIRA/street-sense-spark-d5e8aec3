@@ -35,7 +35,7 @@ export const WestHollywoodProvider: ParkingProvider = {
         const a = f.attributes as Attrs;
         const coords = arcgisPolyline(f.geometry);
         if (coords.length < 2 || !a.OBJECTID) continue;
-        const rules = [
+        const rules: import("./types").NormalizedRule[] = [
           {
             priority: 25,
             restriction_code: "street_cleaning",
