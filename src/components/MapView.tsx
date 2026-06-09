@@ -68,6 +68,7 @@ export function MapView({ token, city }: MapViewProps) {
   const userMarkerRef = useRef<MapboxGL.Marker | null>(null);
   const accuracyMarkerRef = useRef<MapboxGL.Marker | null>(null);
   const lastLocationRef = useRef<{ lng: number; lat: number; accuracy: number | null; heading: number | null } | null>(null);
+  const globeFrameRef = useRef<number | null>(null);
   const featuresRef = useRef<Map<string, Feature<LineString>>>(new Map());
   const importingRef = useRef(false);
   const lastFetchKeyRef = useRef<string>("");
@@ -480,16 +481,73 @@ export function MapView({ token, city }: MapViewProps) {
     void loadBbox();
   }, [forecastAtIso, ready, loadBbox]);
 
+  useEffect(() => {
+    if (!ready || !locationFix) return;
+    syncUserLocationMarker({
+      lng: locationFix.lng,
+      lat: locationFix.lat,
+      accuracy: locationFix.accuracy,
+      heading: locationFix.heading,
+    });
+  }, [locationFix, ready, syncUserLocationMarker]);
+
+  useEffect(() => {
+    const map = mapRef.current as any;
+    if (!ready || !map) return;
+    if (globeFrameRef.current) window.cancelAnimationFrame(globeFrameRef.current);
+
+    if (!globeMode) {
+      map.setProjection?.({ name: "mercator" });
+      map.setFog?.(null);
+      globeFrameRef.current = null;
+      return;
+    }
+
+    map.setProjection?.({ name: "globe" });
+    map.setFog?.({ color: "rgb(186, 210, 235)", "high-color": "rgb(36, 92, 180)", "horizon-blend": 0.04 });
+    map.easeTo({ center: locationFix ? [locationFix.lng, locationFix.lat] : city.center, zoom: 1.8, pitch: 0, bearing: 0, duration: 900 });
+
+    const rotate = () => {
+      const current = map.getCenter();
+      map.setCenter([current.lng + 0.025, current.lat]);
+      globeFrameRef.current = window.requestAnimationFrame(rotate);
+    };
+    globeFrameRef.current = window.requestAnimationFrame(rotate);
+    return () => {
+      if (globeFrameRef.current) window.cancelAnimationFrame(globeFrameRef.current);
+      globeFrameRef.current = null;
+    };
+  }, [city.center, globeMode, locationFix, ready]);
+
   const zoomIn = () => mapRef.current?.zoomIn();
   const zoomOut = () => mapRef.current?.zoomOut();
+  const toggleGlobe = () => setGlobeMode((v) => !v);
   const locate = () => {
+    const loc = useLocationStore.getState().current ?? useLocationStore.getState().lastKnown;
     if (geolocateRef.current) {
       geolocateRef.current.trigger();
+    }
+    if (loc && mapRef.current) {
+      syncUserLocationMarker({ lng: loc.lng, lat: loc.lat, accuracy: loc.accuracy, heading: loc.heading });
+      if (!isInsideBounds(loc, BOUNDS)) toast.message("Showing your GPS location outside Seattle coverage.");
+      mapRef.current.flyTo({ center: [loc.lng, loc.lat], zoom: 17, pitch: 60, duration: 1200, essential: true });
+      return;
+    }
+    if (useLocationStore.getState().status === "denied") {
+      toast.error("Location permission is denied. Enable location for this site in browser settings.");
       return;
     }
     if (!navigator.geolocation || !mapRef.current) return;
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        useLocationStore.getState().setFix({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: Number.isFinite(pos.coords.accuracy) ? pos.coords.accuracy : null,
+          heading: Number.isFinite(pos.coords.heading ?? NaN) ? pos.coords.heading : null,
+          speed: Number.isFinite(pos.coords.speed ?? NaN) ? pos.coords.speed : null,
+          timestamp: pos.timestamp || Date.now(),
+        });
         mapRef.current?.flyTo({
           center: [pos.coords.longitude, pos.coords.latitude],
           zoom: 17, pitch: 60, duration: 1200,
@@ -520,6 +578,7 @@ export function MapView({ token, city }: MapViewProps) {
           <MapBtn onClick={() => toast.message("Tap any colored line for details")} ariaLabel="Info">
             <Info className="h-5 w-5" />
           </MapBtn>
+          <MapBtn onClick={toggleGlobe} ariaLabel="Rotate globe"><Globe2 className="h-5 w-5" /></MapBtn>
           <MapBtn onClick={locate} ariaLabel="My location"><LocateFixed className="h-5 w-5" /></MapBtn>
         </div>
       )}
