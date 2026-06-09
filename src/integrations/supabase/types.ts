@@ -306,8 +306,12 @@ export type Database = {
           id: string
           lat: number | null
           lng: number | null
+          match_status: string | null
+          nearest_distance_m: number | null
           overall_confidence: number | null
           segment_id: string | null
+          summary: Json | null
+          verdict: string | null
         }
         Insert: {
           city_id?: string | null
@@ -316,8 +320,12 @@ export type Database = {
           id?: string
           lat?: number | null
           lng?: number | null
+          match_status?: string | null
+          nearest_distance_m?: number | null
           overall_confidence?: number | null
           segment_id?: string | null
+          summary?: Json | null
+          verdict?: string | null
         }
         Update: {
           city_id?: string | null
@@ -326,8 +334,12 @@ export type Database = {
           id?: string
           lat?: number | null
           lng?: number | null
+          match_status?: string | null
+          nearest_distance_m?: number | null
           overall_confidence?: number | null
           segment_id?: string | null
+          summary?: Json | null
+          verdict?: string | null
         }
         Relationships: [
           {
