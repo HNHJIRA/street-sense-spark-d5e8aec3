@@ -61,6 +61,8 @@ export interface SignScanResponse {
   decision: ParkingStatus;
   /** Verdict tier — derived from decision.color. */
   verdict: "YES" | "NO" | "LIMITED";
+  /** Driver-friendly AI summary built from the engine output (not raw OCR). */
+  summary: ScanSummary;
   /** Rules the AI extracted from the photo (normalized). */
   parsed_rules: NormalizedRule[];
   /** SDOT rules already on file for the nearest segment, for comparison. */
