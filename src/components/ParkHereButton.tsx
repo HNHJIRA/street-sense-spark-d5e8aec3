@@ -148,7 +148,7 @@ export function ParkHereButton({ cityId, timezone }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingCheckSegmentId]);
 
-  const viewOnMap = (opt: NearbyOption) => {
+  const viewOnMap = (opt: RankedParkingOption) => {
     const mid = opt.coordinates[Math.floor(opt.coordinates.length / 2)] ?? opt.coordinates[0];
     if (mid) setFlyTo({ lng: mid[0], lat: mid[1], zoom: 18 });
     if (origin && mid) {
