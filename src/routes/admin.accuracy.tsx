@@ -102,7 +102,7 @@ function AccuracyPage() {
         <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ textAlign: "left", color: "#64748b", fontSize: 11, textTransform: "uppercase" }}>
-              <th>City</th><th>Segs</th><th>Rules</th><th>Avg</th><th>1-rule</th><th>0-rule</th>
+              <th>City</th><th>Segs</th><th>Rules</th><th>Avg</th><th>2+ %</th><th>1-rule</th><th>0-rule</th>
             </tr>
           </thead>
           <tbody>
@@ -112,12 +112,66 @@ function AccuracyPage() {
                 <td style={num}>{c.segments}</td>
                 <td style={num}>{c.rules}</td>
                 <td style={num}>{c.rulesPerSegment}</td>
+                <td style={{ ...num, color: c.multiRulePct < 50 ? "#dc2626" : "#16a34a" }}>{c.multiRulePct}%</td>
                 <td style={{ ...num, color: c.oneRuleSegments / Math.max(1, c.segments) > 0.9 ? "#dc2626" : undefined }}>{c.oneRuleSegments}</td>
                 <td style={{ ...num, color: c.zeroRuleSegments > 0 ? "#dc2626" : undefined }}>{c.zeroRuleSegments}</td>
               </tr>
             ))}
           </tbody>
         </table>
+      </section>
+
+      <section style={card}>
+        <h2 style={h2}>Rule Depth Histogram</h2>
+        {r.rules.byCity.map((c) => (
+          <div key={c.city} style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#0f172a", marginBottom: 4 }}>{c.city}</div>
+            <div style={{ display: "flex", gap: 2, height: 22 }}>
+              {(["0", "1", "2", "3", "4", "5+"] as const).map((k) => {
+                const n = c.depth[k] ?? 0;
+                const pctW = (n / Math.max(1, c.segments)) * 100;
+                const color =
+                  k === "0" ? "#fecaca" :
+                  k === "1" ? "#fde68a" :
+                  k === "2" ? "#bbf7d0" :
+                  k === "3" ? "#86efac" :
+                  k === "4" ? "#4ade80" : "#16a34a";
+                return (
+                  <div key={k} title={`${k} rule${k === "1" ? "" : "s"}: ${n} segments`}
+                       style={{ width: `${pctW}%`, background: color, fontSize: 10, color: "#0f172a", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {pctW > 6 ? k : ""}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </section>
+
+      <section style={card}>
+        <h2 style={h2}>Rules by Data Source</h2>
+        {r.rules.bySource.map((s) => (
+          <KV key={s.data_source} label={s.data_source} value={s.rules.toLocaleString()} />
+        ))}
+      </section>
+
+      <section style={card}>
+        <h2 style={h2}>Scanner Self-Test</h2>
+        <KV label="Tests run" value={r.scannerSelfTest.count} />
+        <KV label="Passed" value={`${r.scannerSelfTest.pass} / ${r.scannerSelfTest.count}`} danger={r.scannerSelfTest.count > 0 && r.scannerSelfTest.pass < r.scannerSelfTest.count} />
+        {Object.entries(r.scannerSelfTest.byCity).map(([city, v]) => (
+          <KV key={city} label={city} value={`${v.pass} pass · ${v.fail} fail`} danger={v.fail > 0} />
+        ))}
+        <div style={{ marginTop: 8, fontSize: 12, color: "#64748b" }}>
+          POST /api/public/admin/run-scanner-self-test to refresh.
+        </div>
+      </section>
+
+      <section style={card}>
+        <h2 style={h2}>Restriction Distribution</h2>
+        {r.rules.byRestriction.slice(0, 10).map((r2) => (
+          <KV key={r2.restriction_code} label={r2.restriction_code} value={r2.count.toLocaleString()} />
+        ))}
       </section>
 
       <section style={card}>
