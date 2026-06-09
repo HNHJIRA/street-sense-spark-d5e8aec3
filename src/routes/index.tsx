@@ -124,6 +124,7 @@ function HomePage() {
         <SearchSheet token={tokenQuery.data.token} />
         <ForecastSheet />
         <StreetSheet timezone={city.timezone} restrictionTypes={city.restrictionTypes} cityId={city.id} />
+        <DestinationParkingSheet cityId={city.id} timezone={city.timezone} />
         <Onboarding />
       </div>
     </div>
