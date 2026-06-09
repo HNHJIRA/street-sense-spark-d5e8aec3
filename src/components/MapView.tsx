@@ -5,7 +5,7 @@ import type { Feature, FeatureCollection, LineString } from "geojson";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
-import { Sliders, Info, LocateFixed, Plus, Minus } from "lucide-react";
+import { Sliders, Info, LocateFixed, Plus, Minus, Globe2 } from "lucide-react";
 import {
   getSegmentsInBbox,
   importSeattleBlockface,
@@ -33,6 +33,17 @@ const BOUNDS: [[number, number], [number, number]] = [
   [-122.224, 47.734],
 ];
 
+const EARTH_CIRCUMFERENCE_M = 40_075_016.686;
+
+function isInsideBounds(loc: { lng: number; lat: number }, bounds: [[number, number], [number, number]]) {
+  return loc.lng >= bounds[0][0] && loc.lng <= bounds[1][0] && loc.lat >= bounds[0][1] && loc.lat <= bounds[1][1];
+}
+
+function metersToPixels(meters: number, lat: number, zoom: number) {
+  const safeCos = Math.max(0.15, Math.cos((lat * Math.PI) / 180));
+  return (meters * 512 * 2 ** zoom) / (EARTH_CIRCUMFERENCE_M * safeCos);
+}
+
 function segmentToFeature(s: SegmentLite): Feature<LineString> {
   return {
     type: "Feature",
@@ -53,6 +64,10 @@ export function MapView({ token, city }: MapViewProps) {
   const container = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapboxGL.Map | null>(null);
   const geolocateRef = useRef<MapboxGL.GeolocateControl | null>(null);
+  const markerCtorRef = useRef<typeof MapboxGL.Marker | null>(null);
+  const userMarkerRef = useRef<MapboxGL.Marker | null>(null);
+  const accuracyMarkerRef = useRef<MapboxGL.Marker | null>(null);
+  const lastLocationRef = useRef<{ lng: number; lat: number; accuracy: number | null; heading: number | null } | null>(null);
   const featuresRef = useRef<Map<string, Feature<LineString>>>(new Map());
   const importingRef = useRef(false);
   const lastFetchKeyRef = useRef<string>("");
@@ -69,6 +84,68 @@ export function MapView({ token, city }: MapViewProps) {
   const setMapCenter = useAppStore((s) => s.setMapCenter);
   const forecastAt = useAppStore((s) => s.forecastAt);
   const forecastAtIso = forecastAt ? forecastAt.toISOString() : null;
+  const locationFix = useLocationStore((s) => s.current ?? s.lastKnown);
+
+  const syncUserLocationMarker = useCallback((loc: { lng: number; lat: number; accuracy: number | null; heading: number | null } | null) => {
+    const map = mapRef.current;
+    const MarkerCtor = markerCtorRef.current as any;
+    if (!map || !MarkerCtor || !loc) return;
+
+    lastLocationRef.current = loc;
+    const lngLat: [number, number] = [loc.lng, loc.lat];
+
+    if (!accuracyMarkerRef.current) {
+      const el = document.createElement("div");
+      el.style.position = "absolute";
+      el.style.borderRadius = "9999px";
+      el.style.background = "rgba(37, 99, 235, 0.14)";
+      el.style.border = "2px solid rgba(37, 99, 235, 0.32)";
+      el.style.pointerEvents = "none";
+      el.style.transform = "translate(-50%, -50%)";
+      accuracyMarkerRef.current = new MarkerCtor({ element: el, anchor: "center" }).setLngLat(lngLat).addTo(map);
+    }
+
+    if (!userMarkerRef.current) {
+      const el = document.createElement("div");
+      el.style.position = "relative";
+      el.style.width = "24px";
+      el.style.height = "24px";
+      el.style.borderRadius = "9999px";
+      el.style.background = "#2563eb";
+      el.style.border = "4px solid white";
+      el.style.boxShadow = "0 0 0 2px rgba(37,99,235,.35), 0 8px 24px rgba(15,23,42,.35)";
+      el.style.pointerEvents = "none";
+
+      const heading = document.createElement("div");
+      heading.dataset.heading = "true";
+      heading.style.position = "absolute";
+      heading.style.left = "50%";
+      heading.style.top = "-15px";
+      heading.style.width = "0";
+      heading.style.height = "0";
+      heading.style.borderLeft = "6px solid transparent";
+      heading.style.borderRight = "6px solid transparent";
+      heading.style.borderBottom = "15px solid #2563eb";
+      heading.style.transform = "translateX(-50%)";
+      heading.style.filter = "drop-shadow(0 1px 1px rgba(15,23,42,.35))";
+      el.appendChild(heading);
+
+      userMarkerRef.current = new MarkerCtor({ element: el, anchor: "center", rotationAlignment: "map" }).setLngLat(lngLat).addTo(map);
+    }
+
+    const radius = metersToPixels(Math.max(10, loc.accuracy ?? 30), loc.lat, map.getZoom());
+    const diameter = Math.max(28, Math.min(260, radius * 2));
+    const accuracyEl = accuracyMarkerRef.current.getElement();
+    accuracyEl.style.width = `${diameter}px`;
+    accuracyEl.style.height = `${diameter}px`;
+    accuracyMarkerRef.current.setLngLat(lngLat);
+
+    const dotEl = userMarkerRef.current.getElement();
+    const headingEl = dotEl.querySelector<HTMLElement>("[data-heading='true']");
+    if (headingEl) headingEl.style.display = typeof loc.heading === "number" ? "block" : "none";
+    userMarkerRef.current.setLngLat(lngLat);
+    userMarkerRef.current.setRotation(typeof loc.heading === "number" ? loc.heading : 0);
+  }, []);
 
   const updateSource = useCallback(() => {
     const map = mapRef.current;
