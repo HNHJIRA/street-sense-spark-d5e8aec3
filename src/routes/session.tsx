@@ -180,19 +180,35 @@ function SessionPage() {
           const fix = liveLocation ?? lastKnownLocation;
           let extra: React.ReactNode = null;
           if (fix && session.coordinates) {
+            const carLngLat = { lng: session.coordinates[0], lat: session.coordinates[1] };
             const meters = haversineMeters(
               { lng: fix.lng, lat: fix.lat },
-              { lng: session.coordinates[0], lat: session.coordinates[1] },
+              carLngLat,
             );
             const mins = walkingMinutes(meters);
+            const dir = compassDirection(bearingDeg({ lng: fix.lng, lat: fix.lat }, carLngLat));
             extra = (
-              <div className="flex items-center justify-between">
-                <span className="font-semibold">Distance to your car</span>
-                <span>
-                  {meters < 1000 ? `${Math.round(meters)} m` : `${(meters / 1000).toFixed(1)} km`}
-                  {" · "}
-                  {mins} min walk
-                </span>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold">Distance to your car</span>
+                  <span>
+                    {meters < 1000 ? `${Math.round(meters)} m` : `${(meters / 1000).toFixed(1)} km`}
+                    {" · "}
+                    {mins} min walk
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1"><Compass className="h-3 w-3" /> Direction</span>
+                  <span className="font-semibold">{dir}</span>
+                </div>
+                <a
+                  href={walkingDirectionsUrl(carLngLat, { lng: fix.lng, lat: fix.lat })}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center justify-center gap-1.5 rounded-full bg-primary py-2 text-xs font-bold text-primary-foreground"
+                >
+                  <Navigation className="h-3.5 w-3.5" /> Navigate to my car
+                </a>
               </div>
             );
           } else if (!session.coordinates) {
@@ -207,6 +223,7 @@ function SessionPage() {
             />
           );
         })()}
+
 
 
         <UpcomingAlerts
