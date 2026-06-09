@@ -1035,6 +1035,11 @@ export type Database = {
           vacant: number
         }[]
       }
+      la_link_meter_spaces_to_segments: {
+        Args: { p_city_id: string; p_max_meters?: number }
+        Returns: number
+      }
+      la_upsert_meter_occupancy: { Args: { p_rows: Json }; Returns: number }
       longtransactionsenabled: { Args: never; Returns: boolean }
       nearest_segment: {
         Args: {
