@@ -81,9 +81,12 @@ export const getAccuracyReport = createServerFn({ method: "GET" }).handler(async
   void occCountRow;
   const { data: occHead } = await admin.from("la_meter_occupancy")
     .select("event_time").order("event_time", { ascending: false }).limit(1);
-  const { data: occCount } = await admin.from("la_meter_occupancy").select("space_id", { count: "exact", head: true });
-  const { data: spaceCount } = await admin.from("la_meter_spaces").select("space_id", { count: "exact", head: true });
+  const occCountRes = await admin.from("la_meter_occupancy").select("space_id", { count: "exact", head: true });
+  const spaceCountRes = await admin.from("la_meter_spaces").select("space_id", { count: "exact", head: true });
+  const occCount = (occCountRes as { count: number | null }).count ?? 0;
+  const spaceCount = (spaceCountRes as { count: number | null }).count ?? 0;
   const freshest = (occHead as { event_time: string }[] | null)?.[0]?.event_time ?? null;
+
 
   // -- Rule coverage by city
   const { data: cities } = await admin.from("cities").select("id, slug, name");
