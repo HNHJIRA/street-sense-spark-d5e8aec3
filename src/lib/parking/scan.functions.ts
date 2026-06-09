@@ -109,13 +109,21 @@ function validateAgainstSdot(
   aiRules: NormalizedRule[],
   sdotRules: ParkingRule[],
   overallConfidence: number,
+  matchStatus: "matched" | "out_of_range" | "no_gps" | "no_segment_data",
 ): SignScanValidation[] {
   if (sdotRules.length === 0) {
+    const outcome: SignScanValidation["outcome"] =
+      matchStatus === "out_of_range" ? "out_of_range" :
+      matchStatus === "no_gps" ? "no_gps" : "no_sdot";
+    const reason =
+      matchStatus === "out_of_range" ? "GPS is outside the selected city's coverage (no segment within 80m)." :
+      matchStatus === "no_gps" ? "No GPS captured — cannot cross-check against street data." :
+      "Nearest segment has no SDOT rules on file.";
     return aiRules.map((r) => ({
-      outcome: "no_sdot",
+      outcome,
       matched_rule_id: null,
       confidence: overallConfidence,
-      detail: `Sign rule "${r.restriction_code}" — no SDOT data on file to compare.`,
+      detail: `Sign rule "${r.restriction_code}" — ${reason}`,
     }));
   }
   const out: SignScanValidation[] = [];
@@ -145,6 +153,7 @@ function validateAgainstSdot(
   }
   return out;
 }
+
 
 const SOURCE_LABELS: Record<string, string> = {
   sdot: "Seattle SDOT Blockface",
