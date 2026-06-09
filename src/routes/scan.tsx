@@ -65,7 +65,7 @@ function ScanPage() {
       const fix = liveLocation ?? lastKnown;
       const res = await scan({
         data: {
-          cityId: city.id, citySlug: city.slug, timezone: city.timezone,
+          cityId: city.id, citySlug: city.slug, timezone: "America/Los_Angeles",
           imageBase64: base64,
           mimeType: file.type || "image/jpeg",
           lng: fix?.lng ?? null, lat: fix?.lat ?? null,
