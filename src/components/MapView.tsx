@@ -391,6 +391,10 @@ export function MapView({ token, city }: MapViewProps) {
   const zoomIn = () => mapRef.current?.zoomIn();
   const zoomOut = () => mapRef.current?.zoomOut();
   const locate = () => {
+    if (geolocateRef.current) {
+      geolocateRef.current.trigger();
+      return;
+    }
     if (!navigator.geolocation || !mapRef.current) return;
     navigator.geolocation.getCurrentPosition(
       (pos) => {
