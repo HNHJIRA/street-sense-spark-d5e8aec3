@@ -106,6 +106,8 @@ export function MapView({ token, city }: MapViewProps) {
   const forecastAtIso = forecastAt ? forecastAt.toISOString() : null;
   const mapMode = useAppStore((s) => s.mapMode);
   const locationFix = useLocationStore((s) => s.current ?? s.lastKnown);
+  const recommendedHighlight = useAppStore((s) => s.recommendedHighlight);
+
 
   const syncUserLocationMarker = useCallback((loc: { lng: number; lat: number; accuracy: number | null; heading: number | null } | null) => {
     const map = mapRef.current;
