@@ -438,12 +438,17 @@ export const syncProvider = createServerFn({ method: "POST" })
         imported += rows.length;
       }
 
-      // Replace rules per segment with the normalized rule set.
+      // Replace ONLY rules contributed by *this* provider, so other layered
+      // datasets (Signposts, RPZ, street sweeping) remain attached to the
+      // same segment. Rules are tagged with data_source = provider.id.
       const rulesByExt = new Map(normalized.map((s) => [s.external_id, s.rules]));
       const ids = insertedIds.map((r) => r.id);
       for (let i = 0; i < ids.length; i += 500) {
         const slice = ids.slice(i, i + 500);
-        await admin.from("parking_rules").delete().in("street_segment_id", slice);
+        await admin.from("parking_rules")
+          .delete()
+          .in("street_segment_id", slice)
+          .eq("data_source", provider.id);
         const ruleRows = insertedIds
           .filter((r) => slice.includes(r.id))
           .flatMap((r) => (rulesByExt.get(r.external_id) ?? []).map((rule) => ({
@@ -458,6 +463,7 @@ export const syncProvider = createServerFn({ method: "POST" })
             effective_from: rule.effective_from,
             effective_to: rule.effective_to,
             notes: rule.notes,
+            data_source: provider.id,
           })));
         if (ruleRows.length) await admin.from("parking_rules").insert(ruleRows);
       }
