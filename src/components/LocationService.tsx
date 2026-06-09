@@ -34,8 +34,7 @@ export function LocationService() {
     };
     (async () => {
       try {
-        // @ts-expect-error — "geolocation" is a valid PermissionName at runtime
-        permStatus = await navigator.permissions?.query({ name: "geolocation" });
+        permStatus = (await navigator.permissions?.query({ name: "geolocation" as PermissionName })) ?? null;
         if (permStatus) {
           store().setPermission(permStatus.state);
           permStatus.addEventListener?.("change", onPermChange);
