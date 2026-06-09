@@ -27,17 +27,7 @@ const COLOR_HEX: Record<ParkingColor, string> = {
   red: "#EF4444",
 };
 
-// Seattle parking-area bounds (SW, NE).
-const BOUNDS: [[number, number], [number, number]] = [
-  [-122.459, 47.481],
-  [-122.224, 47.734],
-];
-
 const EARTH_CIRCUMFERENCE_M = 40_075_016.686;
-
-function isInsideBounds(loc: { lng: number; lat: number }, bounds: [[number, number], [number, number]]) {
-  return loc.lng >= bounds[0][0] && loc.lng <= bounds[1][0] && loc.lat >= bounds[0][1] && loc.lat <= bounds[1][1];
-}
 
 function metersToPixels(meters: number, lat: number, zoom: number) {
   const safeCos = Math.max(0.15, Math.cos((lat * Math.PI) / 180));
@@ -528,7 +518,7 @@ export function MapView({ token, city }: MapViewProps) {
     }
     if (loc && mapRef.current) {
       syncUserLocationMarker({ lng: loc.lng, lat: loc.lat, accuracy: loc.accuracy, heading: loc.heading });
-      if (!isInsideBounds(loc, BOUNDS)) toast.message("Showing your GPS location outside Seattle coverage.");
+      
       mapRef.current.flyTo({ center: [loc.lng, loc.lat], zoom: 17, pitch: 60, duration: 1200, essential: true });
       return;
     }

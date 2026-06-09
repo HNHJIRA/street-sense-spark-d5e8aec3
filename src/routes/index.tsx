@@ -13,11 +13,23 @@ import { ActiveSessionWidget } from "@/components/ActiveSessionWidget";
 import { Onboarding } from "@/components/Onboarding";
 import { useAppStore } from "@/stores/app-store";
 
-const cityOpts = queryOptions({
-  queryKey: ["parking", "city", "seattle"],
-  queryFn: () => getCityInfo({ data: { citySlug: "seattle" } }),
-  staleTime: 5 * 60 * 1000,
-});
+export const AVAILABLE_CITIES: { slug: string; name: string }[] = [
+  { slug: "los-angeles", name: "Los Angeles" },
+  { slug: "santa-monica", name: "Santa Monica" },
+  { slug: "west-hollywood", name: "West Hollywood" },
+  { slug: "pasadena", name: "Pasadena" },
+  { slug: "seattle", name: "Seattle" },
+];
+
+const DEFAULT_CITY = "los-angeles";
+
+function cityOptsFor(slug: string) {
+  return queryOptions({
+    queryKey: ["parking", "city", slug],
+    queryFn: () => getCityInfo({ data: { citySlug: slug } }),
+    staleTime: 5 * 60 * 1000,
+  });
+}
 const tokenOpts = queryOptions({
   queryKey: ["mapbox", "token"],
   queryFn: () => getMapboxToken(),
@@ -27,15 +39,15 @@ const tokenOpts = queryOptions({
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "ParkClear — Seattle parking map" },
-      { name: "description", content: "Real-time, color-coded street parking map for Seattle. See where you can park right now, or forecast a future time." },
-      { property: "og:title", content: "ParkClear — Seattle parking map" },
-      { property: "og:description", content: "See parking legality on every street in Seattle, at a glance." },
+      { title: "ParkClear — Street parking map" },
+      { name: "description", content: "Real-time, color-coded street parking map. See where you can park right now, or forecast a future time." },
+      { property: "og:title", content: "ParkClear — Street parking map" },
+      { property: "og:description", content: "See parking legality on every street, at a glance." },
     ],
   }),
   loader: async ({ context }) => {
     await Promise.all([
-      context.queryClient.ensureQueryData(cityOpts),
+      context.queryClient.ensureQueryData(cityOptsFor(DEFAULT_CITY)),
       context.queryClient.ensureQueryData(tokenOpts),
     ]);
   },
@@ -56,8 +68,23 @@ export const Route = createFileRoute("/")({
   notFoundComponent: () => null,
 });
 
+const CITY_STORAGE_KEY = "parkclear:selected-city";
+
 function HomePage() {
-  const cityQuery = useSuspenseQuery(cityOpts);
+  const [citySlug, setCitySlug] = useState<string>(() => {
+    if (typeof window === "undefined") return DEFAULT_CITY;
+    const stored = window.localStorage.getItem(CITY_STORAGE_KEY);
+    if (stored && AVAILABLE_CITIES.some((c) => c.slug === stored)) return stored;
+    return DEFAULT_CITY;
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(CITY_STORAGE_KEY, citySlug);
+    }
+  }, [citySlug]);
+
+  const cityQuery = useSuspenseQuery(cityOptsFor(citySlug));
   const tokenQuery = useSuspenseQuery(tokenOpts);
   const [now, setNow] = useState<Date | null>(null);
 
@@ -78,11 +105,13 @@ function HomePage() {
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-black">
-      {/* Mobile phone frame — constrains the map and all overlays to a phone-width column on larger screens. */}
       <div className="relative mx-auto h-full w-full max-w-md overflow-hidden bg-background shadow-2xl">
         <MapView token={tokenQuery.data.token} city={city} />
         <TopBar
           cityName={city.name}
+          citySlug={city.slug}
+          cities={AVAILABLE_CITIES}
+          onCityChange={setCitySlug}
           now={displayTime}
           timezone={city.timezone}
           isForecast={!!forecastAt}
