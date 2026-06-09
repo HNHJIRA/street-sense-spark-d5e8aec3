@@ -5,15 +5,18 @@ import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
-  X, Loader2, Footprints, MapPin, ArrowRight, Sparkles,
+  X, Loader2, Footprints, MapPin, ArrowRight, Sparkles, Navigation,
 } from "lucide-react";
 import {
   findRankedParking,
   type RankedParkingOption,
 } from "@/lib/parking/parking.functions";
 import { scoreBadgeClass } from "@/lib/parking/score";
+import { drivingDirectionsUrl } from "@/lib/parking/navigation";
+import { useLocationStore } from "@/stores/location-store";
 import { useAppStore } from "@/stores/app-store";
 import { cn } from "@/lib/utils";
+
 
 interface Props {
   cityId: string;
@@ -39,6 +42,9 @@ export function DestinationParkingSheet({ cityId, timezone }: Props) {
   const selectSegment = useAppStore((s) => s.selectSegment);
   const setRecommendedHighlight = useAppStore((s) => s.setRecommendedHighlight);
   const forecastAt = useAppStore((s) => s.forecastAt);
+  const liveLocation = useLocationStore((s) => s.current);
+  const lastKnown = useLocationStore((s) => s.lastKnown);
+
 
   const find = useServerFn(findRankedParking);
   const atIso = forecastAt ? forecastAt.toISOString() : null;
@@ -143,14 +149,28 @@ export function DestinationParkingSheet({ cityId, timezone }: Props) {
                   </div>
                   <ScoreBadge score={top.parking_score} />
                 </div>
-                <button
-                  onClick={() => choose(top)}
-                  className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-full bg-primary py-2.5 text-sm font-bold text-primary-foreground"
-                >
-                  Show on map <ArrowRight className="h-4 w-4" />
-                </button>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => choose(top)}
+                    className="flex items-center justify-center gap-1.5 rounded-full bg-surface py-2.5 text-sm font-bold"
+                  >
+                    Show on map <ArrowRight className="h-4 w-4" />
+                  </button>
+                  <a
+                    href={drivingDirectionsUrl(
+                      { lng: top.coordinates[0]?.[0] ?? destination.lng, lat: top.coordinates[0]?.[1] ?? destination.lat },
+                      (liveLocation ?? lastKnown) ? { lng: (liveLocation ?? lastKnown)!.lng, lat: (liveLocation ?? lastKnown)!.lat } : null,
+                    )}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-center gap-1.5 rounded-full bg-primary py-2.5 text-sm font-bold text-primary-foreground"
+                  >
+                    <Navigation className="h-4 w-4" /> Navigate
+                  </a>
+                </div>
               </div>
             )}
+
 
             {results.length > 1 && (
               <div className="mt-4">
