@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { Loader2, Navigation, ScanLine, Footprints, ArrowRight } from "lucide-react";
+import { Loader2, Navigation, ScanLine, Footprints, ArrowRight, Sparkles } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
-  findNearbyAvailable,
-  type NearbyOption,
+  findRankedParking,
+  type RankedParkingOption,
 } from "@/lib/parking/parking.functions";
+import { scoreBadgeClass } from "@/lib/parking/score";
 import {
   getDecisionForSegment,
   getDecisionAt,
