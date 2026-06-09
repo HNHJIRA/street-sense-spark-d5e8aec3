@@ -1,94 +1,104 @@
+# Data Completeness Sprint — Plan
 
-# ParkClear Core Completion — Phased Plan
+No new consumer-facing features. Every change is plumbing, providers, or admin-only dashboards.
 
-Everything below is **additive**. Seattle provider, rules, forecast, sessions, alerts, and Can-I-Park path stay byte-identical. All decisions continue to flow through `evaluateRulesAt()` — no second engine.
+## P1 — Seattle Restriction Layering
 
-This is a large build. To keep each step shippable and reviewable, I'll deliver it in **4 phases**, pausing after each so you can verify before I continue.
+Today the `SeattleBlockfaceProvider` writes exactly one rule per blockface from `PARKING_CATEGORY`. To get to 3–5 rules/segment we layer additional SDOT datasets and write them as additional `parking_rules` rows attached to the **same** `street_segments` (matched by spatial proximity to the blockface centerline).
 
----
+New providers (additive, each in its own `*.server.ts`):
 
-## Phase 1 — Decision Core + AI Driver Summary + Timeline/Countdown
-Covers **Feature 1 (Advanced Can I Park Here)**, **Feature 4 (Manual Test Mode)**, **Feature 7 (Confidence System)** wiring.
+1. `SeattleSignpostsProvider` — SDOT Signposts FeatureService (point dataset of every posted sign). Parse the sign text into restrictions (no parking, time-limit, tow-away, loading zone) using the existing `sign-ai`/`scan-summary` rule extractor. Snap each sign to the nearest blockface within ~25 m and append rules.
+2. `SeattleStreetCleaningProvider` — SDOT Street Sweeping routes. Append `street_cleaning` rules with day-of-week + time windows.
+3. `SeattleRpzProvider` — SDOT Restricted Parking Zones (RPZ) polygons. For every blockface intersecting an RPZ polygon, append a `permit` rule with `permit_zone = <zone#>`.
+4. `SeattleTemporaryRestrictionsProvider` — SDOT Temporary No-Parking permits. Append rules with `effective_from`/`effective_to` set so the engine auto-expires them.
 
-- **New shared module** `src/lib/parking/decision.ts` (pure): given `(segment, restrictionTypes, when, timezone)` produces a `ParkingDecision`:
-  - `verdict`: YES | NO | LIMITED | UNKNOWN
-  - `status` (existing `evaluateRulesAt` output)
-  - `nextRestriction` (scans next 24h of rules+events for the next color change)
-  - `timeline` (NOW + up to 6 boundary entries in next 24h)
-  - `timeRemainingMs` (until next boundary)
-  - `confidence` (reuses `confidence.ts` scoring; surfaces high/medium/low)
-- **New component** `src/components/ParkDecisionScreen.tsx`:
-  - Status banner (verdict, reason, allowed-until)
-  - Live countdown (ticks every 1s when YES/LIMITED)
-  - Next Restriction card (label + starts-at + time-until)
-  - Parking Timeline (vertical list, NOW marker)
-  - Confidence badge
-  - **AI Driver Summary** section
-  - Street name, data source, permit, max stay
-- **AI summary** `src/lib/parking/driver-summary.functions.ts` (new `createServerFn`, Lovable AI Gateway, `google/gemini-3-flash-preview`):
-  - Input: structured `ParkingDecision` + segment meta (NOT raw OCR / provider text)
-  - Output: `{ summary: string }` via `Output.object` schema
-  - Cached client-side via React Query keyed on `(segmentId, rounded-15min when, verdict)`
-- **ParkHereButton rewrite** to render `ParkDecisionScreen` as its result view; reuses existing GPS + tap (`pendingCheckSegmentId`) wiring already in place.
-- **StreetSheet "Can I park here?"** already triggers manual mode — it will now open the full decision screen.
+Sync orchestration:
 
----
+- New `syncCityAllProviders(citySlug, bbox)` server fn that runs every provider registered for the city in series and **appends** rules instead of replacing the whole rule set (current `syncProvider` deletes-then-inserts — change it to delete only rules whose `data_source` matches the provider being synced, by adding a `data_source` column to `parking_rules`).
+- `registry.server.ts` returns an array of providers per city (not single).
 
-## Phase 2 — Nearest Available + Destination Search + Discovery
-Covers **Feature 2**, **Feature 3**, **Feature 9**.
+Schema migration:
 
-- **Server fn** `findRankedParking({ from, radii: [100,250,500], when, cityId })` in `parking.functions.ts`:
-  - Reuses existing `nearest_segments_full` RPC, expands radius until results found
-  - Evaluates every candidate via `evaluateRulesAt()` (server-side import of pure engine)
-  - Ranks: legality (green>yellow, red excluded) → time-remaining → distance → confidence
-  - Returns top N with distance, walking-time (1.33 m/s), decision summary
-- **AI recommendation summary** (same gateway fn, different prompt template) — one sentence per top result, batched.
-- **`ParkHereButton`** when GPS verdict is NO/UNKNOWN: shows ranked list with "View on map" (drives existing `recommendedHighlight`) and "Navigate" (opens Apple/Google Maps URL).
-- **Destination search**: extend `SearchSheet`:
-  - On result selection, call `findRankedParking({ from: destCoords })`
-  - New `DestinationParkingSheet` shows best spot + alternatives with same card UI
-- **Discovery entry point**: small "Where should I park?" CTA on the map overlay → uses current GPS or last map center.
+- `ALTER TABLE parking_rules ADD COLUMN data_source TEXT;` + index on `(street_segment_id, data_source)`.
 
----
+## P2 — LA Coverage Expansion
 
-## Phase 3 — Sign Scanner Upgrade + Find My Car + Session Auto-fill
-Covers **Feature 5**, **Feature 6**, scanner integration into sessions.
+Today `SantaMonicaProvider`, `PasadenaProvider`, `WestHollywoodProvider` exist but have **0 segments synced** because nobody has triggered a sync for their bboxes. Two fixes:
 
-- **Sign scanner**: keep existing OCR → `parsed_sign_rules` pipeline. **Add** a synthetic in-memory `StreetSegment` built from parsed rules, run through `evaluateRulesAt()`, then render the same `ParkDecisionScreen` (timeline, countdown, next restriction, AI summary) on the scan result page. OCR remains read-only — engine still decides.
-- **Rule Summary card** on scan result: allowed days/hours, max stay, permit, sweeping, tow-away, loading zone — pulled from `parsed_sign_rules` (already structured).
-- **Session auto-fill**: when "I parked here" is pressed from scanner or street sheet, prefill `allowed_until`, `max_stay`, `next_restriction`, `reason` from the decision (existing `startSession` already takes most of these; extend `device-store` Session type for `nextRestriction`).
-- **Find My Car**: extend active session with stored `coordinates` (already present) + small `FindMyCarCard` on `/session` showing distance from current GPS, bearing arrow, "Navigate" deep link, "Show on map" (flyTo).
+1. **Trigger initial sync.** Extend the admin LA sync endpoint (`/api/public/admin/sync-la`) to call `syncProvider` for each of `santa-monica`, `pasadena`, `west-hollywood` using each city's full bbox (computed from the existing `cities.center` + a sensible radius per city). Also enroll them in the same daily provider re-sync that LADOT uses.
+2. **Add real datasets** beyond street sweeping where they exist:
+   - Santa Monica: Preferential Parking Zones (permit polygons), Metered Parking inventory.
+   - Pasadena: Preferential Parking Districts, Metered Zones.
+   - West Hollywood: Permit Parking Districts (already partially wired), Time-Limited Zones.
 
----
+Each new dataset goes into the same `*.server.ts` provider as additional `fetchSegments` calls; rules are appended to the same blockfaces.
 
-## Phase 4 — LA Provider Hardening + UNKNOWN Surface
-Covers **Feature 8**.
+## P3 — Occupancy Verification
 
-- **Providers**: LADOT, SantaMonica, WestHollywood, Pasadena server files already exist. Audit each, ensure they import published open-data feeds (street sweeping, permit zones, meters, red curbs) and write normalized `parking_rules` + `street_segments`. Add missing fields where provider data supports it. Pasadena/WeHo gaps will be flagged in `provider_health`.
-- **No Seattle fallback**: confirm registry routes LA bbox queries to LA providers only; never to `seattle-blockface`.
-- **UNKNOWN handling**: when no segment within 50m has rules, decision returns UNKNOWN with copy: *"Parking status cannot be verified. Please verify local signage."* plus a one-tap "Scan the sign" CTA that opens `/scan`.
-- **Coverage areas** wired into LA coverage admin page (already exists) so DTLA / Hollywood / Koreatown / etc. each report a status.
+Cron already runs `/api/public/cron/sync-la-occupancy` every 5 minutes. Add:
 
----
+- `getOccupancyHealth()` server fn returning `{ rowCount, freshestEventAgeMin, last5RunDurations, last5RunErrors }` from `la_meter_occupancy` + `sync_logs`.
+- New `/api/public/cron/health-check` endpoint that:
+  - Asserts `freshestAgeMin < 15`
+  - Asserts `rowCount > 0`
+  - Inserts a `usage_events` row tagged `provider_health` on failure for alerting.
+- Surface freshness in the existing `/admin/accuracy` dashboard (already partially present; add per-cron last-run + error rate).
 
-## Phase 5 (small) — Polish + Confidence Badges Everywhere
-- Confidence badge on street sheet, scan result, recommendation cards.
-- Memory of design tokens (no hardcoded colors).
+## P4 — Scanner Validation QA
 
----
+Programmatic test harness, NOT a UI feature.
 
-## Technical Notes
+- New server fn `runScannerSelfTest()` that submits 5 synthetic scans per city:
+  - inside a known segment (expect `matched`)
+  - 10 m off a segment with conflicting OCR text (expect `conflict`)
+  - 5 km from any segment (expect `out_of_range`)
+  - no GPS provided (expect `no_gps`)
+  - inside a segment with no posted rule (expect `unmatched`)
+- Persist results to `scan_validation_results` tagged `source = 'self_test'`.
+- Surface pass/fail matrix on `/admin/accuracy` ("Scanner QA" card per city).
 
-- **No new engine.** `decision.ts` is a thin wrapper over `evaluateRulesAt()` + a forward scan of the same rule set; it never re-interprets restrictions.
-- **AI calls** go through `src/lib/ai-gateway.server.ts` (will create if missing) using `LOVABLE_API_KEY` and `google/gemini-3-flash-preview`. Structured output via `Output.object` with tiny schema (single `summary` string) to avoid Gemini state-limit issues.
-- **Server fns** live in `src/lib/parking/*.functions.ts` (already the convention). No `createServerFn` in loaders of public routes.
-- **Seattle isolation**: no edits to `providers/seattle-blockface.server.ts`, Seattle rule rows, or any Seattle-only code path. New code branches on `cityId` only where city-specific behavior is needed.
-- **DB**: no schema changes expected in phases 1–3. Phase 4 may add columns to `provider_health` if needed; will surface as a migration for your approval.
+## P5 — Accuracy Dashboard Expansion
 
----
+Extend `getAccuracyReport()` and `/admin/accuracy` to add:
 
-## What I'll Do First If You Approve
+- **Rule depth histogram per city** (1/2/3/4/5+ rules per segment).
+- **Provider completeness matrix** — rows = providers, columns = (segments synced, rules contributed, last run, last error).
+- **Occupancy panel** — rowCount, freshness, last 5 cron run durations.
+- **Scanner QA panel** — pass/fail matrix from P4.
+- **Multi-rule coverage** — % of segments with ≥2 overlapping rules per city (target ≥80% Seattle, ≥50% LA).
 
-Phase 1 only — it's the foundation everything else renders on. After you verify the new Can-I-Park screen + AI summary + timeline + countdown work on a tapped LA segment and your current GPS, I'll move to Phase 2.
+## Technical Details
 
-Reply "go" to start Phase 1, or tell me to reorder phases.
+Files added:
+
+- `src/lib/parking/providers/seattle-signposts.server.ts`
+- `src/lib/parking/providers/seattle-street-cleaning.server.ts`
+- `src/lib/parking/providers/seattle-rpz.server.ts`
+- `src/lib/parking/providers/seattle-temp-restrictions.server.ts`
+- `src/lib/parking/scanner-self-test.functions.ts`
+- `src/routes/api/public/cron.health-check.ts`
+
+Files changed:
+
+- `src/lib/parking/providers/registry.server.ts` — return `ParkingProvider[]` per city.
+- `src/lib/parking/parking.functions.ts` — `syncProvider` becomes provider-scoped rule replace (uses new `data_source` column); add `syncCityAllProviders`.
+- `src/lib/parking/providers/santa-monica.server.ts`, `pasadena.server.ts`, `west-hollywood.server.ts` — add permit/meter datasets.
+- `src/routes/api/public/admin.sync-la.ts` — sync all 4 LA cities, not just LADOT.
+- `src/lib/parking/accuracy.functions.ts` + `src/routes/admin.accuracy.tsx` — new panels (rule depth, provider matrix, scanner QA, occupancy panel).
+- `supabase` migration: add `parking_rules.data_source TEXT` + index.
+
+## Out of Scope
+
+- No new end-user UI.
+- No changes to the parking decision engine ranking logic itself.
+- No mobile / CarPlay work.
+- ML-based predictive availability (Phase 5+).
+
+## Success Criteria
+
+- Seattle `rulesPerSegment` ≥ 3 average; `twoPlusRuleSegments / segments` ≥ 0.8.
+- Santa Monica, Pasadena, West Hollywood each have ≥ 500 segments and ≥ 1 rule/segment.
+- Occupancy cron health-check green; freshness < 15 min.
+- Scanner self-test produces ≥ 1 example of each verdict (`matched`, `conflict`, `unmatched`, `out_of_range`, `no_gps`) per city.
+- Accuracy dashboard shows all five new panels with live data.
