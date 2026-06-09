@@ -45,7 +45,7 @@ export interface SignScanInput {
 }
 
 export interface SignScanValidation {
-  outcome: "match" | "conflict" | "unmatched" | "no_sdot";
+  outcome: "match" | "conflict" | "unmatched" | "no_sdot" | "out_of_range" | "no_gps";
   matched_rule_id: string | null;
   confidence: number;
   detail: string;
