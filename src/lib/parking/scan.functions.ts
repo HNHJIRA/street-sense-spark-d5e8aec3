@@ -166,6 +166,7 @@ export const scanSign = createServerFn({ method: "POST" })
     }).parse(input),
   )
   .handler(async ({ data }): Promise<SignScanResponse> => {
+    const scannedAt = new Date();
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured");
 
