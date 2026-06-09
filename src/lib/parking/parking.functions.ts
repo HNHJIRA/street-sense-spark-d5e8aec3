@@ -575,7 +575,7 @@ export const checkParkingForSegment = createServerFn({ method: "GET" })
       label: status.label,
       restriction_code: status.code,
       distance_m: 0,
-      coordinates: coords,
+      coordinates: [],
       allowed_until: status.allowed_until,
       permit_zone: status.permit_zone,
       time_limit_minutes: status.time_limit_minutes,
