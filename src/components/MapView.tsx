@@ -51,6 +51,7 @@ function segmentToFeature(s: SegmentLite): Feature<LineString> {
 export function MapView({ token, city }: MapViewProps) {
   const container = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapboxGL.Map | null>(null);
+  const geolocateRef = useRef<MapboxGL.GeolocateControl | null>(null);
   const featuresRef = useRef<Map<string, Feature<LineString>>>(new Map());
   const importingRef = useRef(false);
   const lastFetchKeyRef = useRef<string>("");
