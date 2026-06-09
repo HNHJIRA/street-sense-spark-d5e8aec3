@@ -1081,6 +1081,25 @@ export type Database = {
           side: string
         }[]
       }
+      nearest_segments_full: {
+        Args: {
+          p_city_id: string
+          p_lat: number
+          p_limit?: number
+          p_lng: number
+          p_max_meters?: number
+        }
+        Returns: {
+          data_source: string
+          distance_m: number
+          geojson: string
+          id: string
+          metadata: Json
+          name: string
+          rules: Json
+          side: string
+        }[]
+      }
       populate_geometry_columns:
         | { Args: { tbl_oid: unknown; use_typmod?: boolean }; Returns: number }
         | { Args: { use_typmod?: boolean }; Returns: string }
