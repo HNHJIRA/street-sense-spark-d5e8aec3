@@ -36,6 +36,11 @@ function ScanPage() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<SignScanResponse | null>(null);
 
+  // Global location store — single source of truth across pages.
+  const liveLocation = useLocationStore((s) => s.current);
+  const lastKnown = useLocationStore((s) => s.lastKnown);
+  const locStatus = useLocationStore((s) => s.status);
+
   const reset = () => {
     setResult(null); setPreviewUrl(null); setError(null);
     if (fileRef.current) fileRef.current.value = "";
@@ -54,14 +59,14 @@ function ScanPage() {
     setLoading(true);
     try {
       const base64 = await fileToBase64(file);
-      // Use last-known browser geolocation if available — fall back to null.
-      const coords = await getCurrentCoordsSafe();
+      // Use the global GPS store — live fix, then last-known, then null.
+      const fix = liveLocation ?? lastKnown;
       const res = await scan({
         data: {
           cityId: city.id, citySlug: city.slug, timezone: city.timezone,
           imageBase64: base64,
           mimeType: file.type || "image/jpeg",
-          lng: coords?.lng ?? null, lat: coords?.lat ?? null,
+          lng: fix?.lng ?? null, lat: fix?.lat ?? null,
         },
       });
       setResult(res);
