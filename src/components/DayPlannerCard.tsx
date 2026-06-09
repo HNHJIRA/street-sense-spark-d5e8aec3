@@ -48,7 +48,7 @@ export function DayPlannerCard({ segmentId, citySlug }: Props) {
   });
   const [offset, setOffset] = useState<0 | 1 | 2>(0);
 
-  const tz = city.city.timezone;
+  const tz = city.timezone;
   const plan = useMemo(() => {
     if (!detailsQ.data) return null;
     const target = new Date(Date.now() + offset * 86_400_000);
@@ -67,6 +67,7 @@ export function DayPlannerCard({ segmentId, citySlug }: Props) {
       tz,
     );
   }, [detailsQ.data, city.restrictionTypes, offset, tz]);
+
 
   if (!detailsQ.data) {
     return (
