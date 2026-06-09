@@ -180,6 +180,11 @@ export const getAccuracyReport = createServerFn({ method: "GET" }).handler(async
     };
   }
 
+  // -- Scanner self-test summary
+  const { getLatestScannerSelfTest } = await import("./scanner-self-test.functions");
+  let scannerSelfTest = { count: 0, pass: 0, byCity: {} as Record<string, { pass: number; fail: number }> };
+  try { scannerSelfTest = await getLatestScannerSelfTest(); } catch { /* ignore */ }
+
   return {
     generatedAt: new Date().toISOString(),
     scans: {
@@ -196,9 +201,10 @@ export const getAccuracyReport = createServerFn({ method: "GET" }).handler(async
       freshestEventTime: freshest,
       freshestAgeMinutes: freshest ? Math.round((now - new Date(freshest).getTime()) / 60000) : null,
       spaces: spaceCount,
-
     },
-    rules: { byCity, byRestriction },
+    rules: { byCity, byRestriction, bySource },
     seattleAudit,
+    scannerSelfTest,
   };
 });
+
