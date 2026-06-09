@@ -73,6 +73,7 @@ export function MapView({ token, city }: MapViewProps) {
   const lastFetchKeyRef = useRef<string>("");
   const [mapError, setMapError] = useState(false);
   const [ready, setReady] = useState(false);
+  const [globeMode, setGlobeMode] = useState(false);
 
   const queryClient = useQueryClient();
   const fetchSegments = useServerFn(getSegmentsInBbox);
@@ -251,12 +252,12 @@ export function MapView({ token, city }: MapViewProps) {
             zoom: Math.max(15.5, city.default_zoom),
             pitch: 60,
             bearing: -18,
-            maxBounds: BOUNDS,
             minZoom: 12,
             maxZoom: 20,
             attributionControl: false,
             antialias: true,
           });
+          markerCtorRef.current = mapboxgl.Marker;
           map.dragRotate.enable();
           map.touchZoomRotate.enable();
           map.touchZoomRotate.enableRotation();
@@ -418,6 +419,7 @@ export function MapView({ token, city }: MapViewProps) {
             // (e.g., suspense fallback flicker). Tiles only fetch once sized.
             window.requestAnimationFrame(() => map.resize());
             window.setTimeout(() => map.resize(), 250);
+            syncUserLocationMarker(lastLocationRef.current);
             updateSource();
             void loadBbox();
 
