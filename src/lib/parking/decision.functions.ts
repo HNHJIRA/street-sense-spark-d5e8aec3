@@ -63,7 +63,7 @@ async function fetchSegmentBundle(admin: AdminClient, segmentId: string) {
     .maybeSingle();
   if (!seg) return null;
 
-  const [{ data: rules }, { data: events }, { data: geomJson }] = await Promise.all([
+  const [{ data: rules }, { data: events }] = await Promise.all([
     admin.from("parking_rules")
       .select("id, street_segment_id, priority, restriction_code, days_of_week, time_start, time_end, permit_zone, time_limit_minutes, effective_from, effective_to, notes")
       .eq("street_segment_id", segmentId)
@@ -71,16 +71,12 @@ async function fetchSegmentBundle(admin: AdminClient, segmentId: string) {
     admin.from("parking_events")
       .select("id, street_segment_id, restriction_code, starts_at, ends_at, reason")
       .eq("street_segment_id", segmentId),
-    admin.rpc("segment_geojson", { p_id: segmentId }).then((r) => r).catch(() => ({ data: null })),
-  ]) as [any, any, any];
+  ]) as [any, any];
 
-  let coords: [number, number][] = [];
-  if (typeof geomJson === "string") {
-    try {
-      const g = JSON.parse(geomJson) as LineString;
-      if (Array.isArray(g.coordinates)) coords = g.coordinates as [number, number][];
-    } catch { /* ignore */ }
-  }
+  // Coordinates are not required for the decision screen; the engine and AI
+  // summary only need rules + metadata. Map highlighting still uses
+  // checkParkingForSegment which already returns coords via the bbox layer.
+  const coords: [number, number][] = [];
 
   return {
     seg,
