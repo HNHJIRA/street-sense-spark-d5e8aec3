@@ -438,12 +438,17 @@ export const syncProvider = createServerFn({ method: "POST" })
         imported += rows.length;
       }
 
-      // Replace rules per segment with the normalized rule set.
+      // Replace ONLY rules contributed by *this* provider, so other layered
+      // datasets (Signposts, RPZ, street sweeping) remain attached to the
+      // same segment. Rules are tagged with data_source = provider.id.
       const rulesByExt = new Map(normalized.map((s) => [s.external_id, s.rules]));
       const ids = insertedIds.map((r) => r.id);
       for (let i = 0; i < ids.length; i += 500) {
         const slice = ids.slice(i, i + 500);
-        await admin.from("parking_rules").delete().in("street_segment_id", slice);
+        await admin.from("parking_rules")
+          .delete()
+          .in("street_segment_id", slice)
+          .eq("data_source", provider.id);
         const ruleRows = insertedIds
           .filter((r) => slice.includes(r.id))
           .flatMap((r) => (rulesByExt.get(r.external_id) ?? []).map((rule) => ({
@@ -458,6 +463,7 @@ export const syncProvider = createServerFn({ method: "POST" })
             effective_from: rule.effective_from,
             effective_to: rule.effective_to,
             notes: rule.notes,
+            data_source: provider.id,
           })));
         if (ruleRows.length) await admin.from("parking_rules").insert(ruleRows);
       }
@@ -474,6 +480,51 @@ export const syncProvider = createServerFn({ method: "POST" })
 
 /** Back-compat alias for the existing MapView import. */
 export const importSeattleBlockface = syncProvider;
+
+/** Sync EVERY provider registered for a city in series. Used by the cron and
+ *  the admin LA-sync endpoint to layer multiple datasets onto the same city. */
+export const syncAllProvidersForCity = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z.object({
+      citySlug: z.string().min(1).max(64),
+      minLng: z.number(), minLat: z.number(),
+      maxLng: z.number(), maxLat: z.number(),
+      force: z.boolean().optional(),
+    }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { getProvidersForCity } = await import("./providers/registry.server");
+    const providers = getProvidersForCity(data.citySlug);
+    const results: Array<SyncRunResult & { providerName: string }> = [];
+    for (const p of providers) {
+      try {
+        const r = await syncProvider({
+          data: {
+            citySlug: data.citySlug,
+            minLng: data.minLng, minLat: data.minLat,
+            maxLng: data.maxLng, maxLat: data.maxLat,
+            force: data.force,
+          },
+        });
+        results.push({ ...r, providerName: p.name });
+      } catch (e) {
+        results.push({
+          imported: 0, skipped: 0, provider: p.id,
+          error: (e as Error).message, providerName: p.name,
+        });
+      }
+    }
+    return {
+      city: data.citySlug,
+      providers_run: results.length,
+      totals: results.reduce(
+        (acc, r) => ({ imported: acc.imported + r.imported, skipped: acc.skipped + r.skipped }),
+        { imported: 0, skipped: 0 },
+      ),
+      results,
+    };
+  });
+
 
 // ---------- Provider health + recent sync log readers ----------
 

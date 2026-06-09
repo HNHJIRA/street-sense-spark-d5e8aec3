@@ -28,7 +28,9 @@ import { Route as AdminBetaReadinessRouteImport } from './routes/admin.beta-read
 import { Route as AdminAnalyticsRouteImport } from './routes/admin.analytics'
 import { Route as AdminAccuracyRouteImport } from './routes/admin.accuracy'
 import { Route as ApiPublicCronSyncLaOccupancyRouteImport } from './routes/api/public/cron.sync-la-occupancy'
+import { Route as ApiPublicCronHealthCheckRouteImport } from './routes/api/public/cron.health-check'
 import { Route as ApiPublicAdminSyncLaRouteImport } from './routes/api/public/admin.sync-la'
+import { Route as ApiPublicAdminRunScannerSelfTestRouteImport } from './routes/api/public/admin.run-scanner-self-test'
 
 const SessionRoute = SessionRouteImport.update({
   id: '/session',
@@ -126,11 +128,23 @@ const ApiPublicCronSyncLaOccupancyRoute =
     path: '/api/public/cron/sync-la-occupancy',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicCronHealthCheckRoute =
+  ApiPublicCronHealthCheckRouteImport.update({
+    id: '/api/public/cron/health-check',
+    path: '/api/public/cron/health-check',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicAdminSyncLaRoute = ApiPublicAdminSyncLaRouteImport.update({
   id: '/api/public/admin/sync-la',
   path: '/api/public/admin/sync-la',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicAdminRunScannerSelfTestRoute =
+  ApiPublicAdminRunScannerSelfTestRouteImport.update({
+    id: '/api/public/admin/run-scanner-self-test',
+    path: '/api/public/admin/run-scanner-self-test',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -151,7 +165,9 @@ export interface FileRoutesByFullPath {
   '/admin/validation': typeof AdminValidationRoute
   '/debug/parking': typeof DebugParkingRoute
   '/admin/': typeof AdminIndexRoute
+  '/api/public/admin/run-scanner-self-test': typeof ApiPublicAdminRunScannerSelfTestRoute
   '/api/public/admin/sync-la': typeof ApiPublicAdminSyncLaRoute
+  '/api/public/cron/health-check': typeof ApiPublicCronHealthCheckRoute
   '/api/public/cron/sync-la-occupancy': typeof ApiPublicCronSyncLaOccupancyRoute
 }
 export interface FileRoutesByTo {
@@ -172,7 +188,9 @@ export interface FileRoutesByTo {
   '/admin/validation': typeof AdminValidationRoute
   '/debug/parking': typeof DebugParkingRoute
   '/admin': typeof AdminIndexRoute
+  '/api/public/admin/run-scanner-self-test': typeof ApiPublicAdminRunScannerSelfTestRoute
   '/api/public/admin/sync-la': typeof ApiPublicAdminSyncLaRoute
+  '/api/public/cron/health-check': typeof ApiPublicCronHealthCheckRoute
   '/api/public/cron/sync-la-occupancy': typeof ApiPublicCronSyncLaOccupancyRoute
 }
 export interface FileRoutesById {
@@ -195,7 +213,9 @@ export interface FileRoutesById {
   '/admin/validation': typeof AdminValidationRoute
   '/debug/parking': typeof DebugParkingRoute
   '/admin/': typeof AdminIndexRoute
+  '/api/public/admin/run-scanner-self-test': typeof ApiPublicAdminRunScannerSelfTestRoute
   '/api/public/admin/sync-la': typeof ApiPublicAdminSyncLaRoute
+  '/api/public/cron/health-check': typeof ApiPublicCronHealthCheckRoute
   '/api/public/cron/sync-la-occupancy': typeof ApiPublicCronSyncLaOccupancyRoute
 }
 export interface FileRouteTypes {
@@ -219,7 +239,9 @@ export interface FileRouteTypes {
     | '/admin/validation'
     | '/debug/parking'
     | '/admin/'
+    | '/api/public/admin/run-scanner-self-test'
     | '/api/public/admin/sync-la'
+    | '/api/public/cron/health-check'
     | '/api/public/cron/sync-la-occupancy'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -240,7 +262,9 @@ export interface FileRouteTypes {
     | '/admin/validation'
     | '/debug/parking'
     | '/admin'
+    | '/api/public/admin/run-scanner-self-test'
     | '/api/public/admin/sync-la'
+    | '/api/public/cron/health-check'
     | '/api/public/cron/sync-la-occupancy'
   id:
     | '__root__'
@@ -262,7 +286,9 @@ export interface FileRouteTypes {
     | '/admin/validation'
     | '/debug/parking'
     | '/admin/'
+    | '/api/public/admin/run-scanner-self-test'
     | '/api/public/admin/sync-la'
+    | '/api/public/cron/health-check'
     | '/api/public/cron/sync-la-occupancy'
   fileRoutesById: FileRoutesById
 }
@@ -275,7 +301,9 @@ export interface RootRouteChildren {
   ScanRoute: typeof ScanRoute
   SessionRoute: typeof SessionRoute
   DebugParkingRoute: typeof DebugParkingRoute
+  ApiPublicAdminRunScannerSelfTestRoute: typeof ApiPublicAdminRunScannerSelfTestRoute
   ApiPublicAdminSyncLaRoute: typeof ApiPublicAdminSyncLaRoute
+  ApiPublicCronHealthCheckRoute: typeof ApiPublicCronHealthCheckRoute
   ApiPublicCronSyncLaOccupancyRoute: typeof ApiPublicCronSyncLaOccupancyRoute
 }
 
@@ -414,11 +442,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCronSyncLaOccupancyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/cron/health-check': {
+      id: '/api/public/cron/health-check'
+      path: '/api/public/cron/health-check'
+      fullPath: '/api/public/cron/health-check'
+      preLoaderRoute: typeof ApiPublicCronHealthCheckRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/admin/sync-la': {
       id: '/api/public/admin/sync-la'
       path: '/api/public/admin/sync-la'
       fullPath: '/api/public/admin/sync-la'
       preLoaderRoute: typeof ApiPublicAdminSyncLaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/admin/run-scanner-self-test': {
+      id: '/api/public/admin/run-scanner-self-test'
+      path: '/api/public/admin/run-scanner-self-test'
+      fullPath: '/api/public/admin/run-scanner-self-test'
+      preLoaderRoute: typeof ApiPublicAdminRunScannerSelfTestRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -461,7 +503,9 @@ const rootRouteChildren: RootRouteChildren = {
   ScanRoute: ScanRoute,
   SessionRoute: SessionRoute,
   DebugParkingRoute: DebugParkingRoute,
+  ApiPublicAdminRunScannerSelfTestRoute: ApiPublicAdminRunScannerSelfTestRoute,
   ApiPublicAdminSyncLaRoute: ApiPublicAdminSyncLaRoute,
+  ApiPublicCronHealthCheckRoute: ApiPublicCronHealthCheckRoute,
   ApiPublicCronSyncLaOccupancyRoute: ApiPublicCronSyncLaOccupancyRoute,
 }
 export const routeTree = rootRouteImport

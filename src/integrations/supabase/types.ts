@@ -197,6 +197,7 @@ export type Database = {
       parking_rules: {
         Row: {
           created_at: string
+          data_source: string | null
           days_of_week: number[]
           effective_from: string | null
           effective_to: string | null
@@ -213,6 +214,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          data_source?: string | null
           days_of_week?: number[]
           effective_from?: string | null
           effective_to?: string | null
@@ -229,6 +231,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          data_source?: string | null
           days_of_week?: number[]
           effective_from?: string | null
           effective_to?: string | null
