@@ -374,7 +374,7 @@ export const scanSign = createServerFn({ method: "POST" })
       );
     }
 
-    const validations = validateAgainstSdot(aiRules, sdotRules, ai.overall_confidence);
+    const validations = validateAgainstSdot(aiRules, sdotRules, ai.overall_confidence, matchStatus);
     if (validations.length > 0) {
       await admin.from("scan_validation_results").insert(
         validations.map((v) => ({
@@ -395,6 +395,10 @@ export const scanSign = createServerFn({ method: "POST" })
       aiConfidence: ai.overall_confidence,
       signCount: ai.sign_count,
     });
+
+    // Persist the summary on the scan row for the accuracy dashboard.
+    await admin.from("parking_sign_scans").update({ summary }).eq("id", scanId);
+
 
     return {
       scan_id: scanId,
