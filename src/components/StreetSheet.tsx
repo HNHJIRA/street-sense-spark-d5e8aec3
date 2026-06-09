@@ -14,7 +14,9 @@ interface StreetSheetProps {
   timezone: string;
   restrictionTypes: RestrictionType[];
   cityId: string;
+  citySlug: string;
 }
+
 
 const COLOR_CLASS = {
   green: "bg-park-green-soft text-park-green border-park-green/40",
