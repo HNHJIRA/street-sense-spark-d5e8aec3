@@ -25,6 +25,7 @@ import { Route as AdminHealthRouteImport } from './routes/admin.health'
 import { Route as AdminForecastRouteImport } from './routes/admin.forecast'
 import { Route as AdminBetaReadinessRouteImport } from './routes/admin.beta-readiness'
 import { Route as AdminAnalyticsRouteImport } from './routes/admin.analytics'
+import { Route as ApiPublicAdminSyncLaRouteImport } from './routes/api/public/admin.sync-la'
 
 const SessionRoute = SessionRouteImport.update({
   id: '/session',
@@ -106,6 +107,11 @@ const AdminAnalyticsRoute = AdminAnalyticsRouteImport.update({
   path: '/analytics',
   getParentRoute: () => AdminRoute,
 } as any)
+const ApiPublicAdminSyncLaRoute = ApiPublicAdminSyncLaRouteImport.update({
+  id: '/api/public/admin/sync-la',
+  path: '/api/public/admin/sync-la',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -124,6 +130,7 @@ export interface FileRoutesByFullPath {
   '/admin/validation': typeof AdminValidationRoute
   '/debug/parking': typeof DebugParkingRoute
   '/admin/': typeof AdminIndexRoute
+  '/api/public/admin/sync-la': typeof ApiPublicAdminSyncLaRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -141,6 +148,7 @@ export interface FileRoutesByTo {
   '/admin/validation': typeof AdminValidationRoute
   '/debug/parking': typeof DebugParkingRoute
   '/admin': typeof AdminIndexRoute
+  '/api/public/admin/sync-la': typeof ApiPublicAdminSyncLaRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -160,6 +168,7 @@ export interface FileRoutesById {
   '/admin/validation': typeof AdminValidationRoute
   '/debug/parking': typeof DebugParkingRoute
   '/admin/': typeof AdminIndexRoute
+  '/api/public/admin/sync-la': typeof ApiPublicAdminSyncLaRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -180,6 +189,7 @@ export interface FileRouteTypes {
     | '/admin/validation'
     | '/debug/parking'
     | '/admin/'
+    | '/api/public/admin/sync-la'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -197,6 +207,7 @@ export interface FileRouteTypes {
     | '/admin/validation'
     | '/debug/parking'
     | '/admin'
+    | '/api/public/admin/sync-la'
   id:
     | '__root__'
     | '/'
@@ -215,6 +226,7 @@ export interface FileRouteTypes {
     | '/admin/validation'
     | '/debug/parking'
     | '/admin/'
+    | '/api/public/admin/sync-la'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -225,6 +237,7 @@ export interface RootRouteChildren {
   ScanRoute: typeof ScanRoute
   SessionRoute: typeof SessionRoute
   DebugParkingRoute: typeof DebugParkingRoute
+  ApiPublicAdminSyncLaRoute: typeof ApiPublicAdminSyncLaRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -341,6 +354,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAnalyticsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/api/public/admin/sync-la': {
+      id: '/api/public/admin/sync-la'
+      path: '/api/public/admin/sync-la'
+      fullPath: '/api/public/admin/sync-la'
+      preLoaderRoute: typeof ApiPublicAdminSyncLaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -378,6 +398,7 @@ const rootRouteChildren: RootRouteChildren = {
   ScanRoute: ScanRoute,
   SessionRoute: SessionRoute,
   DebugParkingRoute: DebugParkingRoute,
+  ApiPublicAdminSyncLaRoute: ApiPublicAdminSyncLaRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
