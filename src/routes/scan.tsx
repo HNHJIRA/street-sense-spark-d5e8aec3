@@ -6,7 +6,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
 import {
   Camera, Upload, Loader2, ArrowLeft, ScanLine, CheckCircle2, AlertTriangle, XCircle,
-  Clock, ShieldAlert, MapPin, Database, FileText,
+  Clock, ShieldAlert,
 } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
 import { LocationStatusCard } from "@/components/LocationStatusCard";
@@ -186,17 +186,25 @@ function ScanResult({
     : s.status === "LIMITED" ? AlertTriangle
     : ShieldAlert;
 
+  // Find the next "allowed" change to surface a clear "until when".
+  const nextAllowed = s.timeline.find((t) => t.status === "YES" && t.when !== "now");
+  const nextRestricted = s.timeline.find((t) => t.status !== "YES" && t.when !== "now");
+  const untilLabel =
+    s.status === "YES" && nextRestricted ? `Until ${nextRestricted.when_label}`
+    : s.status === "NO" && nextAllowed ? `Until ${nextAllowed.when_label}`
+    : s.time_guidance;
+
   return (
     <div className="mt-5 space-y-4">
-      {/* Headline summary — driver should grok this in <5s. */}
-      <div className={cn("rounded-3xl border-2 p-5 text-foreground", tone.border)}>
+      {/* AI summary — the only thing the driver needs. */}
+      <div className={cn("rounded-3xl border-2 p-6 text-foreground", tone.border)}>
         <div className="flex items-center gap-3">
-          <StatusIcon className={cn("h-7 w-7", tone.accent)} />
-          <div>
+          <StatusIcon className={cn("h-8 w-8", tone.accent)} />
+          <div className="min-w-0">
             <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
               Can I park here?
             </div>
-            <div className={cn("font-display text-3xl font-extrabold leading-tight", tone.accent)}>
+            <div className={cn("font-display text-4xl font-extrabold leading-none", tone.accent)}>
               {s.status}
             </div>
           </div>
@@ -204,116 +212,23 @@ function ScanResult({
             {s.confidence}
           </span>
         </div>
-        <div className="mt-3 text-sm font-semibold leading-snug text-foreground">{s.plain}</div>
-        <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
-          <span className="rounded-full bg-background/70 px-2.5 py-1 font-semibold text-foreground">
-            {s.reason}
+
+        <p className="mt-4 text-base font-semibold leading-snug text-foreground">{s.plain}</p>
+
+        <div className="mt-4 flex flex-wrap gap-2 text-xs">
+          <span className="inline-flex items-center gap-1 rounded-full bg-background/70 px-3 py-1.5 font-semibold text-foreground">
+            <ShieldAlert className="h-3.5 w-3.5" /> {s.reason}
           </span>
-          {s.time_guidance && (
-            <span className="rounded-full bg-background/70 px-2.5 py-1 font-semibold text-foreground">
-              {s.time_guidance}
+          {untilLabel && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-background/70 px-3 py-1.5 font-semibold text-foreground">
+              <Clock className="h-3.5 w-3.5" /> {untilLabel}
             </span>
           )}
         </div>
       </div>
 
-      {/* Parking timeline — Now → next change(s). */}
-      <section className="rounded-3xl border border-border bg-surface p-4">
-        <h2 className="text-sm font-bold">Parking timeline</h2>
-        <ol className="mt-3 space-y-3">
-          {s.timeline.map((t, i) => (
-            <li key={i} className="flex items-start gap-3">
-              <TimelineDot icon={t.icon} />
-              <div className="flex-1">
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  {t.when_label}
-                </div>
-                <div className="text-sm font-semibold">{t.label}</div>
-              </div>
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      {/* Compact location/source context. */}
-      <div className="grid grid-cols-1 gap-2">
-        <Row icon={MapPin} label="Nearest street" value={result.segment ? `${result.segment.name} (${Math.round(result.segment.distance_m)} m)` : "Location not provided"} />
-        <Row icon={Database} label="Data source" value={result.source_label} />
-      </div>
-
-      {/* Why? — collapsed by default. */}
-      <details className="rounded-3xl border border-border bg-surface p-4">
-        <summary className="cursor-pointer text-sm font-bold">Why this decision?</summary>
-        <div className="mt-3 grid grid-cols-1 gap-2">
-          {result.decision.allowed_until && (
-            <Row icon={Clock} label="Allowed until"
-                 value={new Date(result.decision.allowed_until).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: timezone })} />
-          )}
-          {result.decision.restriction_starts_at && (
-            <Row icon={Clock} label="Restriction starts"
-                 value={new Date(result.decision.restriction_starts_at).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: timezone })} />
-          )}
-          {result.decision.restriction_ends_at && (
-            <Row icon={Clock} label="Restriction ends"
-                 value={new Date(result.decision.restriction_ends_at).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: timezone })} />
-          )}
-          {result.decision.permit_zone && (
-            <Row icon={ShieldAlert} label="Permit zone" value={result.decision.permit_zone} />
-          )}
-          {result.decision.time_limit_minutes != null && (
-            <Row icon={Clock} label="Max stay" value={`${result.decision.time_limit_minutes} min`} />
-          )}
-          <Row icon={ScanLine} label="AI confidence" value={`${Math.round((result.overall_confidence || 0) * 100)}%`} />
-        </div>
-      </details>
-
-      {result.parsed_rules.length > 0 && (
-        <details className="rounded-3xl border border-border bg-surface p-4">
-          <summary className="cursor-pointer flex items-center gap-2 text-sm font-bold">
-            <FileText className="h-4 w-4 text-primary" /> Extracted sign rules
-          </summary>
-          <ul className="mt-3 space-y-2">
-            {result.parsed_rules.map((r, i) => (
-              <li key={i} className="rounded-2xl bg-background px-3 py-2">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-bold uppercase tracking-wider">{r.restriction_code.replace(/_/g, " ")}</span>
-                  <span className="text-[10px] text-muted-foreground">{daysLabel(r.days_of_week)}</span>
-                </div>
-                <div className="mt-0.5 text-[11px] text-muted-foreground">
-                  {r.time_start && r.time_end ? `${r.time_start}–${r.time_end}` : "All day"}
-                  {r.permit_zone ? ` · Zone ${r.permit_zone}` : ""}
-                  {r.time_limit_minutes ? ` · ${r.time_limit_minutes} min limit` : ""}
-                </div>
-                {r.notes && <div className="mt-0.5 text-[11px] opacity-80">{r.notes}</div>}
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
-
-      {result.validations.length > 0 && (
-        <details className="rounded-3xl border border-border bg-surface p-4">
-          <summary className="cursor-pointer text-sm font-bold">Sign vs data validation</summary>
-          <ul className="mt-2 space-y-1.5">
-            {result.validations.map((v, i) => (
-              <li key={i} className="flex items-start gap-2 rounded-2xl bg-background px-3 py-2 text-[11px]">
-                <ValidationIcon outcome={v.outcome} />
-                <span className="flex-1">{v.detail}</span>
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
-
-      {result.raw_text && (
-        <details className="rounded-3xl border border-border bg-surface p-4">
-          <summary className="cursor-pointer text-sm font-bold">Raw OCR transcript</summary>
-          <pre className="mt-2 whitespace-pre-wrap text-[11px] text-muted-foreground">{result.raw_text}</pre>
-        </details>
-      )}
-
       {previewUrl && (
-        <img src={previewUrl} alt="Captured sign" className="w-full rounded-3xl border border-border" />
+        <img src={previewUrl} alt="Captured sign" className="w-full rounded-3xl border border-border opacity-80" />
       )}
 
       <button
@@ -323,48 +238,12 @@ function ScanResult({
         Scan another sign
       </button>
       <p className="text-center text-[10px] text-muted-foreground">
-        Summary generated from the ParkClear rules engine — the same evaluator used by
-        Forecast, Can I Park Here, Sessions, and Alerts.
+        Summary generated by the ParkClear AI from the posted sign{result.segment ? ` near ${result.segment.name}` : ""}.
       </p>
     </div>
   );
 }
 
-function TimelineDot({ icon }: { icon: "allowed" | "restricted" | "limited" | "unknown" }) {
-  if (icon === "allowed")
-    return <span className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-park-green-soft text-park-green">✓</span>;
-  if (icon === "restricted")
-    return <span className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-park-red-soft text-park-red">⛔</span>;
-  if (icon === "limited")
-    return <span className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-park-yellow-soft text-park-yellow">⚠</span>;
-  return <span className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-surface text-muted-foreground">?</span>;
-}
-
-function ValidationIcon({ outcome }: { outcome: SignScanResponse["validations"][number]["outcome"] }) {
-  if (outcome === "match") return <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-park-green" />;
-  if (outcome === "conflict") return <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-park-yellow" />;
-  if (outcome === "unmatched") return <ShieldAlert className="h-3.5 w-3.5 shrink-0 text-primary" />;
-  return <Database className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />;
-}
-
-function Row({ icon: Icon, label, value }: { icon: typeof Clock; label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between rounded-2xl bg-surface px-4 py-3">
-      <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-        <Icon className="h-4 w-4" /> {label}
-      </span>
-      <span className="text-sm font-semibold text-right">{value}</span>
-    </div>
-  );
-}
-
-const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-function daysLabel(days: number[]): string {
-  if (days.length === 7) return "Every day";
-  if (days.length === 5 && [1, 2, 3, 4, 5].every((d) => days.includes(d))) return "Mon–Fri";
-  if (days.length === 2 && days.includes(0) && days.includes(6)) return "Weekends";
-  return [...days].sort().map((d) => DAY_LABELS[d]).join(", ");
-}
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
