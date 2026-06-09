@@ -95,6 +95,13 @@ function ScanPage() {
           <b> Can I park here?</b> using your location.
         </p>
 
+        {/* Global GPS status — same source of truth as map/session. */}
+        <LocationStatusCard
+          live={liveLocation}
+          lastKnown={lastKnown}
+          status={locStatus}
+        />
+
         {/* Capture / upload */}
         {!result && (
           <div className="mt-5 space-y-3">
