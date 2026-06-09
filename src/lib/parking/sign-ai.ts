@@ -98,6 +98,15 @@ Sign types you must recognize:
 - METERED / PAID PARKING
 - BUS ZONE / TRANSIT ZONE
 
+DIRECTIONAL ARROWS — critical:
+Many sign blocks include a directional arrow indicating which side of the
+post the rule applies to:
+- "←" or arrow pointing left  → arrow = "left"  (rule applies to the left side of the post)
+- "→" or arrow pointing right → arrow = "right" (rule applies to the right side of the post)
+- "↔" or double-headed arrow  → arrow = "both"  (rule applies in both directions)
+- No arrow visible            → arrow = null    (rule applies to this whole pole)
+Set arrow per sign — different signs on the same pole can have different arrows.
+
 Output STRICT JSON matching the schema exactly. Days use 3-letter uppercase
 codes (MON, TUE, ...). Times use 24-hour HH:MM. Use null when a field is not
 posted. Confidence is 0..1 per sign and overall.`;
