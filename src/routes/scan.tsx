@@ -160,60 +160,102 @@ function ScanPage() {
 function ScanResult({
   result, previewUrl, timezone, onReset,
 }: { result: SignScanResponse; previewUrl: string | null; timezone: string; onReset: () => void }) {
-  const verdictClass =
-    result.verdict === "YES" ? "border-park-green/50 bg-park-green-soft text-park-green"
-      : result.verdict === "NO" ? "border-park-red/50 bg-park-red-soft text-park-red"
-      : "border-park-yellow/50 bg-park-yellow-soft text-park-yellow";
-  const VerdictIcon =
-    result.verdict === "YES" ? CheckCircle2 : result.verdict === "NO" ? XCircle : AlertTriangle;
+  const s = result.summary;
+  const tone =
+    s.status === "YES" ? "border-park-green/50 bg-park-green-soft text-park-green"
+    : s.status === "NO" ? "border-park-red/50 bg-park-red-soft text-park-red"
+    : s.status === "LIMITED" ? "border-park-yellow/50 bg-park-yellow-soft text-park-yellow"
+    : "border-border bg-surface text-foreground";
+  const StatusIcon =
+    s.status === "YES" ? CheckCircle2
+    : s.status === "NO" ? XCircle
+    : s.status === "LIMITED" ? AlertTriangle
+    : ShieldAlert;
 
   return (
     <div className="mt-5 space-y-4">
-      <div className={cn("rounded-3xl border-2 p-5", verdictClass)}>
+      {/* Headline summary — driver should grok this in <5s. */}
+      <div className={cn("rounded-3xl border-2 p-5", tone)}>
         <div className="flex items-center gap-3">
-          <VerdictIcon className="h-7 w-7" />
+          <StatusIcon className="h-7 w-7" />
           <div>
             <div className="text-[10px] font-bold uppercase tracking-widest opacity-80">
               Can I park here?
             </div>
-            <div className="font-display text-3xl font-extrabold leading-tight">{result.verdict}</div>
+            <div className="font-display text-3xl font-extrabold leading-tight">{s.status}</div>
           </div>
+          <span className="ml-auto rounded-full bg-background/60 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider">
+            {s.confidence} confidence
+          </span>
         </div>
-        <div className="mt-3 text-sm font-semibold">{result.decision.label}</div>
-        {result.decision.notes && (
-          <div className="mt-1 text-xs opacity-80">{result.decision.notes}</div>
-        )}
+        <div className="mt-3 text-sm font-semibold leading-snug">{s.plain}</div>
+        <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+          <span className="rounded-full bg-background/60 px-2.5 py-1 font-semibold">
+            {s.reason}
+          </span>
+          {s.time_guidance && (
+            <span className="rounded-full bg-background/60 px-2.5 py-1 font-semibold">
+              {s.time_guidance}
+            </span>
+          )}
+        </div>
       </div>
 
+      {/* Parking timeline — Now → next change(s). */}
+      <section className="rounded-3xl border border-border bg-surface p-4">
+        <h2 className="text-sm font-bold">Parking timeline</h2>
+        <ol className="mt-3 space-y-3">
+          {s.timeline.map((t, i) => (
+            <li key={i} className="flex items-start gap-3">
+              <TimelineDot icon={t.icon} />
+              <div className="flex-1">
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  {t.when_label}
+                </div>
+                <div className="text-sm font-semibold">{t.label}</div>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      {/* Compact location/source context. */}
       <div className="grid grid-cols-1 gap-2">
-        {result.decision.allowed_until && (
-          <Row icon={Clock} label="Allowed until"
-               value={new Date(result.decision.allowed_until).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: timezone })} />
-        )}
-        {result.decision.restriction_starts_at && (
-          <Row icon={Clock} label="Restriction starts"
-               value={new Date(result.decision.restriction_starts_at).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: timezone })} />
-        )}
-        {result.decision.restriction_ends_at && (
-          <Row icon={Clock} label="Restriction ends"
-               value={new Date(result.decision.restriction_ends_at).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: timezone })} />
-        )}
-        {result.decision.permit_zone && (
-          <Row icon={ShieldAlert} label="Permit zone" value={result.decision.permit_zone} />
-        )}
-        {result.decision.time_limit_minutes != null && (
-          <Row icon={Clock} label="Max stay" value={`${result.decision.time_limit_minutes} min`} />
-        )}
         <Row icon={MapPin} label="Nearest street" value={result.segment ? `${result.segment.name} (${Math.round(result.segment.distance_m)} m)` : "Location not provided"} />
         <Row icon={Database} label="Data source" value={result.source_label} />
-        <Row icon={ScanLine} label="AI confidence" value={`${Math.round((result.overall_confidence || 0) * 100)}%`} />
       </div>
 
+      {/* Why? — collapsed by default. */}
+      <details className="rounded-3xl border border-border bg-surface p-4">
+        <summary className="cursor-pointer text-sm font-bold">Why this decision?</summary>
+        <div className="mt-3 grid grid-cols-1 gap-2">
+          {result.decision.allowed_until && (
+            <Row icon={Clock} label="Allowed until"
+                 value={new Date(result.decision.allowed_until).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: timezone })} />
+          )}
+          {result.decision.restriction_starts_at && (
+            <Row icon={Clock} label="Restriction starts"
+                 value={new Date(result.decision.restriction_starts_at).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: timezone })} />
+          )}
+          {result.decision.restriction_ends_at && (
+            <Row icon={Clock} label="Restriction ends"
+                 value={new Date(result.decision.restriction_ends_at).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: timezone })} />
+          )}
+          {result.decision.permit_zone && (
+            <Row icon={ShieldAlert} label="Permit zone" value={result.decision.permit_zone} />
+          )}
+          {result.decision.time_limit_minutes != null && (
+            <Row icon={Clock} label="Max stay" value={`${result.decision.time_limit_minutes} min`} />
+          )}
+          <Row icon={ScanLine} label="AI confidence" value={`${Math.round((result.overall_confidence || 0) * 100)}%`} />
+        </div>
+      </details>
+
       {result.parsed_rules.length > 0 && (
-        <section className="rounded-3xl border border-border bg-surface p-4">
-          <h2 className="flex items-center gap-2 text-sm font-bold">
+        <details className="rounded-3xl border border-border bg-surface p-4">
+          <summary className="cursor-pointer flex items-center gap-2 text-sm font-bold">
             <FileText className="h-4 w-4 text-primary" /> Extracted sign rules
-          </h2>
+          </summary>
           <ul className="mt-3 space-y-2">
             {result.parsed_rules.map((r, i) => (
               <li key={i} className="rounded-2xl bg-background px-3 py-2">
@@ -230,12 +272,12 @@ function ScanResult({
               </li>
             ))}
           </ul>
-        </section>
+        </details>
       )}
 
       {result.validations.length > 0 && (
-        <section className="rounded-3xl border border-border bg-surface p-4">
-          <h2 className="text-sm font-bold">Sign vs SDOT validation</h2>
+        <details className="rounded-3xl border border-border bg-surface p-4">
+          <summary className="cursor-pointer text-sm font-bold">Sign vs data validation</summary>
           <ul className="mt-2 space-y-1.5">
             {result.validations.map((v, i) => (
               <li key={i} className="flex items-start gap-2 rounded-2xl bg-background px-3 py-2 text-[11px]">
@@ -244,12 +286,12 @@ function ScanResult({
               </li>
             ))}
           </ul>
-        </section>
+        </details>
       )}
 
       {result.raw_text && (
         <details className="rounded-3xl border border-border bg-surface p-4">
-          <summary className="cursor-pointer text-sm font-bold">OCR transcript</summary>
+          <summary className="cursor-pointer text-sm font-bold">Raw OCR transcript</summary>
           <pre className="mt-2 whitespace-pre-wrap text-[11px] text-muted-foreground">{result.raw_text}</pre>
         </details>
       )}
@@ -265,10 +307,21 @@ function ScanResult({
         Scan another sign
       </button>
       <p className="text-center text-[10px] text-muted-foreground">
-        Engine: same evaluator used by Forecast, Can I Park Here, Sessions, and Alerts.
+        Summary generated from the ParkClear rules engine — the same evaluator used by
+        Forecast, Can I Park Here, Sessions, and Alerts.
       </p>
     </div>
   );
+}
+
+function TimelineDot({ icon }: { icon: "allowed" | "restricted" | "limited" | "unknown" }) {
+  if (icon === "allowed")
+    return <span className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-park-green-soft text-park-green">✓</span>;
+  if (icon === "restricted")
+    return <span className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-park-red-soft text-park-red">⛔</span>;
+  if (icon === "limited")
+    return <span className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-park-yellow-soft text-park-yellow">⚠</span>;
+  return <span className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-surface text-muted-foreground">?</span>;
 }
 
 function ValidationIcon({ outcome }: { outcome: SignScanResponse["validations"][number]["outcome"] }) {
