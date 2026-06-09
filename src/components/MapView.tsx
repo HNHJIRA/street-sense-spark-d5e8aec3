@@ -55,7 +55,9 @@ function segmentToFeature(s: SegmentLite): Feature<LineString> {
 function availabilityBlockToFeature(block: AvailabilityBlock): Feature<LineString> {
   const coords = block.coordinates.length >= 2
     ? block.coordinates
-    : [block.coordinates[0], block.coordinates[0]].filter(Boolean) as [number, number][];
+    : block.coordinates[0]
+      ? [[block.coordinates[0][0] - 0.000035, block.coordinates[0][1]], [block.coordinates[0][0] + 0.000035, block.coordinates[0][1]]] as [number, number][]
+      : [];
   return {
     type: "Feature",
     id: block.id,
@@ -434,6 +436,10 @@ export function MapView({ token, city }: MapViewProps) {
             map.on("click", ["seg-left", "seg-right"] as any, (e: any) => {
               const f = e.features?.[0];
               const id = f?.properties?.segmentId as string | undefined;
+              if (f?.properties?.sourceType === "availability") {
+                toast.message(f.properties.label ?? "Live meter availability");
+                return;
+              }
               if (id) selectSegment(id);
             });
 
@@ -502,12 +508,12 @@ export function MapView({ token, city }: MapViewProps) {
     setFlyTo(null);
   }, [flyTo, setFlyTo]);
 
-  // Forecast time changed → re-evaluate engine colors for the current bbox.
+  // Forecast time or map mode changed → repaint the current bbox.
   useEffect(() => {
     if (!ready) return;
     lastFetchKeyRef.current = "";
     void loadBbox();
-  }, [forecastAtIso, ready, loadBbox]);
+  }, [forecastAtIso, mapMode, ready, loadBbox]);
 
   useEffect(() => {
     if (!ready || !locationFix) return;
