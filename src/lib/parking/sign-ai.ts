@@ -123,7 +123,7 @@ const RESPONSE_SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["type", "days", "start", "end", "permit_zone", "time_limit_minutes", "notes", "confidence"],
+        required: ["type", "days", "start", "end", "permit_zone", "time_limit_minutes", "notes", "arrow", "confidence"],
         properties: {
           type: { type: "string" },
           days: { type: "array", items: { type: "string" } },
@@ -132,6 +132,7 @@ const RESPONSE_SCHEMA = {
           permit_zone: { type: ["string", "null"] },
           time_limit_minutes: { type: ["integer", "null"] },
           notes: { type: ["string", "null"] },
+          arrow: { type: ["string", "null"], enum: ["left", "right", "both", null] },
           confidence: { type: "number", minimum: 0, maximum: 1 },
         },
       },
