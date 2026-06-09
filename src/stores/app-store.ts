@@ -20,6 +20,16 @@ interface ClockState {
   /** "legal" = is parking allowed here? "available" = is there an open spot right now? */
   mapMode: "legal" | "available";
   setMapMode: (m: "legal" | "available") => void;
+  /** Set by StreetSheet to ask ParkHereButton to evaluate a specific segment (Manual Test Mode). */
+  pendingCheckSegmentId: string | null;
+  requestCheckSegment: (id: string | null) => void;
+  /** Recommended alternative parking — drawn as a highlight + connector line on the map. */
+  recommendedHighlight: {
+    from: { lng: number; lat: number };
+    segmentId: string;
+    coordinates: [number, number][];
+  } | null;
+  setRecommendedHighlight: (v: ClockState["recommendedHighlight"]) => void;
 }
 
 export const useAppStore = create<ClockState>((set) => ({
@@ -39,4 +49,8 @@ export const useAppStore = create<ClockState>((set) => ({
   setMapCenter: (v) => set({ mapCenter: v }),
   mapMode: "legal",
   setMapMode: (m) => set({ mapMode: m }),
+  pendingCheckSegmentId: null,
+  requestCheckSegment: (id) => set({ pendingCheckSegmentId: id }),
+  recommendedHighlight: null,
+  setRecommendedHighlight: (v) => set({ recommendedHighlight: v }),
 }));

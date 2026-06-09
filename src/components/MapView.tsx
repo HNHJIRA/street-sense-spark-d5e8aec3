@@ -106,6 +106,8 @@ export function MapView({ token, city }: MapViewProps) {
   const forecastAtIso = forecastAt ? forecastAt.toISOString() : null;
   const mapMode = useAppStore((s) => s.mapMode);
   const locationFix = useLocationStore((s) => s.current ?? s.lastKnown);
+  const recommendedHighlight = useAppStore((s) => s.recommendedHighlight);
+
 
   const syncUserLocationMarker = useCallback((loc: { lng: number; lat: number; accuracy: number | null; heading: number | null } | null) => {
     const map = mapRef.current;
@@ -432,6 +434,36 @@ export function MapView({ token, city }: MapViewProps) {
             addSeg("seg-left", "left", -1);
             addSeg("seg-right", "right", 1);
 
+            // Recommended-parking highlight + connector line
+            if (!map.getSource("rec-highlight")) {
+              map.addSource("rec-highlight", {
+                type: "geojson",
+                data: { type: "FeatureCollection", features: [] },
+              });
+              map.addLayer({
+                id: "rec-highlight-line",
+                type: "line",
+                source: "rec-highlight",
+                filter: ["==", ["get", "kind"], "segment"],
+                layout: { "line-cap": "round", "line-join": "round" },
+                paint: { "line-color": "#2563eb", "line-width": 8, "line-opacity": 0.9 },
+              });
+              map.addLayer({
+                id: "rec-highlight-connector",
+                type: "line",
+                source: "rec-highlight",
+                filter: ["==", ["get", "kind"], "connector"],
+                layout: { "line-cap": "round", "line-join": "round" },
+                paint: {
+                  "line-color": "#2563eb",
+                  "line-width": 3,
+                  "line-opacity": 0.85,
+                  "line-dasharray": [2, 2],
+                },
+              });
+            }
+
+
 
             map.on("click", ["seg-left", "seg-right"] as any, (e: any) => {
               const f = e.features?.[0];
@@ -524,6 +556,42 @@ export function MapView({ token, city }: MapViewProps) {
       heading: locationFix.heading,
     });
   }, [locationFix, ready, syncUserLocationMarker]);
+
+  // Mode 4: recommended-parking highlight + connector line
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    const src = map.getSource("rec-highlight") as MapboxGL.GeoJSONSource | undefined;
+    if (!src) return;
+    if (!recommendedHighlight || recommendedHighlight.coordinates.length < 2) {
+      src.setData({ type: "FeatureCollection", features: [] });
+      return;
+    }
+    const mid = recommendedHighlight.coordinates[Math.floor(recommendedHighlight.coordinates.length / 2)];
+    const data: FeatureCollection<LineString> = {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          geometry: { type: "LineString", coordinates: recommendedHighlight.coordinates },
+          properties: { kind: "segment" },
+        },
+        {
+          type: "Feature",
+          geometry: {
+            type: "LineString",
+            coordinates: [
+              [recommendedHighlight.from.lng, recommendedHighlight.from.lat],
+              mid,
+            ],
+          },
+          properties: { kind: "connector" },
+        },
+      ],
+    };
+    src.setData(data);
+  }, [ready, recommendedHighlight]);
+
 
   useEffect(() => {
     const map = mapRef.current as any;

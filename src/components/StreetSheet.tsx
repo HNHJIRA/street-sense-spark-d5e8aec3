@@ -1,4 +1,4 @@
-import { X, Clock, ShieldAlert, BadgeInfo, Database, Timer, Bookmark, Heart, Car } from "lucide-react";
+import { X, Clock, ShieldAlert, BadgeInfo, Database, Timer, Bookmark, Heart, Car, Navigation } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
@@ -35,6 +35,8 @@ export function StreetSheet({ timezone, restrictionTypes, cityId }: StreetSheetP
   const selectedSegmentId = useAppStore((s) => s.selectedSegmentId);
   const selectSegment = useAppStore((s) => s.selectSegment);
   const forecastAt = useAppStore((s) => s.forecastAt);
+  const requestCheckSegment = useAppStore((s) => s.requestCheckSegment);
+
 
   const addSavedSpot = useDeviceStore((s) => s.addSavedSpot);
   const addFavorite = useDeviceStore((s) => s.addFavorite);
@@ -164,9 +166,24 @@ export function StreetSheet({ timezone, restrictionTypes, cityId }: StreetSheetP
               </div>
             )}
 
+            {/* Manual Test: evaluate this exact segment, no GPS needed */}
+            {data && (
+              <button
+                type="button"
+                onClick={() => {
+                  requestCheckSegment(data.id);
+                  selectSegment(null);
+                }}
+                className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3 text-sm font-bold text-primary-foreground transition active:scale-95"
+              >
+                <Navigation className="h-4 w-4" strokeWidth={2.5} />
+                Can I park here?
+              </button>
+            )}
+
             {/* Action row */}
             {data && (
-              <div className="mt-4 grid grid-cols-3 gap-2">
+              <div className="mt-3 grid grid-cols-3 gap-2">
                 <ActionButton icon={Bookmark} label="Save" onClick={() => setSaveOpen((v) => !v)} active={saveOpen} />
                 <ActionButton icon={Heart} label={isFav ? "Favorited" : "Favorite"} onClick={handleFavorite} active={isFav} />
                 <ActionButton
@@ -178,6 +195,7 @@ export function StreetSheet({ timezone, restrictionTypes, cityId }: StreetSheetP
                 />
               </div>
             )}
+
 
             {saveOpen && (
               <div className="mt-3 space-y-2 rounded-2xl bg-surface p-3">
