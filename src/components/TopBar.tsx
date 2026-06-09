@@ -23,6 +23,8 @@ function formatTime(d: Date, tz: string) {
 export function TopBar({ cityName, citySlug, cities, onCityChange, now, timezone, isForecast }: TopBarProps) {
   const setSearchOpen = useAppStore((s) => s.setSearchOpen);
   const clearForecast = useAppStore((s) => s.setForecastAt);
+  const mapMode = useAppStore((s) => s.mapMode);
+  const setMapMode = useAppStore((s) => s.setMapMode);
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
