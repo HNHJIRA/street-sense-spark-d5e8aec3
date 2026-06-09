@@ -59,7 +59,11 @@ function isHHMM(s: string | null | undefined): s is string {
  * unchanged. Returns one rule per sign — multiple signs combine into multiple
  * rules on the synthesized "scan segment".
  */
-export function aiRulesToNormalized(rules: RawAiRule[]): NormalizedRule[] {
+export interface NormalizedScanRule extends NormalizedRule {
+  arrow: ArrowDirection;
+}
+
+export function aiRulesToNormalized(rules: RawAiRule[]): NormalizedScanRule[] {
   return rules.map((r, idx) => {
     const classified = normalizeCategory(r.type);
     const days = parseDays(r.days);
@@ -76,6 +80,7 @@ export function aiRulesToNormalized(rules: RawAiRule[]): NormalizedRule[] {
       effective_from: null,
       effective_to: null,
       notes: r.notes?.trim() || classified.notes,
+      arrow: r.arrow ?? null,
     };
   });
 }
