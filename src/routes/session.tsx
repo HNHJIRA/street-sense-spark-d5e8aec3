@@ -39,6 +39,9 @@ function SessionPage() {
   const selectSegment = useAppStore((s) => s.selectSegment);
   const navigate = useNavigate();
   const alertSettings = useDeviceStore((s) => s.alertSettings);
+  const liveLocation = useLocationStore((s) => s.current);
+  const lastKnownLocation = useLocationStore((s) => s.lastKnown);
+  const locStatus = useLocationStore((s) => s.status);
 
   const detailsQ = useQuery({
     queryKey: ["segment-details", session?.segmentId],
