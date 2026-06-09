@@ -47,6 +47,73 @@ export type Database = {
         }
         Relationships: []
       }
+      la_meter_occupancy: {
+        Row: {
+          event_time: string
+          fetched_at: string
+          space_id: string
+          state: string
+        }
+        Insert: {
+          event_time: string
+          fetched_at?: string
+          space_id: string
+          state: string
+        }
+        Update: {
+          event_time?: string
+          fetched_at?: string
+          space_id?: string
+          state?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "la_meter_occupancy_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: true
+            referencedRelation: "la_meter_spaces"
+            referencedColumns: ["space_id"]
+          },
+        ]
+      }
+      la_meter_spaces: {
+        Row: {
+          block_face: string | null
+          geom: unknown
+          lat: number
+          lng: number
+          segment_id: string | null
+          space_id: string
+          updated_at: string
+        }
+        Insert: {
+          block_face?: string | null
+          geom: unknown
+          lat: number
+          lng: number
+          segment_id?: string | null
+          space_id: string
+          updated_at?: string
+        }
+        Update: {
+          block_face?: string | null
+          geom?: unknown
+          lat?: number
+          lng?: number
+          segment_id?: string | null
+          space_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "la_meter_spaces_segment_id_fkey"
+            columns: ["segment_id"]
+            isOneToOne: false
+            referencedRelation: "street_segments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ocr_results: {
         Row: {
           created_at: string
@@ -952,6 +1019,20 @@ export type Database = {
           segments: number
           sweeping: number
           unknown: number
+        }[]
+      }
+      la_availability_in_bbox: {
+        Args: {
+          p_city_id: string
+          p_max_lat: number
+          p_max_lng: number
+          p_min_lat: number
+          p_min_lng: number
+        }
+        Returns: {
+          occupied: number
+          segment_id: string
+          vacant: number
         }[]
       }
       longtransactionsenabled: { Args: never; Returns: boolean }
