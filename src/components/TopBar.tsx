@@ -99,6 +99,24 @@ export function TopBar({ cityName, citySlug, cities, onCityChange, now, timezone
             </button>
           )}
         </div>
+        {citySlug === "los-angeles" && (
+          <div className="pointer-events-auto flex rounded-full border border-border bg-surface/90 p-0.5 shadow-lg backdrop-blur-xl">
+            <button
+              type="button"
+              onClick={() => setMapMode("legal")}
+              className={`rounded-full px-2.5 py-1 text-[11px] font-bold transition ${mapMode === "legal" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+            >
+              Legal
+            </button>
+            <button
+              type="button"
+              onClick={() => setMapMode("available")}
+              className={`rounded-full px-2.5 py-1 text-[11px] font-bold transition ${mapMode === "available" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+            >
+              Open
+            </button>
+          </div>
+        )}
         <button
           type="button"
           onClick={() => setSearchOpen(true)}
