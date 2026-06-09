@@ -12,6 +12,8 @@ import type { NormalizedRule } from "@/lib/parking/providers/types";
 const AI_GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const AI_MODEL = "google/gemini-3-flash-preview";
 
+export type ArrowDirection = "left" | "right" | "both" | null;
+
 export interface RawAiRule {
   type: string;                // free-form, e.g. "NO PARKING", "STREET CLEANING"
   days: string[];              // ["MON","TUE",...]
@@ -20,6 +22,8 @@ export interface RawAiRule {
   permit_zone: string | null;  // e.g. "ZONE 5"
   time_limit_minutes: number | null;
   notes: string | null;
+  /** Directional arrow on the sign: "left" (←), "right" (→), "both" (↔). null = no arrow. */
+  arrow: ArrowDirection;
   confidence: number;          // 0..1
 }
 
