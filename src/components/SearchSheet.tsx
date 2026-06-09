@@ -16,6 +16,7 @@ export function SearchSheet({ token }: { token: string }) {
   const open = useAppStore((s) => s.searchOpen);
   const setOpen = useAppStore((s) => s.setSearchOpen);
   const setFlyTo = useAppStore((s) => s.setFlyTo);
+  const setDestination = useAppStore((s) => s.setDestination);
   const history = useDeviceStore((s) => s.searchHistory);
   const pushSearch = useDeviceStore((s) => s.pushSearch);
   const removeSearch = useDeviceStore((s) => s.removeSearch);
