@@ -175,20 +175,59 @@ function ScanResult({
   result, previewUrl, onReset,
 }: { result: SignScanResponse; previewUrl: string | null; onReset: () => void }) {
   const s = result.summary;
-  const tone =
-    s.status === "YES" ? "text-park-green"
-    : s.status === "NO" ? "text-park-red"
-    : s.status === "LIMITED" ? "text-park-yellow"
-    : "text-foreground";
+
+  const palette =
+    s.status === "YES"
+      ? { ring: "bg-park-green/15", dot: "bg-park-green", text: "text-park-green", icon: Check, title: "Yes, you can park!", subtitle: "Parking is allowed at this spot right now.", untilLabel: "Parking until" }
+      : s.status === "NO"
+      ? { ring: "bg-park-red/15", dot: "bg-park-red", text: "text-park-red", icon: X, title: "No, you can't park", subtitle: "Parking is not allowed at this spot right now.", untilLabel: "Restriction until" }
+      : s.status === "LIMITED"
+      ? { ring: "bg-park-yellow/15", dot: "bg-park-yellow", text: "text-park-yellow", icon: AlertTriangle, title: "Limited parking", subtitle: s.plain, untilLabel: "Changes at" }
+      : { ring: "bg-muted", dot: "bg-muted-foreground", text: "text-foreground", icon: HelpCircle, title: "Unclear sign", subtitle: "We couldn't fully read this sign.", untilLabel: "Next change" };
+
+  const Icon = palette.icon;
+
+  // Find the next timeline entry that isn't "now" to get the "until" time.
+  const nextChange = s.timeline.find((t) => t.when !== "now");
+  const untilTime = nextChange?.when_label ?? null;
 
   return (
-    <div className="mt-5 space-y-4">
-      <div className="rounded-3xl border border-border bg-surface p-6">
-        <div className="mb-3 flex items-center gap-2">
-          <span className={cn("font-display text-2xl font-extrabold", tone)}>{s.status}</span>
-          <span className="text-xs text-muted-foreground">— AI summary</span>
+    <div className="mt-5 space-y-5">
+      {/* Hero status */}
+      <div className="flex flex-col items-center pt-2 text-center">
+        <div className={cn("flex h-28 w-28 items-center justify-center rounded-full", palette.ring)}>
+          <div className={cn("flex h-20 w-20 items-center justify-center rounded-full", palette.dot)}>
+            <Icon className="h-10 w-10 text-white" strokeWidth={3} />
+          </div>
         </div>
-        <p className="text-base font-semibold leading-relaxed text-foreground">
+        <h2 className={cn("mt-5 font-display text-3xl font-extrabold leading-tight", palette.text)}>
+          {palette.title}
+        </h2>
+        <p className="mt-2 px-4 text-sm text-muted-foreground">{palette.subtitle}</p>
+      </div>
+
+      {/* Until card */}
+      {untilTime && (
+        <div className="rounded-3xl bg-surface p-5">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+            {palette.untilLabel}
+          </div>
+          <div className="mt-1 font-display text-3xl font-extrabold text-foreground">
+            {untilTime}
+          </div>
+          <button className="mt-4 flex w-full items-center justify-center gap-2 rounded-full border-2 border-primary py-3 text-sm font-bold text-primary">
+            <Bell className="h-4 w-4" /> Set a reminder
+          </button>
+        </div>
+      )}
+
+      {/* AI summary */}
+      <div className="rounded-3xl border border-border bg-background p-5">
+        <div className="mb-2 flex items-center gap-2">
+          <MessageSquare className="h-4 w-4 text-primary" />
+          <span className="text-sm font-bold text-foreground">AI summary</span>
+        </div>
+        <p className="text-sm leading-relaxed text-muted-foreground">
           {s.plain}
           {s.time_guidance ? ` ${s.time_guidance}` : ""}
         </p>
