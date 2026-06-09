@@ -17,6 +17,9 @@ interface ClockState {
   /** Current map center, kept in sync by MapView so the "Can I park here?" button can use it as a tap-to-query fallback when GPS is unavailable. */
   mapCenter: { lng: number; lat: number } | null;
   setMapCenter: (v: { lng: number; lat: number } | null) => void;
+  /** "legal" = is parking allowed here? "available" = is there an open spot right now? */
+  mapMode: "legal" | "available";
+  setMapMode: (m: "legal" | "available") => void;
 }
 
 export const useAppStore = create<ClockState>((set) => ({
@@ -34,4 +37,6 @@ export const useAppStore = create<ClockState>((set) => ({
   setFlyTo: (v) => set({ flyTo: v }),
   mapCenter: null,
   setMapCenter: (v) => set({ mapCenter: v }),
+  mapMode: "legal",
+  setMapMode: (m) => set({ mapMode: m }),
 }));
