@@ -36,7 +36,7 @@ function formatWalk(seconds: number) {
 export function ParkHereButton({ cityId, timezone }: Props) {
   const checkAt = useServerFn(getDecisionAt);
   const checkSeg = useServerFn(getDecisionForSegment);
-  const findNearby = useServerFn(findNearbyAvailable);
+  const findRanked = useServerFn(findRankedParking);
 
   const setFlyTo = useAppStore((s) => s.setFlyTo);
   const selectSegment = useAppStore((s) => s.selectSegment);
