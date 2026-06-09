@@ -173,6 +173,40 @@ function SessionPage() {
           {sourceLabel && <Row icon={Database} label="Source provider" value={sourceLabel} />}
         </div>
 
+        {/* Walking distance from current GPS to parked vehicle, via global LocationStore. */}
+        {(() => {
+          const fix = liveLocation ?? lastKnownLocation;
+          let extra: React.ReactNode = null;
+          if (fix && session.coordinates) {
+            const meters = haversineMeters(
+              { lng: fix.lng, lat: fix.lat },
+              { lng: session.coordinates[0], lat: session.coordinates[1] },
+            );
+            const mins = walkingMinutes(meters);
+            extra = (
+              <div className="flex items-center justify-between">
+                <span className="font-semibold">Distance to your car</span>
+                <span>
+                  {meters < 1000 ? `${Math.round(meters)} m` : `${(meters / 1000).toFixed(1)} km`}
+                  {" · "}
+                  {mins} min walk
+                </span>
+              </div>
+            );
+          } else if (!session.coordinates) {
+            extra = <span className="opacity-80">No coordinates saved for this spot.</span>;
+          }
+          return (
+            <LocationStatusCard
+              live={liveLocation}
+              lastKnown={lastKnownLocation}
+              status={locStatus}
+              extra={extra}
+            />
+          );
+        })()}
+
+
         <UpcomingAlerts
           allowedUntil={allowedUntil}
           color={color}
