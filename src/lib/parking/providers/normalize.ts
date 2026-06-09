@@ -14,7 +14,10 @@ export type CanonicalCode =
   | "no_stopping"
   | "loading_zone"
   | "bus_lane"
-  | "street_cleaning";
+  | "street_cleaning"
+  | "red_curb"
+  | "tow_away"
+  | "unknown";
 
 interface ClassifiedRule {
   code: CanonicalCode;
@@ -26,6 +29,18 @@ interface ClassifiedRule {
 export function normalizeCategory(raw: string | null | undefined): ClassifiedRule {
   const c = (raw ?? "").trim().toLowerCase();
   if (!c) return { code: "allowed", priority: 1000, notes: "Unrestricted on-street parking." };
+
+  // ----- LA-specific phrases (additive — does not affect Seattle vocabulary) -----
+  if (c.includes("red curb") || c === "red zone")
+    return { code: "red_curb", priority: 10, notes: "Red curb: no stopping at any time." };
+  if (c.includes("tow away") || c.includes("tow-away"))
+    return { code: "tow_away", priority: 12, notes: "Tow-away zone (posted)." };
+  if (c.includes("preferential parking") || c === "ppd")
+    return { code: "permit", priority: 50, notes: "Preferential Parking District (permit required)." };
+  if (c === "posted" || c.includes("posted restriction"))
+    return { code: "unknown", priority: 900, notes: "Posted restriction — verify local signage." };
+  if (c === "unknown")
+    return { code: "unknown", priority: 900, notes: "Open data does not contain posted restriction details." };
 
   // Order matters: more specific phrases first.
   if (c.includes("no parking") || c === "no parking allowed")
