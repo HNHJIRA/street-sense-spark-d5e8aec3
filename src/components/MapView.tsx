@@ -557,6 +557,42 @@ export function MapView({ token, city }: MapViewProps) {
     });
   }, [locationFix, ready, syncUserLocationMarker]);
 
+  // Mode 4: recommended-parking highlight + connector line
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    const src = map.getSource("rec-highlight") as MapboxGL.GeoJSONSource | undefined;
+    if (!src) return;
+    if (!recommendedHighlight || recommendedHighlight.coordinates.length < 2) {
+      src.setData({ type: "FeatureCollection", features: [] });
+      return;
+    }
+    const mid = recommendedHighlight.coordinates[Math.floor(recommendedHighlight.coordinates.length / 2)];
+    const data: FeatureCollection<LineString> = {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          geometry: { type: "LineString", coordinates: recommendedHighlight.coordinates },
+          properties: { kind: "segment" },
+        },
+        {
+          type: "Feature",
+          geometry: {
+            type: "LineString",
+            coordinates: [
+              [recommendedHighlight.from.lng, recommendedHighlight.from.lat],
+              mid,
+            ],
+          },
+          properties: { kind: "connector" },
+        },
+      ],
+    };
+    src.setData(data);
+  }, [ready, recommendedHighlight]);
+
+
   useEffect(() => {
     const map = mapRef.current as any;
     if (!ready || !map) return;
