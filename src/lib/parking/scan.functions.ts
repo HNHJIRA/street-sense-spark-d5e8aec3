@@ -10,6 +10,7 @@ import type { LineString } from "geojson";
 import { evaluateRulesAt } from "./engine";
 import { aiRulesToNormalized, callSignScanAi, type AiScanResult } from "./sign-ai";
 import { resolveRuleConflicts } from "./providers/normalize";
+import { buildScanSummary, type ScanSummary } from "./scan-summary";
 import type {
   ParkingRule,
   ParkingStatus,
@@ -60,6 +61,8 @@ export interface SignScanResponse {
   decision: ParkingStatus;
   /** Verdict tier — derived from decision.color. */
   verdict: "YES" | "NO" | "LIMITED";
+  /** Driver-friendly AI summary built from the engine output (not raw OCR). */
+  summary: ScanSummary;
   /** Rules the AI extracted from the photo (normalized). */
   parsed_rules: NormalizedRule[];
   /** SDOT rules already on file for the nearest segment, for comparison. */
@@ -285,6 +288,15 @@ export const scanSign = createServerFn({ method: "POST" })
       );
     }
 
+    const summary = buildScanSummary({
+      decision,
+      parsedRules: aiRules,
+      sdotRules,
+      timezone: data.timezone,
+      aiConfidence: ai.overall_confidence,
+      signCount: ai.sign_count,
+    });
+
     return {
       scan_id: scanId,
       image_url: signedUrl,
@@ -293,6 +305,7 @@ export const scanSign = createServerFn({ method: "POST" })
       overall_confidence: ai.overall_confidence,
       decision,
       verdict: verdictFromColor(decision.color),
+      summary,
       parsed_rules: aiRules,
       sdot_rules: sdotRules,
       segment: segmentInfo,
