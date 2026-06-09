@@ -1,14 +1,17 @@
 import { useEffect, useState } from "react";
-import { CircleCheck, CircleX, Loader2, Navigation, TriangleAlert, MapPin, Clock, ScanLine, Footprints, ArrowRight, ShieldQuestion } from "lucide-react";
+import { Loader2, Navigation, ScanLine, Footprints, ArrowRight } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
-  checkParkingHere,
-  checkParkingForSegment,
   findNearbyAvailable,
-  type ParkHereResult,
   type NearbyOption,
 } from "@/lib/parking/parking.functions";
+import {
+  getDecisionForSegment,
+  getDecisionAt,
+  type SegmentDecisionResult,
+} from "@/lib/parking/decision.functions";
+import { ParkDecisionScreen, ParkDecisionUnknownCTA } from "@/components/ParkDecisionScreen";
 import { useAppStore } from "@/stores/app-store";
 import { useLocationStore } from "@/stores/location-store";
 import { cn } from "@/lib/utils";
@@ -30,8 +33,8 @@ function formatWalk(seconds: number) {
 }
 
 export function ParkHereButton({ cityId, timezone }: Props) {
-  const checkGps = useServerFn(checkParkingHere);
-  const checkSeg = useServerFn(checkParkingForSegment);
+  const checkAt = useServerFn(getDecisionAt);
+  const checkSeg = useServerFn(getDecisionForSegment);
   const findNearby = useServerFn(findNearbyAvailable);
 
   const setFlyTo = useAppStore((s) => s.setFlyTo);
@@ -47,7 +50,8 @@ export function ParkHereButton({ cityId, timezone }: Props) {
   const locStatus = useLocationStore((s) => s.status);
 
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<ParkHereResult | null>(null);
+  const [result, setResult] = useState<SegmentDecisionResult | null>(null);
+  const [evaluatedAt, setEvaluatedAt] = useState<Date>(() => new Date());
   const [origin, setOrigin] = useState<{ lng: number; lat: number } | null>(null);
   const [alts, setAlts] = useState<NearbyOption[] | null>(null);
   const [altsLoading, setAltsLoading] = useState(false);
@@ -62,12 +66,12 @@ export function ParkHereButton({ cityId, timezone }: Props) {
   const atIso = forecastAt ? forecastAt.toISOString() : null;
 
   const maybeLoadAlts = async (
-    res: ParkHereResult,
+    res: SegmentDecisionResult,
     from: { lng: number; lat: number } | null,
   ) => {
     if (!from) return;
-    // Mode 2: trigger when NO PARKING or UNKNOWN
-    const needAlts = !res.found || res.color === "red";
+    const verdict = res.decision?.verdict ?? "UNKNOWN";
+    const needAlts = !res.found || verdict === "NO" || verdict === "UNKNOWN";
     if (!needAlts) return;
     setAltsLoading(true);
     try {
@@ -91,7 +95,6 @@ export function ParkHereButton({ cityId, timezone }: Props) {
   const runGpsOrTap = async () => {
     const fix = liveLocation ?? lastKnown;
     const from = fix ? { lng: fix.lng, lat: fix.lat } : mapCenter;
-    const source: "gps" | "tap" = fix ? "gps" : "tap";
     if (!from) {
       if (locStatus === "denied") {
         toast.error("Location denied. Pan the map to a street and tap again.");
@@ -102,10 +105,12 @@ export function ParkHereButton({ cityId, timezone }: Props) {
     }
     setLoading(true);
     setOrigin(from);
+    const when = forecastAt ?? new Date();
+    setEvaluatedAt(when);
     if (fix) setFlyTo({ lat: fix.lat, lng: fix.lng, zoom: 18 });
     try {
-      const res = await checkGps({
-        data: { cityId, lng: from.lng, lat: from.lat, source, timezone, at: atIso },
+      const res = await checkAt({
+        data: { cityId, lng: from.lng, lat: from.lat, timezone, at: atIso },
       });
       setResult(res);
       if (res.found && res.segmentId) selectSegment(res.segmentId);
@@ -117,7 +122,7 @@ export function ParkHereButton({ cityId, timezone }: Props) {
     }
   };
 
-  // Mode 3: Manual Test — triggered from StreetSheet
+  // Manual Test Mode — triggered from StreetSheet
   useEffect(() => {
     if (!pendingCheckSegmentId) return;
     const segId = pendingCheckSegmentId;
@@ -126,6 +131,8 @@ export function ParkHereButton({ cityId, timezone }: Props) {
       setLoading(true);
       const from = mapCenter ?? (liveLocation ? { lng: liveLocation.lng, lat: liveLocation.lat } : null);
       setOrigin(from);
+      const when = forecastAt ?? new Date();
+      setEvaluatedAt(when);
       try {
         const res = await checkSeg({ data: { segmentId: segId, at: atIso, timezone } });
         setResult(res);
@@ -154,15 +161,7 @@ export function ParkHereButton({ cityId, timezone }: Props) {
     setAlts(null);
   };
 
-  const decision: "YES" | "NO" | "LIMITED" | "UNKNOWN" = !result
-    ? "UNKNOWN"
-    : !result.found
-      ? "UNKNOWN"
-      : result.color === "green"
-        ? "YES"
-        : result.color === "yellow"
-          ? "LIMITED"
-          : "NO";
+  const verdict = result?.decision?.verdict ?? "UNKNOWN";
 
   return (
     <>
@@ -195,58 +194,24 @@ export function ParkHereButton({ cityId, timezone }: Props) {
           <div className="absolute inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={closeAll} />
           <div className="absolute inset-x-0 bottom-0 z-50 safe-bottom animate-in slide-in-from-bottom duration-200">
             <div className="mx-auto max-w-md px-3 pb-3">
-              <div className="max-h-[80vh] overflow-y-auto rounded-3xl border border-border bg-elevated p-5 shadow-2xl">
+              <div className="max-h-[85vh] overflow-y-auto rounded-3xl border border-border bg-elevated p-5 shadow-2xl">
                 <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-muted" />
 
-                {/* Decision banner */}
-                <div
-                  className={cn(
-                    "flex items-center gap-3 rounded-2xl border p-4",
-                    decision === "YES" && "border-park-green/40 bg-park-green-soft text-park-green",
-                    decision === "LIMITED" && "border-park-yellow/40 bg-park-yellow-soft text-park-yellow",
-                    decision === "NO" && "border-park-red/40 bg-park-red-soft text-park-red",
-                    decision === "UNKNOWN" && "border-border bg-surface text-muted-foreground",
-                  )}
-                >
-                  {decision === "YES" ? <CircleCheck className="h-8 w-8 shrink-0" />
-                    : decision === "LIMITED" ? <TriangleAlert className="h-8 w-8 shrink-0" />
-                    : decision === "NO" ? <CircleX className="h-8 w-8 shrink-0" />
-                    : <ShieldQuestion className="h-8 w-8 shrink-0" />}
-                  <div className="min-w-0">
-                    <div className="text-[11px] font-bold uppercase tracking-wider opacity-80">
-                      Can I park here? · {decision}
+                {result.found && result.decision ? (
+                  <ParkDecisionScreen
+                    result={result}
+                    timezone={timezone}
+                    evaluatedAt={evaluatedAt}
+                  />
+                ) : (
+                  <div className="space-y-3">
+                    <div className="rounded-2xl border border-border bg-surface p-4 text-sm">
+                      {result.message}
                     </div>
-                    <div className="text-base font-bold leading-tight">{result.message}</div>
-                    {result.found && (
-                      <div className="mt-0.5 text-[11px] opacity-80">
-                        {result.source === "gps" ? "GPS" : result.source === "tap" ? "Map" : "Selected"} · {Math.round(result.distance_m ?? 0)} m away
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {result.found && (
-                  <div className="mt-3 grid grid-cols-1 gap-1.5 text-xs">
-                    {result.name && (
-                      <DetailRow icon={MapPin} label="Street" value={result.name} />
-                    )}
-                    <DetailRow icon={ShieldQuestion} label="Status" value={result.label ?? "—"} />
-                    {result.allowed_until && (
-                      <DetailRow icon={Clock} label="Allowed until" value={formatTime(new Date(result.allowed_until), timezone)} />
-                    )}
-                    {result.permit_zone && (
-                      <DetailRow icon={MapPin} label="Permit zone" value={result.permit_zone} />
-                    )}
-                    {result.time_limit_minutes != null && (
-                      <DetailRow icon={Clock} label="Max stay" value={`${result.time_limit_minutes} min`} />
-                    )}
-                    {result.data_source && (
-                      <DetailRow icon={MapPin} label="Source" value={result.data_source} />
-                    )}
+                    <ParkDecisionUnknownCTA onScanClick={() => { window.location.href = "/scan"; }} />
                   </div>
                 )}
 
-                {/* Mode 2: alternatives */}
                 {(altsLoading || (alts && alts.length > 0)) && (
                   <div className="mt-4">
                     <div className="mb-2 flex items-center justify-between">
@@ -316,16 +281,5 @@ export function ParkHereButton({ cityId, timezone }: Props) {
         </>
       )}
     </>
-  );
-}
-
-function DetailRow({ icon: Icon, label, value }: { icon: typeof Clock; label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between rounded-xl bg-surface px-3 py-2">
-      <span className="flex items-center gap-2 text-muted-foreground">
-        <Icon className="h-3.5 w-3.5" /> {label}
-      </span>
-      <span className="truncate pl-2 text-right font-semibold">{value}</span>
-    </div>
   );
 }
