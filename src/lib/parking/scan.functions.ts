@@ -89,6 +89,8 @@ export interface SignScanResponse {
   segment: { id: string; name: string; distance_m: number } | null;
   validations: SignScanValidation[];
   source_label: string;
+  /** ISO timestamp of when this scan was evaluated (the moment the photo was processed). */
+  scanned_at: string;
 }
 
 function verdictFromColor(c: ParkingStatus["color"]): "YES" | "NO" | "LIMITED" {
@@ -164,6 +166,7 @@ export const scanSign = createServerFn({ method: "POST" })
     }).parse(input),
   )
   .handler(async ({ data }): Promise<SignScanResponse> => {
+    const scannedAt = new Date();
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured");
 
@@ -247,7 +250,7 @@ export const scanSign = createServerFn({ method: "POST" })
         rules: [...rules, ...sdotRules],
         events: [],
       };
-      return evaluateRulesAt(segment, restrictionTypes, new Date(), data.timezone);
+      return evaluateRulesAt(segment, restrictionTypes, scannedAt, data.timezone);
     };
 
     // Top-level decision keeps today's behavior: ALL posted rules + SDOT.
@@ -386,6 +389,7 @@ export const scanSign = createServerFn({ method: "POST" })
       segment: segmentInfo,
       validations,
       source_label: SOURCE_LABELS[segmentSource] ?? segmentSource,
+      scanned_at: scannedAt.toISOString(),
     };
   });
 
