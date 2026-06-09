@@ -162,10 +162,10 @@ function ScanResult({
 }: { result: SignScanResponse; previewUrl: string | null; timezone: string; onReset: () => void }) {
   const s = result.summary;
   const tone =
-    s.status === "YES" ? "border-park-green/50 bg-park-green-soft text-park-green"
-    : s.status === "NO" ? "border-park-red/50 bg-park-red-soft text-park-red"
-    : s.status === "LIMITED" ? "border-park-yellow/50 bg-park-yellow-soft text-park-yellow"
-    : "border-border bg-surface text-foreground";
+    s.status === "YES" ? { border: "border-park-green/60 bg-park-green-soft", accent: "text-park-green" }
+    : s.status === "NO" ? { border: "border-park-red/60 bg-park-red-soft", accent: "text-park-red" }
+    : s.status === "LIMITED" ? { border: "border-park-yellow/60 bg-park-yellow-soft", accent: "text-park-yellow" }
+    : { border: "border-border bg-surface", accent: "text-foreground" };
   const StatusIcon =
     s.status === "YES" ? CheckCircle2
     : s.status === "NO" ? XCircle
@@ -175,26 +175,28 @@ function ScanResult({
   return (
     <div className="mt-5 space-y-4">
       {/* Headline summary — driver should grok this in <5s. */}
-      <div className={cn("rounded-3xl border-2 p-5", tone)}>
+      <div className={cn("rounded-3xl border-2 p-5 text-foreground", tone.border)}>
         <div className="flex items-center gap-3">
-          <StatusIcon className="h-7 w-7" />
+          <StatusIcon className={cn("h-7 w-7", tone.accent)} />
           <div>
-            <div className="text-[10px] font-bold uppercase tracking-widest opacity-80">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
               Can I park here?
             </div>
-            <div className="font-display text-3xl font-extrabold leading-tight">{s.status}</div>
+            <div className={cn("font-display text-3xl font-extrabold leading-tight", tone.accent)}>
+              {s.status}
+            </div>
           </div>
-          <span className="ml-auto rounded-full bg-background/60 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider">
-            {s.confidence} confidence
+          <span className="ml-auto rounded-full bg-background/70 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-foreground">
+            {s.confidence}
           </span>
         </div>
-        <div className="mt-3 text-sm font-semibold leading-snug">{s.plain}</div>
+        <div className="mt-3 text-sm font-semibold leading-snug text-foreground">{s.plain}</div>
         <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
-          <span className="rounded-full bg-background/60 px-2.5 py-1 font-semibold">
+          <span className="rounded-full bg-background/70 px-2.5 py-1 font-semibold text-foreground">
             {s.reason}
           </span>
           {s.time_guidance && (
-            <span className="rounded-full bg-background/60 px-2.5 py-1 font-semibold">
+            <span className="rounded-full bg-background/70 px-2.5 py-1 font-semibold text-foreground">
               {s.time_guidance}
             </span>
           )}
