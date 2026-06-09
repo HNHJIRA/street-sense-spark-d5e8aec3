@@ -35,8 +35,10 @@ async function run() {
 
   // Heartbeat
   await supabaseAdmin.from("usage_events").insert({
-    event_type: "provider_health_check",
-    payload: {
+    device_id: "cron-health-check",
+    event_name: "provider_health_check",
+    surface: "cron",
+    properties: {
       ok: issues.length === 0,
       issues,
       occupancyRows: occRows,
