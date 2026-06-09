@@ -9,7 +9,7 @@ async function run() {
   try {
     const res = await syncLaMeterOccupancy();
     return new Response(
-      JSON.stringify({ ok: true, ...res, duration_ms: Date.now() - started }),
+      JSON.stringify({ ...res, duration_ms: Date.now() - started }),
       { status: 200, headers: { "Content-Type": "application/json" } },
     );
   } catch (err) {
