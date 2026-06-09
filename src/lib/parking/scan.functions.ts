@@ -250,7 +250,7 @@ export const scanSign = createServerFn({ method: "POST" })
         rules: [...rules, ...sdotRules],
         events: [],
       };
-      return evaluateRulesAt(segment, restrictionTypes, new Date(), data.timezone);
+      return evaluateRulesAt(segment, restrictionTypes, scannedAt, data.timezone);
     };
 
     // Top-level decision keeps today's behavior: ALL posted rules + SDOT.
