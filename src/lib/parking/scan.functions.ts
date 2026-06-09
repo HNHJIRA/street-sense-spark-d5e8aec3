@@ -288,6 +288,15 @@ export const scanSign = createServerFn({ method: "POST" })
       );
     }
 
+    const summary = buildScanSummary({
+      decision,
+      parsedRules: aiRules,
+      sdotRules,
+      timezone: data.timezone,
+      aiConfidence: ai.overall_confidence,
+      signCount: ai.sign_count,
+    });
+
     return {
       scan_id: scanId,
       image_url: signedUrl,
@@ -296,6 +305,7 @@ export const scanSign = createServerFn({ method: "POST" })
       overall_confidence: ai.overall_confidence,
       decision,
       verdict: verdictFromColor(decision.color),
+      summary,
       parsed_rules: aiRules,
       sdot_rules: sdotRules,
       segment: segmentInfo,
