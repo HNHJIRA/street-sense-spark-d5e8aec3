@@ -6,6 +6,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
 import {
   Camera, Upload, Loader2, ArrowLeft, ScanLine,
+  Check, X, AlertTriangle, HelpCircle, Bell, MessageSquare,
 } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
 import { LocationStatusCard } from "@/components/LocationStatusCard";
