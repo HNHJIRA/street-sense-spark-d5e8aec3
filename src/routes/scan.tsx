@@ -163,7 +163,7 @@ function ScanPage() {
           </div>
         )}
 
-        {result && <ScanResult result={result} previewUrl={previewUrl} timezone={city.timezone} onReset={reset} />}
+        {result && <ScanResult result={result} previewUrl={previewUrl} onReset={reset} />}
       </div>
       <BottomNav />
     </div>
