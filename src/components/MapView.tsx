@@ -434,6 +434,36 @@ export function MapView({ token, city }: MapViewProps) {
             addSeg("seg-left", "left", -1);
             addSeg("seg-right", "right", 1);
 
+            // Recommended-parking highlight + connector line
+            if (!map.getSource("rec-highlight")) {
+              map.addSource("rec-highlight", {
+                type: "geojson",
+                data: { type: "FeatureCollection", features: [] },
+              });
+              map.addLayer({
+                id: "rec-highlight-line",
+                type: "line",
+                source: "rec-highlight",
+                filter: ["==", ["get", "kind"], "segment"],
+                layout: { "line-cap": "round", "line-join": "round" },
+                paint: { "line-color": "#2563eb", "line-width": 8, "line-opacity": 0.9 },
+              });
+              map.addLayer({
+                id: "rec-highlight-connector",
+                type: "line",
+                source: "rec-highlight",
+                filter: ["==", ["get", "kind"], "connector"],
+                layout: { "line-cap": "round", "line-join": "round" },
+                paint: {
+                  "line-color": "#2563eb",
+                  "line-width": 3,
+                  "line-opacity": 0.85,
+                  "line-dasharray": [2, 2],
+                },
+              });
+            }
+
+
 
             map.on("click", ["seg-left", "seg-right"] as any, (e: any) => {
               const f = e.features?.[0];
