@@ -51,6 +51,7 @@ function segmentToFeature(s: SegmentLite): Feature<LineString> {
 export function MapView({ token, city }: MapViewProps) {
   const container = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapboxGL.Map | null>(null);
+  const geolocateRef = useRef<MapboxGL.GeolocateControl | null>(null);
   const featuresRef = useRef<Map<string, Feature<LineString>>>(new Map());
   const importingRef = useRef(false);
   const lastFetchKeyRef = useRef<string>("");
@@ -181,6 +182,32 @@ export function MapView({ token, city }: MapViewProps) {
             new mapboxgl.NavigationControl({ visualizePitch: true, showCompass: true, showZoom: true }),
             "top-right"
           );
+          // Persistent user-location: blue dot + accuracy ring, driven by watchPosition.
+          const geolocate = new mapboxgl.GeolocateControl({
+            positionOptions: { enableHighAccuracy: true, timeout: 8000 },
+            trackUserLocation: true,
+            showUserHeading: true,
+            showAccuracyCircle: true,
+            fitBoundsOptions: { maxZoom: 17 },
+          });
+          map.addControl(geolocate, "top-right");
+          geolocateRef.current = geolocate;
+          geolocate.on("error", (e: GeolocationPositionError) => {
+            const msg =
+              e?.code === 1 ? "Location permission denied. Enable it in your browser settings."
+              : e?.code === 2 ? "Location unavailable on this device."
+              : e?.code === 3 ? "Location request timed out."
+              : "Couldn't get your location";
+            toast.error(msg);
+          });
+          geolocate.on("geolocate", (pos: GeolocationPosition) => {
+            console.info("[MapView] geolocate", {
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude,
+              accuracy_m: pos.coords.accuracy,
+              ts: new Date(pos.timestamp).toISOString(),
+            });
+          });
         } catch (err) {
           // WebGL2 unavailable in this preview iframe → surface fallback UI.
           console.error("[MapView] mapbox-gl init failed", err);
@@ -364,6 +391,10 @@ export function MapView({ token, city }: MapViewProps) {
   const zoomIn = () => mapRef.current?.zoomIn();
   const zoomOut = () => mapRef.current?.zoomOut();
   const locate = () => {
+    if (geolocateRef.current) {
+      geolocateRef.current.trigger();
+      return;
+    }
     if (!navigator.geolocation || !mapRef.current) return;
     navigator.geolocation.getCurrentPosition(
       (pos) => {
