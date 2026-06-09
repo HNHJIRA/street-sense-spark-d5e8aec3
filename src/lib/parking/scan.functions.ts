@@ -381,6 +381,7 @@ export const scanSign = createServerFn({ method: "POST" })
       verdict: verdictFromColor(decision.color),
       summary,
       parsed_rules: aiRules,
+      sides,
       sdot_rules: sdotRules,
       segment: segmentInfo,
       validations,
