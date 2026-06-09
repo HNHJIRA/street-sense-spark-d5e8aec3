@@ -28,6 +28,7 @@ import { Route as AdminBetaReadinessRouteImport } from './routes/admin.beta-read
 import { Route as AdminAnalyticsRouteImport } from './routes/admin.analytics'
 import { Route as AdminAccuracyRouteImport } from './routes/admin.accuracy'
 import { Route as ApiPublicCronSyncLaOccupancyRouteImport } from './routes/api/public/cron.sync-la-occupancy'
+import { Route as ApiPublicCronHealthCheckRouteImport } from './routes/api/public/cron.health-check'
 import { Route as ApiPublicAdminSyncLaRouteImport } from './routes/api/public/admin.sync-la'
 
 const SessionRoute = SessionRouteImport.update({
@@ -126,6 +127,12 @@ const ApiPublicCronSyncLaOccupancyRoute =
     path: '/api/public/cron/sync-la-occupancy',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicCronHealthCheckRoute =
+  ApiPublicCronHealthCheckRouteImport.update({
+    id: '/api/public/cron/health-check',
+    path: '/api/public/cron/health-check',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicAdminSyncLaRoute = ApiPublicAdminSyncLaRouteImport.update({
   id: '/api/public/admin/sync-la',
   path: '/api/public/admin/sync-la',
@@ -152,6 +159,7 @@ export interface FileRoutesByFullPath {
   '/debug/parking': typeof DebugParkingRoute
   '/admin/': typeof AdminIndexRoute
   '/api/public/admin/sync-la': typeof ApiPublicAdminSyncLaRoute
+  '/api/public/cron/health-check': typeof ApiPublicCronHealthCheckRoute
   '/api/public/cron/sync-la-occupancy': typeof ApiPublicCronSyncLaOccupancyRoute
 }
 export interface FileRoutesByTo {
@@ -173,6 +181,7 @@ export interface FileRoutesByTo {
   '/debug/parking': typeof DebugParkingRoute
   '/admin': typeof AdminIndexRoute
   '/api/public/admin/sync-la': typeof ApiPublicAdminSyncLaRoute
+  '/api/public/cron/health-check': typeof ApiPublicCronHealthCheckRoute
   '/api/public/cron/sync-la-occupancy': typeof ApiPublicCronSyncLaOccupancyRoute
 }
 export interface FileRoutesById {
@@ -196,6 +205,7 @@ export interface FileRoutesById {
   '/debug/parking': typeof DebugParkingRoute
   '/admin/': typeof AdminIndexRoute
   '/api/public/admin/sync-la': typeof ApiPublicAdminSyncLaRoute
+  '/api/public/cron/health-check': typeof ApiPublicCronHealthCheckRoute
   '/api/public/cron/sync-la-occupancy': typeof ApiPublicCronSyncLaOccupancyRoute
 }
 export interface FileRouteTypes {
@@ -220,6 +230,7 @@ export interface FileRouteTypes {
     | '/debug/parking'
     | '/admin/'
     | '/api/public/admin/sync-la'
+    | '/api/public/cron/health-check'
     | '/api/public/cron/sync-la-occupancy'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -241,6 +252,7 @@ export interface FileRouteTypes {
     | '/debug/parking'
     | '/admin'
     | '/api/public/admin/sync-la'
+    | '/api/public/cron/health-check'
     | '/api/public/cron/sync-la-occupancy'
   id:
     | '__root__'
@@ -263,6 +275,7 @@ export interface FileRouteTypes {
     | '/debug/parking'
     | '/admin/'
     | '/api/public/admin/sync-la'
+    | '/api/public/cron/health-check'
     | '/api/public/cron/sync-la-occupancy'
   fileRoutesById: FileRoutesById
 }
@@ -276,6 +289,7 @@ export interface RootRouteChildren {
   SessionRoute: typeof SessionRoute
   DebugParkingRoute: typeof DebugParkingRoute
   ApiPublicAdminSyncLaRoute: typeof ApiPublicAdminSyncLaRoute
+  ApiPublicCronHealthCheckRoute: typeof ApiPublicCronHealthCheckRoute
   ApiPublicCronSyncLaOccupancyRoute: typeof ApiPublicCronSyncLaOccupancyRoute
 }
 
@@ -414,6 +428,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCronSyncLaOccupancyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/cron/health-check': {
+      id: '/api/public/cron/health-check'
+      path: '/api/public/cron/health-check'
+      fullPath: '/api/public/cron/health-check'
+      preLoaderRoute: typeof ApiPublicCronHealthCheckRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/admin/sync-la': {
       id: '/api/public/admin/sync-la'
       path: '/api/public/admin/sync-la'
@@ -462,8 +483,19 @@ const rootRouteChildren: RootRouteChildren = {
   SessionRoute: SessionRoute,
   DebugParkingRoute: DebugParkingRoute,
   ApiPublicAdminSyncLaRoute: ApiPublicAdminSyncLaRoute,
+  ApiPublicCronHealthCheckRoute: ApiPublicCronHealthCheckRoute,
   ApiPublicCronSyncLaOccupancyRoute: ApiPublicCronSyncLaOccupancyRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
