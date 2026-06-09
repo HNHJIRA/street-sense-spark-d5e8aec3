@@ -89,6 +89,8 @@ export interface SignScanResponse {
   segment: { id: string; name: string; distance_m: number } | null;
   validations: SignScanValidation[];
   source_label: string;
+  /** ISO timestamp of when this scan was evaluated (the moment the photo was processed). */
+  scanned_at: string;
 }
 
 function verdictFromColor(c: ParkingStatus["color"]): "YES" | "NO" | "LIMITED" {
