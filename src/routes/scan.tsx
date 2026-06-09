@@ -245,25 +245,6 @@ function ScanResult({
 }
 
 
-function Row({ icon: Icon, label, value }: { icon: typeof Clock; label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between rounded-2xl bg-surface px-4 py-3">
-      <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-        <Icon className="h-4 w-4" /> {label}
-      </span>
-      <span className="text-sm font-semibold text-right">{value}</span>
-    </div>
-  );
-}
-
-const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-function daysLabel(days: number[]): string {
-  if (days.length === 7) return "Every day";
-  if (days.length === 5 && [1, 2, 3, 4, 5].every((d) => days.includes(d))) return "Mon–Fri";
-  if (days.length === 2 && days.includes(0) && days.includes(6)) return "Weekends";
-  return [...days].sort().map((d) => DAY_LABELS[d]).join(", ");
-}
-
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
