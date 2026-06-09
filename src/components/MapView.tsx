@@ -14,6 +14,7 @@ import {
 } from "@/lib/parking/parking.functions";
 import type { ParkingColor } from "@/lib/parking/types";
 import { useAppStore } from "@/stores/app-store";
+import { useLocationStore } from "@/stores/location-store";
 
 interface MapViewProps {
   token: string;
