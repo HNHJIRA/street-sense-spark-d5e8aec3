@@ -58,6 +58,7 @@ export function SearchSheet({ token }: { token: string }) {
   const choose = (f: { center: [number, number]; place_name: string; text: string }) => {
     setFlyTo({ lng: f.center[0], lat: f.center[1], zoom: 17 });
     pushSearch({ query: f.text, placeName: f.place_name, coordinates: f.center });
+    setDestination({ name: f.text, placeName: f.place_name, lng: f.center[0], lat: f.center[1] });
     setOpen(false); setQ("");
   };
 
