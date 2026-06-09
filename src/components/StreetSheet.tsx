@@ -9,6 +9,8 @@ import type { RestrictionType, StreetSegment } from "@/lib/parking/types";
 import { useAppStore } from "@/stores/app-store";
 import { useDeviceStore } from "@/stores/device-store";
 import { cn } from "@/lib/utils";
+import { DayPlannerCard } from "@/components/DayPlannerCard";
+
 
 interface StreetSheetProps {
   timezone: string;
@@ -32,7 +34,7 @@ function formatTime(d: Date, tz: string) {
 
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-export function StreetSheet({ timezone, restrictionTypes, cityId }: StreetSheetProps) {
+export function StreetSheet({ timezone, restrictionTypes, cityId, citySlug }: StreetSheetProps) {
   const navigate = useNavigate();
   const selectedSegmentId = useAppStore((s) => s.selectedSegmentId);
   const selectSegment = useAppStore((s) => s.selectSegment);
@@ -251,9 +253,14 @@ export function StreetSheet({ timezone, restrictionTypes, cityId }: StreetSheetP
               </div>
             )}
 
+            <div className="mt-4">
+              <DayPlannerCard segmentId={selectedSegmentId} citySlug={citySlug} />
+            </div>
+
             <div className="mt-5 text-center text-[10px] text-muted-foreground">
               {data?.source_label ? `Source: ${data.source_label} · ` : ""}Verify posted signs before parking.
             </div>
+
           </div>
         </div>
       </div>
