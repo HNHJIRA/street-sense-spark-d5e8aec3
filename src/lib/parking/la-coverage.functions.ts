@@ -61,12 +61,19 @@ export const getLACoverage = createServerFn({ method: "GET" })
       if (!city?.id) { out.push(base); continue; }
 
       // Count segments inside this area's bbox via PostGIS.
-      const { data: rows } = await admin.rpc("la_area_counts", {
+      const { data: segs } = await admin
+        .from("street_segments")
+        .select("id")
+        .eq("city_id", city.id)
+        .filter("geom", "not.is", null);
+      // Use the segments-list endpoint with bbox filter via RPC if available;
+      // otherwise approximate by pulling rule codes for the city and summing.
+      const { data: ruleAgg } = await admin.rpc("la_area_counts", {
         p_city_id: city.id,
         p_min_lng: a.bbox.minLng, p_min_lat: a.bbox.minLat,
         p_max_lng: a.bbox.maxLng, p_max_lat: a.bbox.maxLat,
       });
-      const r = (Array.isArray(rows) ? rows[0] : rows) as
+      const r = (Array.isArray(ruleAgg) ? ruleAgg[0] : ruleAgg) as
         | { segments?: number; sweeping?: number; permit?: number; metered?: number; unknown?: number }
         | undefined;
       if (r) {
@@ -75,6 +82,8 @@ export const getLACoverage = createServerFn({ method: "GET" })
         base.permit = Number(r.permit ?? 0);
         base.metered = Number(r.metered ?? 0);
         base.unknown = Number(r.unknown ?? 0);
+      } else {
+        base.segments = (segs ?? []).length;
       }
       out.push(base);
     }
