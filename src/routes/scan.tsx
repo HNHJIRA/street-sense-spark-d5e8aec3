@@ -285,7 +285,13 @@ function ScanResult({
       <div className="flex items-center justify-center gap-1.5 text-center text-[10px] text-muted-foreground">
         <Clock className="h-3 w-3" />
         Scanned at{" "}
-        {new Date(result.scanned_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+        {new Date(result.scanned_at).toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+          timeZone: "America/Los_Angeles",
+          timeZoneName: "short",
+        })}
+        {" "}(Los Angeles)
         {result.segment ? ` near ${result.segment.name}` : ""}
       </div>
     </div>
