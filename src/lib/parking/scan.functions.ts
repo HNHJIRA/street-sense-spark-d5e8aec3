@@ -51,6 +51,17 @@ export interface SignScanValidation {
   detail: string;
 }
 
+export interface SideEvaluation {
+  /** Which side of the post this evaluation represents. */
+  side: "left" | "right" | "both";
+  /** Engine verdict for just this side's posted rules + SDOT data. */
+  decision: ParkingStatus;
+  /** Driver-friendly summary for this side. */
+  summary: ScanSummary;
+  /** Posted rules contributing to this side (both-sided + side-specific). */
+  rules: NormalizedRule[];
+}
+
 export interface SignScanResponse {
   scan_id: string;
   image_url: string | null;
@@ -65,6 +76,13 @@ export interface SignScanResponse {
   summary: ScanSummary;
   /** Rules the AI extracted from the photo (normalized). */
   parsed_rules: NormalizedRule[];
+  /**
+   * When the AI detects directional arrows on the sign block, per-side
+   * evaluations the UI can show behind a Left/Right/Both selector. `null`
+   * when no arrows were detected — the top-level `decision`/`summary` is
+   * authoritative and represents the whole pole.
+   */
+  sides: { left: SideEvaluation; right: SideEvaluation; both: SideEvaluation } | null;
   /** SDOT rules already on file for the nearest segment, for comparison. */
   sdot_rules: ParkingRule[];
   /** Nearest segment matched (if any) — used for validation + display. */
