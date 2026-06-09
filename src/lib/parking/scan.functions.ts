@@ -10,6 +10,7 @@ import type { LineString } from "geojson";
 import { evaluateRulesAt } from "./engine";
 import { aiRulesToNormalized, callSignScanAi, type AiScanResult } from "./sign-ai";
 import { resolveRuleConflicts } from "./providers/normalize";
+import { buildScanSummary, type ScanSummary } from "./scan-summary";
 import type {
   ParkingRule,
   ParkingStatus,
