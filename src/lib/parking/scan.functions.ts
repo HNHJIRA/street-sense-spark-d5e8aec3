@@ -319,6 +319,15 @@ export const scanSign = createServerFn({ method: "POST" })
       signedUrl = signed.data?.signedUrl ?? null;
     }
 
+    const matchStatus: "matched" | "out_of_range" | "no_gps" | "no_segment_data" =
+      data.lng == null || data.lat == null
+        ? "no_gps"
+        : segmentDbId == null
+          ? "out_of_range"
+          : sdotRules.length === 0
+            ? "no_segment_data"
+            : "matched";
+
     await admin.from("parking_sign_scans").insert({
       id: scanId,
       city_id: data.cityId,
@@ -326,7 +335,11 @@ export const scanSign = createServerFn({ method: "POST" })
       lng: data.lng, lat: data.lat,
       decision,
       overall_confidence: ai.overall_confidence,
+      verdict: verdictFromColor(decision.color),
+      nearest_distance_m: segmentInfo?.distance_m ?? null,
+      match_status: matchStatus,
     });
+
 
     if (uploadOk) {
       await admin.from("parking_sign_images").insert({
