@@ -7,6 +7,7 @@ import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
 import {
   Camera, Upload, Loader2, ArrowLeft, ScanLine,
   Check, X, AlertTriangle, HelpCircle, Bell, MessageSquare,
+  ArrowLeftRight, ArrowRight,
 } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
 import { LocationStatusCard } from "@/components/LocationStatusCard";
@@ -174,7 +175,12 @@ function ScanPage() {
 function ScanResult({
   result, previewUrl, onReset,
 }: { result: SignScanResponse; previewUrl: string | null; onReset: () => void }) {
-  const s = result.summary;
+  // When the AI detected directional arrows on the sign block, expose a
+  // Left / Both / Right selector so the user picks which side of the post
+  // they're parked on. Default to "both" — that's the conservative composite.
+  const [side, setSide] = useState<"left" | "both" | "right">("both");
+  const sideEval = result.sides ? result.sides[side] : null;
+  const s = sideEval?.summary ?? result.summary;
 
   const palette =
     s.status === "YES"
@@ -193,6 +199,39 @@ function ScanResult({
 
   return (
     <div className="mt-5 space-y-5">
+      {/* Directional arrow chooser — only shown when AI detected ←/→ arrows */}
+      {result.sides && (
+        <div className="rounded-3xl border border-border bg-surface/60 p-4">
+          <div className="mb-2 flex items-center gap-2">
+            <ArrowLeftRight className="h-4 w-4 text-primary" />
+            <span className="text-sm font-bold text-foreground">Which side of the post?</span>
+          </div>
+          <p className="mb-3 text-xs text-muted-foreground">
+            This sign has directional arrows — different rules apply on each side. Pick where your car is.
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            {([
+              { key: "left",  label: "Left",  Icon: ArrowLeft },
+              { key: "both",  label: "Both",  Icon: ArrowLeftRight },
+              { key: "right", label: "Right", Icon: ArrowRight },
+            ] as const).map(({ key, label, Icon: I }) => (
+              <button
+                key={key}
+                onClick={() => setSide(key)}
+                className={cn(
+                  "flex items-center justify-center gap-1.5 rounded-full py-2.5 text-xs font-bold transition",
+                  side === key
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-background text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <I className="h-3.5 w-3.5" /> {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Hero status */}
       <div className="flex flex-col items-center pt-2 text-center">
         <div className={cn("flex h-28 w-28 items-center justify-center rounded-full", palette.ring)}>

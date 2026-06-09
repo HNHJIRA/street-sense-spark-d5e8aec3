@@ -12,6 +12,8 @@ import type { NormalizedRule } from "@/lib/parking/providers/types";
 const AI_GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const AI_MODEL = "google/gemini-3-flash-preview";
 
+export type ArrowDirection = "left" | "right" | "both" | null;
+
 export interface RawAiRule {
   type: string;                // free-form, e.g. "NO PARKING", "STREET CLEANING"
   days: string[];              // ["MON","TUE",...]
@@ -20,6 +22,8 @@ export interface RawAiRule {
   permit_zone: string | null;  // e.g. "ZONE 5"
   time_limit_minutes: number | null;
   notes: string | null;
+  /** Directional arrow on the sign: "left" (←), "right" (→), "both" (↔). null = no arrow. */
+  arrow: ArrowDirection;
   confidence: number;          // 0..1
 }
 
@@ -55,7 +59,11 @@ function isHHMM(s: string | null | undefined): s is string {
  * unchanged. Returns one rule per sign — multiple signs combine into multiple
  * rules on the synthesized "scan segment".
  */
-export function aiRulesToNormalized(rules: RawAiRule[]): NormalizedRule[] {
+export interface NormalizedScanRule extends NormalizedRule {
+  arrow: ArrowDirection;
+}
+
+export function aiRulesToNormalized(rules: RawAiRule[]): NormalizedScanRule[] {
   return rules.map((r, idx) => {
     const classified = normalizeCategory(r.type);
     const days = parseDays(r.days);
@@ -72,6 +80,7 @@ export function aiRulesToNormalized(rules: RawAiRule[]): NormalizedRule[] {
       effective_from: null,
       effective_to: null,
       notes: r.notes?.trim() || classified.notes,
+      arrow: r.arrow ?? null,
     };
   });
 }
@@ -89,6 +98,15 @@ Sign types you must recognize:
 - METERED / PAID PARKING
 - BUS ZONE / TRANSIT ZONE
 
+DIRECTIONAL ARROWS — critical:
+Many sign blocks include a directional arrow indicating which side of the
+post the rule applies to:
+- "←" or arrow pointing left  → arrow = "left"  (rule applies to the left side of the post)
+- "→" or arrow pointing right → arrow = "right" (rule applies to the right side of the post)
+- "↔" or double-headed arrow  → arrow = "both"  (rule applies in both directions)
+- No arrow visible            → arrow = null    (rule applies to this whole pole)
+Set arrow per sign — different signs on the same pole can have different arrows.
+
 Output STRICT JSON matching the schema exactly. Days use 3-letter uppercase
 codes (MON, TUE, ...). Times use 24-hour HH:MM. Use null when a field is not
 posted. Confidence is 0..1 per sign and overall.`;
@@ -105,7 +123,7 @@ const RESPONSE_SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["type", "days", "start", "end", "permit_zone", "time_limit_minutes", "notes", "confidence"],
+        required: ["type", "days", "start", "end", "permit_zone", "time_limit_minutes", "notes", "arrow", "confidence"],
         properties: {
           type: { type: "string" },
           days: { type: "array", items: { type: "string" } },
@@ -114,6 +132,7 @@ const RESPONSE_SCHEMA = {
           permit_zone: { type: ["string", "null"] },
           time_limit_minutes: { type: ["integer", "null"] },
           notes: { type: ["string", "null"] },
+          arrow: { type: ["string", "null"], enum: ["left", "right", "both", null] },
           confidence: { type: "number", minimum: 0, maximum: 1 },
         },
       },

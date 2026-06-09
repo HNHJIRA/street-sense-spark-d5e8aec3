@@ -8,7 +8,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { LineString } from "geojson";
 import { evaluateRulesAt } from "./engine";
-import { aiRulesToNormalized, callSignScanAi, type AiScanResult } from "./sign-ai";
+import { aiRulesToNormalized, callSignScanAi, type AiScanResult, type ArrowDirection, type NormalizedScanRule } from "./sign-ai";
 import { resolveRuleConflicts } from "./providers/normalize";
 import { buildScanSummary, type ScanSummary } from "./scan-summary";
 import type {
@@ -51,6 +51,17 @@ export interface SignScanValidation {
   detail: string;
 }
 
+export interface SideEvaluation {
+  /** Which side of the post this evaluation represents. */
+  side: "left" | "right" | "both";
+  /** Engine verdict for just this side's posted rules + SDOT data. */
+  decision: ParkingStatus;
+  /** Driver-friendly summary for this side. */
+  summary: ScanSummary;
+  /** Posted rules contributing to this side (both-sided + side-specific). */
+  rules: NormalizedRule[];
+}
+
 export interface SignScanResponse {
   scan_id: string;
   image_url: string | null;
@@ -65,6 +76,13 @@ export interface SignScanResponse {
   summary: ScanSummary;
   /** Rules the AI extracted from the photo (normalized). */
   parsed_rules: NormalizedRule[];
+  /**
+   * When the AI detects directional arrows on the sign block, per-side
+   * evaluations the UI can show behind a Left/Right/Both selector. `null`
+   * when no arrows were detected — the top-level `decision`/`summary` is
+   * authoritative and represents the whole pole.
+   */
+  sides: { left: SideEvaluation; right: SideEvaluation; both: SideEvaluation } | null;
   /** SDOT rules already on file for the nearest segment, for comparison. */
   sdot_rules: ParkingRule[];
   /** Nearest segment matched (if any) — used for validation + display. */
@@ -152,9 +170,15 @@ export const scanSign = createServerFn({ method: "POST" })
     const admin = await getAdmin();
     const restrictionTypes = await loadRestrictionTypes(admin);
 
-    // 1) Run the AI vision pipeline.
+    // 1) Run the AI vision pipeline. aiRulesToNormalized preserves the
+    //    per-sign `arrow` direction so we can evaluate left/right separately.
     const ai: AiScanResult = await callSignScanAi(data.imageBase64, data.mimeType, apiKey);
-    const aiRules = resolveRuleConflicts(aiRulesToNormalized(ai.rules));
+    const aiRulesAll = aiRulesToNormalized(ai.rules) as NormalizedScanRule[];
+
+    // For SDOT comparison + persistence we still need a resolved, flat list.
+    // The conflict resolver strips arrow context, which is fine: side-aware
+    // evaluation runs on the un-resolved per-arrow buckets below.
+    const aiRules = resolveRuleConflicts(aiRulesAll);
 
     // 2) Find nearest SDOT segment so we can compare + still get accurate name.
     let segmentInfo: SignScanResponse["segment"] = null;
@@ -187,35 +211,85 @@ export const scanSign = createServerFn({ method: "POST" })
       }
     }
 
-    // 3) Build a synthesized segment: posted-sign rules (high priority) +
-    //    existing SDOT rules. Run the SAME engine used everywhere else.
-    const combinedRules: ParkingRule[] = [
-      ...aiRules.map((r, i) => ({
-        id: `scan-rule-${i}`,
-        street_segment_id: segmentDbId ?? "scan",
-        priority: r.priority,
-        restriction_code: r.restriction_code,
-        days_of_week: r.days_of_week,
-        time_start: r.time_start,
-        time_end: r.time_end,
-        permit_zone: r.permit_zone,
-        time_limit_minutes: r.time_limit_minutes,
-        effective_from: r.effective_from,
-        effective_to: r.effective_to,
-        notes: r.notes,
-      })),
-      ...sdotRules,
-    ];
-    const segment: StreetSegment = {
-      id: segmentDbId ?? "scan",
-      name: segmentName,
-      side: "both",
-      neighborhood: null,
-      coordinates: segmentCoords,
-      rules: combinedRules,
-      events: [],
+    // 3) Split posted rules by arrow direction so each side of the post can
+    //    be evaluated independently. A rule with arrow=null or arrow="both"
+    //    is shared by both sides. Then run the SAME engine used everywhere.
+    const segId = segmentDbId ?? "scan";
+    const toParkingRule = (r: NormalizedScanRule, i: number): ParkingRule => ({
+      id: `scan-rule-${i}`,
+      street_segment_id: segId,
+      priority: r.priority,
+      restriction_code: r.restriction_code,
+      days_of_week: r.days_of_week,
+      time_start: r.time_start,
+      time_end: r.time_end,
+      permit_zone: r.permit_zone,
+      time_limit_minutes: r.time_limit_minutes,
+      effective_from: r.effective_from,
+      effective_to: r.effective_to,
+      notes: r.notes,
+    });
+    const scanRules = aiRulesAll.map(toParkingRule);
+    const byArrow = (want: ArrowDirection[]) =>
+      scanRules.filter((_, i) => want.includes(aiRulesAll[i].arrow ?? null));
+    const sharedRules = byArrow([null, "both"]);
+    const leftOnly = byArrow(["left"]);
+    const rightOnly = byArrow(["right"]);
+    const hasArrows = leftOnly.length > 0 || rightOnly.length > 0;
+
+    const evalNow = (rules: ParkingRule[]): ParkingStatus => {
+      const segment: StreetSegment = {
+        id: segId,
+        name: segmentName,
+        side: "both",
+        neighborhood: null,
+        coordinates: segmentCoords,
+        rules: [...rules, ...sdotRules],
+        events: [],
+      };
+      return evaluateRulesAt(segment, restrictionTypes, new Date(), data.timezone);
     };
-    const decision = evaluateRulesAt(segment, restrictionTypes, new Date(), data.timezone);
+
+    // Top-level decision keeps today's behavior: ALL posted rules + SDOT.
+    // This is the conservative composite used when no arrows are detected
+    // and as the default verdict on the result page.
+    const combinedRules: ParkingRule[] = [...scanRules, ...sdotRules];
+    const decision = evalNow(scanRules);
+
+    // Per-side decisions, only computed when at least one arrow is present.
+    let sides: SignScanResponse["sides"] = null;
+    if (hasArrows) {
+      const buildSide = (
+        side: "left" | "right" | "both",
+        rules: ParkingRule[],
+      ): SideEvaluation => {
+        const d = evalNow(rules);
+        const ruleSlice = aiRulesAll.filter((r) => {
+          const a = r.arrow ?? null;
+          if (side === "both") return true;
+          return a === null || a === "both" || a === side;
+        });
+        return {
+          side,
+          decision: d,
+          rules: ruleSlice,
+          summary: buildScanSummary({
+            decision: d,
+            parsedRules: ruleSlice,
+            sdotRules,
+            timezone: data.timezone,
+            aiConfidence: ai.overall_confidence,
+            signCount: ruleSlice.length,
+          }),
+        };
+      };
+      sides = {
+        left: buildSide("left", [...sharedRules, ...leftOnly]),
+        right: buildSide("right", [...sharedRules, ...rightOnly]),
+        both: buildSide("both", scanRules),
+      };
+    }
+    void combinedRules;
 
     // 4) Persist image + scan + child rows.
     const scanId = crypto.randomUUID();
@@ -307,6 +381,7 @@ export const scanSign = createServerFn({ method: "POST" })
       verdict: verdictFromColor(decision.color),
       summary,
       parsed_rules: aiRules,
+      sides,
       sdot_rules: sdotRules,
       segment: segmentInfo,
       validations,
