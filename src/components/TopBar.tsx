@@ -1,8 +1,14 @@
-import { Search, MapPin } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Search, MapPin, Check, ChevronDown } from "lucide-react";
 import { useAppStore } from "@/stores/app-store";
+
+interface CityOption { slug: string; name: string }
 
 interface TopBarProps {
   cityName: string;
+  citySlug: string;
+  cities: CityOption[];
+  onCityChange: (slug: string) => void;
   now: Date | null;
   timezone: string;
   isForecast: boolean;
@@ -14,16 +20,61 @@ function formatTime(d: Date, tz: string) {
   }).format(d);
 }
 
-export function TopBar({ cityName, now, timezone, isForecast }: TopBarProps) {
+export function TopBar({ cityName, citySlug, cities, onCityChange, now, timezone, isForecast }: TopBarProps) {
   const setSearchOpen = useAppStore((s) => s.setSearchOpen);
   const clearForecast = useAppStore((s) => s.setForecastAt);
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
 
   return (
     <div className="pointer-events-none absolute inset-x-0 top-0 z-20 safe-top safe-x">
       <div className="mx-auto flex max-w-md items-center gap-2 px-3 pt-2">
-        <div className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-border bg-surface/90 px-3 py-1.5 backdrop-blur-xl shadow-lg">
-          <MapPin className="h-3.5 w-3.5 text-primary" strokeWidth={2.4} />
-          <span className="text-xs font-semibold">{cityName}</span>
+        <div ref={wrapRef} className="pointer-events-auto relative">
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            className="flex items-center gap-1.5 rounded-full border border-border bg-surface/90 px-3 py-1.5 backdrop-blur-xl shadow-lg"
+            aria-haspopup="listbox"
+            aria-expanded={open}
+          >
+            <MapPin className="h-3.5 w-3.5 text-primary" strokeWidth={2.4} />
+            <span className="text-xs font-semibold">{cityName}</span>
+            <ChevronDown className="h-3 w-3 opacity-60" strokeWidth={2.4} />
+          </button>
+          {open && (
+            <div
+              role="listbox"
+              className="absolute left-0 top-full z-30 mt-1 w-48 overflow-hidden rounded-2xl border border-border bg-surface/95 shadow-xl backdrop-blur-xl"
+            >
+              {cities.map((c) => {
+                const active = c.slug === citySlug;
+                return (
+                  <button
+                    key={c.slug}
+                    type="button"
+                    role="option"
+                    aria-selected={active}
+                    onClick={() => { onCityChange(c.slug); setOpen(false); }}
+                    className={`flex w-full items-center justify-between px-3 py-2 text-left text-xs font-semibold transition hover:bg-muted/60 ${
+                      active ? "text-primary" : "text-foreground"
+                    }`}
+                  >
+                    <span>{c.name}</span>
+                    {active && <Check className="h-3.5 w-3.5" strokeWidth={2.4} />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
         <div
           className={`pointer-events-auto flex items-center gap-1.5 rounded-full border px-3 py-1.5 backdrop-blur-xl shadow-lg ${
