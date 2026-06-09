@@ -123,7 +123,7 @@ function HomePage() {
         <BottomNav />
         <SearchSheet token={tokenQuery.data.token} />
         <ForecastSheet />
-        <StreetSheet timezone={city.timezone} restrictionTypes={city.restrictionTypes} cityId={city.id} />
+        <StreetSheet timezone={city.timezone} restrictionTypes={city.restrictionTypes} cityId={city.id} citySlug={city.slug} />
         <DestinationParkingSheet cityId={city.id} timezone={city.timezone} />
         <Onboarding />
       </div>
