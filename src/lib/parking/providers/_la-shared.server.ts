@@ -23,14 +23,15 @@ export function unknownRule(notes = "Open data does not contain posted parking r
   };
 }
 
-/** Convert an ArcGIS REST FeatureServer JSON result (with esriGeometryPolyline
- *  features in WGS84) into [lng,lat][] coordinate arrays. */
+/** Convert an ArcGIS REST FeatureServer JSON result into [lng,lat][] coords.
+ *  Accepts both polylines (`paths`) and polygons (`rings`) in WGS84, picking
+ *  the longest path/ring as the representative line. */
 export function arcgisPolyline(geometry: unknown): [number, number][] {
-  const g = geometry as { paths?: number[][][] } | null;
-  if (!g?.paths || !g.paths.length) return [];
-  // Pick the longest path as the representative line.
-  let longest = g.paths[0];
-  for (const p of g.paths) if (p.length > longest.length) longest = p;
+  const g = geometry as { paths?: number[][][]; rings?: number[][][] } | null;
+  const lines = g?.paths ?? g?.rings ?? [];
+  if (!lines.length) return [];
+  let longest = lines[0];
+  for (const p of lines) if (p.length > longest.length) longest = p;
   return longest.map((c) => [Number(c[0]), Number(c[1])] as [number, number]);
 }
 

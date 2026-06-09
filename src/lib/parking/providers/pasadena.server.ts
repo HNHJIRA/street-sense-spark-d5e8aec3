@@ -1,18 +1,18 @@
 // City of Pasadena open-data provider.
-// VERIFIED OPEN DATA ONLY: street sweeping routes from City of Pasadena GIS.
+// VERIFIED OPEN DATA: ArcGIS Online (CityOfPasadenaCAGIS), NeighAssocCommunityResources
+// FeatureServer, layer 21 ("Street Sweeping"). Geometry is polygons with a
+// single `SWEEPING_DAY` attribute — there is no published time-of-day, so we
+// emit an all-day street-cleaning rule for the day plus an `unknown` rule.
 import { normalizeSide, resolveRuleConflicts } from "./normalize";
-import { arcgisPolyline, fetchArcgis, parseDays, parseTime, unknownRule } from "./_la-shared.server";
-import type { NormalizedSegment, ParkingProvider } from "./types";
+import { arcgisPolyline, fetchArcgis, parseDays, unknownRule } from "./_la-shared.server";
+import type { NormalizedRule, NormalizedSegment, ParkingProvider } from "./types";
 
 const SWEEP_ENDPOINT =
-  "https://www.cityofpasadena.net/gis/rest/services/OpenData/StreetSweeping/MapServer/0/query";
+  "https://services2.arcgis.com/zNjnZafDYCAJAbN0/arcgis/rest/services/NeighAssocCommunityResources/FeatureServer/21/query";
 
 interface Attrs {
   OBJECTID?: number;
-  STREET?: string;
-  DAY?: string;
-  START?: string;
-  END?: string;
+  SWEEPING_DAY?: string;
 }
 
 export const PasadenaProvider: ParkingProvider = {
@@ -22,47 +22,57 @@ export const PasadenaProvider: ParkingProvider = {
 
   async fetchSegments(_citySlug, bbox) {
     const out: NormalizedSegment[] = [];
-    try {
+    // FeatureServer paginates with `resultOffset`; the layer returns
+    // `exceededTransferLimit:true` on a single page. Loop until exhausted.
+    const PAGE = 2000;
+    let offset = 0;
+    let more = true;
+    while (more) {
       const json = await fetchArcgis(SWEEP_ENDPOINT, {
         geometry: `${bbox.minLng},${bbox.minLat},${bbox.maxLng},${bbox.maxLat}`,
         geometryType: "esriGeometryEnvelope",
         inSR: "4326",
         spatialRel: "esriSpatialRelIntersects",
-        resultRecordCount: "2000",
-      });
-      for (const f of json.features ?? []) {
-        const a = f.attributes as Attrs;
+        resultRecordCount: String(PAGE),
+        resultOffset: String(offset),
+      }) as { features?: Array<{ attributes: Attrs; geometry?: unknown }>; exceededTransferLimit?: boolean };
+
+      const feats = json.features ?? [];
+      for (const f of feats) {
+        const a = f.attributes;
         const coords = arcgisPolyline(f.geometry);
-        if (coords.length < 2 || !a.OBJECTID) continue;
-        const sweep = {
+        if (coords.length < 2 || a.OBJECTID == null) continue;
+        const sweep: NormalizedRule = {
           priority: 25,
           restriction_code: "street_cleaning",
-          days_of_week: parseDays(a.DAY),
-          time_start: parseTime(a.START),
-          time_end: parseTime(a.END),
+          days_of_week: parseDays(a.SWEEPING_DAY),
+          time_start: null,
+          time_end: null,
           permit_zone: null,
           time_limit_minutes: null,
           effective_from: null,
           effective_to: null,
-          notes: "Pasadena street sweeping (open data).",
+          notes: `Pasadena street sweeping (open data): ${a.SWEEPING_DAY ?? "unknown day"}. Posted time-of-day not in open data — verify sign.`,
         };
         out.push({
           external_id: `pasadena:sweep/${a.OBJECTID}`,
-          name: a.STREET ?? "Unnamed street",
+          name: `Sweep area ${a.OBJECTID}`,
           side: normalizeSide(null),
           coordinates: coords,
           metadata: {
             source_provider: "Pasadena Open Data",
-            dataset: "Street Sweeping",
+            dataset: "NeighAssocCommunityResources/FeatureServer/21",
+            sweep_day: a.SWEEPING_DAY ?? null,
             posted_restrictions: "unknown",
           },
           rules: resolveRuleConflicts([sweep, unknownRule(
-            "Pasadena publishes sweeping for this block, but posted permit/meter signs are not in open data. Verify local signage.",
+            "Pasadena publishes sweeping day but not posted time-of-day, permit, or meter signs. Verify local signage.",
           )]),
         });
       }
-    } catch (e) {
-      console.warn("[PasadenaProvider] sweeping fetch failed:", (e as Error).message);
+      more = Boolean(json.exceededTransferLimit) && feats.length === PAGE;
+      offset += feats.length;
+      if (offset > 20000) break; // hard safety cap
     }
     return out;
   },
