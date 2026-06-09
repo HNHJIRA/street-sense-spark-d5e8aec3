@@ -26,6 +26,7 @@ import { Route as AdminHealthRouteImport } from './routes/admin.health'
 import { Route as AdminForecastRouteImport } from './routes/admin.forecast'
 import { Route as AdminBetaReadinessRouteImport } from './routes/admin.beta-readiness'
 import { Route as AdminAnalyticsRouteImport } from './routes/admin.analytics'
+import { Route as AdminAccuracyRouteImport } from './routes/admin.accuracy'
 import { Route as ApiPublicCronSyncLaOccupancyRouteImport } from './routes/api/public/cron.sync-la-occupancy'
 import { Route as ApiPublicAdminSyncLaRouteImport } from './routes/api/public/admin.sync-la'
 
@@ -114,6 +115,11 @@ const AdminAnalyticsRoute = AdminAnalyticsRouteImport.update({
   path: '/analytics',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminAccuracyRoute = AdminAccuracyRouteImport.update({
+  id: '/accuracy',
+  path: '/accuracy',
+  getParentRoute: () => AdminRoute,
+} as any)
 const ApiPublicCronSyncLaOccupancyRoute =
   ApiPublicCronSyncLaOccupancyRouteImport.update({
     id: '/api/public/cron/sync-la-occupancy',
@@ -134,6 +140,7 @@ export interface FileRoutesByFullPath {
   '/saved': typeof SavedRoute
   '/scan': typeof ScanRoute
   '/session': typeof SessionRoute
+  '/admin/accuracy': typeof AdminAccuracyRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/beta-readiness': typeof AdminBetaReadinessRoute
   '/admin/forecast': typeof AdminForecastRoute
@@ -154,6 +161,7 @@ export interface FileRoutesByTo {
   '/saved': typeof SavedRoute
   '/scan': typeof ScanRoute
   '/session': typeof SessionRoute
+  '/admin/accuracy': typeof AdminAccuracyRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/beta-readiness': typeof AdminBetaReadinessRoute
   '/admin/forecast': typeof AdminForecastRoute
@@ -176,6 +184,7 @@ export interface FileRoutesById {
   '/saved': typeof SavedRoute
   '/scan': typeof ScanRoute
   '/session': typeof SessionRoute
+  '/admin/accuracy': typeof AdminAccuracyRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/beta-readiness': typeof AdminBetaReadinessRoute
   '/admin/forecast': typeof AdminForecastRoute
@@ -199,6 +208,7 @@ export interface FileRouteTypes {
     | '/saved'
     | '/scan'
     | '/session'
+    | '/admin/accuracy'
     | '/admin/analytics'
     | '/admin/beta-readiness'
     | '/admin/forecast'
@@ -219,6 +229,7 @@ export interface FileRouteTypes {
     | '/saved'
     | '/scan'
     | '/session'
+    | '/admin/accuracy'
     | '/admin/analytics'
     | '/admin/beta-readiness'
     | '/admin/forecast'
@@ -240,6 +251,7 @@ export interface FileRouteTypes {
     | '/saved'
     | '/scan'
     | '/session'
+    | '/admin/accuracy'
     | '/admin/analytics'
     | '/admin/beta-readiness'
     | '/admin/forecast'
@@ -388,6 +400,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAnalyticsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/accuracy': {
+      id: '/admin/accuracy'
+      path: '/accuracy'
+      fullPath: '/admin/accuracy'
+      preLoaderRoute: typeof AdminAccuracyRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/api/public/cron/sync-la-occupancy': {
       id: '/api/public/cron/sync-la-occupancy'
       path: '/api/public/cron/sync-la-occupancy'
@@ -406,6 +425,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AdminRouteChildren {
+  AdminAccuracyRoute: typeof AdminAccuracyRoute
   AdminAnalyticsRoute: typeof AdminAnalyticsRoute
   AdminBetaReadinessRoute: typeof AdminBetaReadinessRoute
   AdminForecastRoute: typeof AdminForecastRoute
@@ -418,6 +438,7 @@ interface AdminRouteChildren {
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminAccuracyRoute: AdminAccuracyRoute,
   AdminAnalyticsRoute: AdminAnalyticsRoute,
   AdminBetaReadinessRoute: AdminBetaReadinessRoute,
   AdminForecastRoute: AdminForecastRoute,
@@ -446,3 +467,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
