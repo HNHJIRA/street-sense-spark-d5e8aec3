@@ -49,4 +49,8 @@ export const useAppStore = create<ClockState>((set) => ({
   setMapCenter: (v) => set({ mapCenter: v }),
   mapMode: "legal",
   setMapMode: (m) => set({ mapMode: m }),
+  pendingCheckSegmentId: null,
+  requestCheckSegment: (id) => set({ pendingCheckSegmentId: id }),
+  recommendedHighlight: null,
+  setRecommendedHighlight: (v) => set({ recommendedHighlight: v }),
 }));
