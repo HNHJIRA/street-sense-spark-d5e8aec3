@@ -1035,6 +1035,10 @@ export type Database = {
           vacant: number
         }[]
       }
+      la_link_meter_batch: {
+        Args: { p_city_id: string; p_limit?: number; p_max_meters?: number }
+        Returns: number
+      }
       la_link_meter_spaces_to_segments: {
         Args: { p_city_id: string; p_max_meters?: number }
         Returns: number
