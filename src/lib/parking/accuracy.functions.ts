@@ -25,8 +25,9 @@ export interface AccuracyReport {
   providers: { id: string; status: string; last_synced_at: string | null; ageMinutes: number | null }[];
   occupancy: { rows: number; freshestEventTime: string | null; freshestAgeMinutes: number | null; spaces: number };
   rules: {
-    byCity: { city: string; segments: number; rules: number; rulesPerSegment: number; oneRuleSegments: number; zeroRuleSegments: number }[];
+    byCity: { city: string; segments: number; rules: number; rulesPerSegment: number; oneRuleSegments: number; zeroRuleSegments: number; twoPlusSegments: number; multiRulePct: number; depth: Record<string, number> }[];
     byRestriction: { restriction_code: string; count: number }[];
+    bySource: { data_source: string; rules: number }[];
   };
   seattleAudit: {
     segments: number;
@@ -36,6 +37,7 @@ export interface AccuracyReport {
     timeLimitedSegments: number;
     cleaningSegments: number;
   };
+  scannerSelfTest: { count: number; pass: number; byCity: Record<string, { pass: number; fail: number }> };
 }
 
 export const getAccuracyReport = createServerFn({ method: "GET" }).handler(async (): Promise<AccuracyReport> => {
