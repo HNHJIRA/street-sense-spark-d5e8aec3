@@ -4,7 +4,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery, useSuspenseQuery, queryOptions } from "@tanstack/react-query";
-import { Car, Clock, ShieldAlert, Timer, Database, MapPin, ArrowLeft, BellRing } from "lucide-react";
+import { Car, Clock, ShieldAlert, Timer, Database, MapPin, ArrowLeft, BellRing, Navigation, Compass } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
 import { LocationStatusCard } from "@/components/LocationStatusCard";
 import { ParkingStatusCard } from "@/components/ParkingStatusCard";
@@ -17,7 +17,9 @@ import { countdownTo, elapsedSince } from "@/lib/parking/countdown";
 import { computeAlertWindows, nextPlannedAlert } from "@/lib/parking/alerts";
 import { useSessionAlertScheduler } from "@/lib/parking/notifications";
 import type { StreetSegment } from "@/lib/parking/types";
+import { bearingDeg, compassDirection, walkingDirectionsUrl } from "@/lib/parking/navigation";
 import { cn } from "@/lib/utils";
+
 
 const cityOpts = queryOptions({
   queryKey: ["parking", "city", "seattle"],
