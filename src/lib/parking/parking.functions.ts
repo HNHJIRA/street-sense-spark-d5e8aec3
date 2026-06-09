@@ -547,25 +547,15 @@ export const checkParkingForSegment = createServerFn({ method: "GET" })
     if (!seg) {
       return { found: false, source: "tap", message: "Segment not found." };
     }
-    const [{ data: rules }, { data: geomRow }] = await Promise.all([
-      admin.from("parking_rules")
-        .select("id, street_segment_id, priority, restriction_code, days_of_week, time_start, time_end, permit_zone, time_limit_minutes, effective_from, effective_to, notes")
-        .eq("street_segment_id", data.segmentId)
-        .order("priority", { ascending: true }),
-      admin.rpc("segment_geojson", { p_id: data.segmentId }).then((r: any) => ({ data: r.data })).catch(() => ({ data: null })),
-    ]);
-    let coords: [number, number][] = [];
-    try {
-      if (typeof geomRow === "string") {
-        const g = JSON.parse(geomRow) as LineString;
-        if (Array.isArray(g.coordinates)) coords = g.coordinates as [number, number][];
-      }
-    } catch { /* ignore */ }
+    const { data: rules } = await admin.from("parking_rules")
+      .select("id, street_segment_id, priority, restriction_code, days_of_week, time_start, time_end, permit_zone, time_limit_minutes, effective_from, effective_to, notes")
+      .eq("street_segment_id", data.segmentId)
+      .order("priority", { ascending: true });
     const restrictionTypes = await loadRestrictionTypes(admin);
     const segObj: StreetSegment = {
       id: seg.id as string, name: seg.name as string,
       side: (seg.side ?? "both") as string, neighborhood: null,
-      coordinates: coords,
+      coordinates: [],
       rules: (rules ?? []) as ParkingRule[],
       events: [],
     };
