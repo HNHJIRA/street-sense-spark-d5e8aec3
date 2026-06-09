@@ -174,12 +174,6 @@ function AccuracyPage() {
         ))}
       </section>
 
-      <section style={card}>
-        <h2 style={h2}>Restriction Distribution</h2>
-        {r.rules.byRestriction.slice(0, 10).map((r2) => (
-          <KV key={r2.restriction_code} label={r2.restriction_code} value={r2.count.toLocaleString()} />
-        ))}
-      </section>
 
       <section style={card}>
         <h2 style={h2}>Seattle Rule Coverage Audit</h2>
