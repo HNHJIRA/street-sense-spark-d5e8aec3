@@ -222,6 +222,30 @@ function ScanResult({
       });
     } catch { return null; }
   };
+  // Like fmtClock but prefixes "Tomorrow at" / "Weekday at" when not today.
+  const fmtDayClock = (iso: string | null | undefined, ref?: Date): string | null => {
+    if (!iso) return null;
+    try {
+      const d = new Date(iso);
+      const r = ref ?? new Date();
+      const dayKey = (x: Date) =>
+        new Intl.DateTimeFormat("en-US", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(x);
+      const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: TZ });
+      if (dayKey(d) === dayKey(r)) return time;
+      const tomorrow = new Date(r.getTime() + 86_400_000);
+      if (dayKey(d) === dayKey(tomorrow)) return `Tomorrow at ${time}`;
+      const wd = new Intl.DateTimeFormat("en-US", { timeZone: TZ, weekday: "long" }).format(d);
+      return `${wd} at ${time}`;
+    } catch { return null; }
+  };
+  // "9:00 AM" from a "HH:MM" string.
+  const fmtHHMM = (hhmm: string | null | undefined): string | null => {
+    if (!hhmm) return null;
+    const [h, m] = hhmm.split(":").map(Number);
+    if (Number.isNaN(h) || Number.isNaN(m)) return null;
+    const d = new Date(); d.setHours(h, m, 0, 0);
+    return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  };
 
   const nextChange = s.timeline.find((t) => t.when !== "now");
   const untilTime = nextChange?.when_label ?? null;
@@ -250,10 +274,38 @@ function ScanResult({
       if (Number.isFinite(changeMs) && changeMs < moveBy) moveBy = changeMs;
     }
     allowedUntilIso = new Date(moveBy).toISOString();
+  } else if (s.status === "YES" && !allowedUntilIso && decision.restriction_starts_at) {
+    // Currently unrestricted but a future restriction begins — surface it.
+    allowedUntilIso = decision.restriction_starts_at;
   }
+  const scannedRef = new Date(result.scanned_at);
   const allowedUntilLabel = fmtClock(allowedUntilIso);
+  const allowedUntilDayLabel = fmtDayClock(allowedUntilIso, scannedRef);
   const nextStartLabel = fmtClock(decision.restriction_starts_at);
+  const nextStartDayLabel = fmtDayClock(decision.restriction_starts_at, scannedRef);
+  // For NO: "Parking becomes available" should land 1 minute after the
+  // restriction ends ("12:01 PM" rather than "12:00 PM").
+  const becomesFreeIso = decision.restriction_ends_at
+    ? new Date(new Date(decision.restriction_ends_at).getTime() + 60_000).toISOString()
+    : null;
   const nextEndLabel = fmtClock(decision.restriction_ends_at);
+  const becomesFreeDayLabel = fmtDayClock(becomesFreeIso, scannedRef);
+
+  // Rule time windows ("between 9:00 AM and 6:00 PM").
+  const ruleWindow = (rs: { starts_at?: string; ends_at?: string } | null | undefined): string | null => {
+    if (!rs?.starts_at || !rs?.ends_at) return null;
+    const a = fmtClock(rs.starts_at), b = fmtClock(rs.ends_at);
+    return a && b ? `between ${a} and ${b}` : null;
+  };
+  const currentRuleWindow = ruleWindow(result.current_rule ?? null);
+  const nextRuleWindow = ruleWindow(result.next_rule ?? null);
+  // Fallback: posted parsed rule window (HH:MM) when engine has no current rule.
+  const parsedWindow = (() => {
+    const r = result.parsed_rules?.[0];
+    if (!r) return null;
+    const a = fmtHHMM(r.time_start), b = fmtHHMM(r.time_end);
+    return a && b ? `between ${a} and ${b}` : null;
+  })();
 
   // Live countdown to allowed_until.
   const [nowMs, setNowMs] = useState(() => Date.now());
