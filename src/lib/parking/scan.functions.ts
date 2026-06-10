@@ -11,7 +11,7 @@ import { evaluateRulesAt } from "./engine";
 import { aiRulesToNormalized, callSignScanAi, validateSignImage, type AiScanResult, type ArrowDirection, type NormalizedScanRule } from "./sign-ai";
 import { resolveRuleConflicts } from "./providers/normalize";
 import { buildScanSummary, type ScanSummary } from "./scan-summary";
-import { buildDriverNarrative, buildSideCaption, type DriverNarrative } from "./driver-narrative";
+import { buildDriverNarrative, buildSideCaption, buildRuleTimeline, deriveRiskLevel, type DriverNarrative, type RuleSummary, type RiskLevel } from "./driver-narrative";
 import type {
   ParkingRule,
   ParkingStatus,
