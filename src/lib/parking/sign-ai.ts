@@ -1,11 +1,14 @@
 // AI sign scanner: extract parking rules from an image of one or more signs.
 //
-// We call Lovable AI Gateway (Gemini Flash) with an OCR + structured-output
-// prompt so a single round-trip returns both the raw transcribed sign text
-// and a normalized rule list. The normalized rules then flow through the
-// existing providers/normalize.ts conflict resolver and the engine that
-// powers Forecast / Can I Park Here / Sessions / Alerts. The scanner never
-// hand-rolls its own evaluator.
+// Four-stage pipeline (all stages share the same Lovable AI Gateway model):
+//   1) Validation gate — is this even a parking-regulation sign?
+//   2) OCR Extraction — verbatim plate text + arrow + color per plate.
+//   3) OCR Interpretation — color/theme-aware stacking → normalized rules
+//      (each rule carries the arrow inherited from the matching plate).
+//   4) (Done downstream in scan.functions.ts) Engine evaluation + driver summary.
+//
+// The public surface (validateSignImage, callSignScanAi, aiRulesToNormalized)
+// is preserved so the rest of the scanner pipeline is unchanged.
 import { normalizeCategory } from "@/lib/parking/providers/normalize";
 import type { NormalizedRule } from "@/lib/parking/providers/types";
 
@@ -19,10 +22,16 @@ export interface SignValidationResult {
   reason: string;
 }
 
-/**
- * Strict pre-check: confirm the photo actually shows a parking-related
- * regulatory sign before we spend tokens on full OCR + rule extraction.
- */
+// ============================================================
+// PHASE 1 — VALIDATION
+// ============================================================
+
+const VALIDATION_PROMPT =
+  "Analyze this image. Does it contain any type of parking, no-parking, loading zone, " +
+  "tow-away, or street restriction signboard? " +
+  "Basically, check if it's a valid street sign that regulates vehicle parking or stopping. " +
+  "Respond in JSON format with 'is_valid' (boolean) and 'reason' (string).";
+
 export async function validateSignImage(
   imageBase64: string,
   mime: string,
@@ -39,14 +48,9 @@ export async function validateSignImage(
       model: AI_MODEL,
       messages: [
         {
-          role: "system",
-          content:
-            "You are a strict gatekeeper. Decide if the image clearly contains at least one US street parking regulatory sign: NO PARKING, NO STOPPING, TOW AWAY, STREET CLEANING/SWEEPING, LOADING ZONE, PERMIT/RPZ, TIME-LIMITED PARKING, METERED PARKING, BUS/TRANSIT ZONE, or RED CURB. Reject photos of people, vehicles, storefronts, food, app screenshots, generic street scenes without legible parking signs, traffic-only signs (STOP, YIELD, speed limits), or blurry/unreadable images.",
-        },
-        {
           role: "user",
           content: [
-            { type: "text", text: 'Reply with JSON: {"is_valid": boolean, "reason": string}. Reason is one short sentence.' },
+            { type: "text", text: VALIDATION_PROMPT },
             { type: "image_url", image_url: { url: `data:${mime};base64,${imageBase64}` } },
           ],
         },
@@ -90,17 +94,297 @@ export async function validateSignImage(
   }
 }
 
+// ============================================================
+// PHASE 2 — OCR EXTRACTION
+// ============================================================
+
+const EXTRACTION_PROMPT = `
+You are a high-precision OCR extraction engine specializing in street signs.
+
+Your ONLY task is to visually extract information exactly as seen.
+
+=================================================
+STRICT ARROW DETECTION RULES
+=================================================
+Arrows are CRITICAL. Misidentifying an arrow ruins the entire rule.
+
+1. ARROW PRESENCE:
+   First, verify if an arrow actually exists on the plate.
+   Most plates DO NOT have arrows.
+   Do not assume every plate has an arrow.
+
+2. VISUAL VERIFICATION:
+   If an arrow IS present, look closely at the arrow's head (the triangle/pointer).
+   - If the pointer is on the LEFT side of the shaft, it is "LEFT".
+   - If the pointer is on the RIGHT side of the shaft, it is "RIGHT".
+   - If there are pointers on BOTH ends, it is "BOTH".
+
+3. NO SPATIAL BIAS:
+   Do not assume arrows alternate (e.g., top=right, bottom=left).
+   Read each arrow independently.
+
+4. CLEAR VS UNCLEAR VS NONE:
+   - If an arrow is partially covered by a sticker or graffiti but the direction is still obvious, report the direction.
+   - If it is truly ambiguous, report "UNCLEAR".
+   - If NO arrow is visible on a plate, you MUST output "NONE".
+     Do not guess or hallucinate an arrow.
+
+=================================================
+CORE EXTRACTION RULES
+=================================================
+1. Extract text EXACTLY as visible.
+2. Identify the THEME/COLOR of each plate (background + text/arrow color).
+3. Preserve line order top-to-bottom.
+4. Treat each physical sign plate separately.
+`.trim();
+
+interface ExtractedPlate {
+  plate_index: number;
+  text: string;
+  arrow: "LEFT" | "RIGHT" | "BOTH" | "UNCLEAR" | "NONE";
+  background_color: string;
+  text_color: string;
+  symbols: string[];
+  confidence: number;
+}
+
+interface ExtractionResult {
+  plates: ExtractedPlate[];
+  image_quality: "good" | "blurry" | "low_light" | string;
+  overall_confidence: number;
+}
+
+const EXTRACTION_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["plates", "image_quality", "overall_confidence"],
+  properties: {
+    plates: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: [
+          "plate_index",
+          "text",
+          "arrow",
+          "background_color",
+          "text_color",
+          "symbols",
+          "confidence",
+        ],
+        properties: {
+          plate_index: { type: "integer" },
+          text: { type: "string" },
+          arrow: { type: "string", enum: ["LEFT", "RIGHT", "BOTH", "UNCLEAR", "NONE"] },
+          background_color: { type: "string" },
+          text_color: { type: "string" },
+          symbols: { type: "array", items: { type: "string" } },
+          confidence: { type: "number", minimum: 0, maximum: 1 },
+        },
+      },
+    },
+    image_quality: { type: "string" },
+    overall_confidence: { type: "number", minimum: 0, maximum: 1 },
+  },
+} as const;
+
+async function runExtraction(
+  imageBase64: string,
+  mime: string,
+  apiKey: string,
+): Promise<ExtractionResult> {
+  const res = await fetch(AI_GATEWAY_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Lovable-API-Key": apiKey,
+      "X-Lovable-AIG-SDK": "raw-fetch",
+    },
+    body: JSON.stringify({
+      model: AI_MODEL,
+      messages: [
+        { role: "system", content: EXTRACTION_PROMPT },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Extract every plate exactly as instructed. Return ONLY the JSON object." },
+            { type: "image_url", image_url: { url: `data:${mime};base64,${imageBase64}` } },
+          ],
+        },
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: { name: "sign_extraction", strict: true, schema: EXTRACTION_SCHEMA },
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    if (res.status === 429) throw new Error("Sign scanner is rate-limited. Try again in a moment.");
+    if (res.status === 402) throw new Error("AI credits exhausted. Add credits in workspace settings.");
+    throw new Error(`Sign extraction failed (${res.status}): ${body.slice(0, 200)}`);
+  }
+  const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+  const content = data.choices?.[0]?.message?.content ?? "{}";
+  try {
+    return JSON.parse(content) as ExtractionResult;
+  } catch {
+    throw new Error("Sign extractor returned non-JSON output.");
+  }
+}
+
+// ============================================================
+// PHASE 3 — OCR INTERPRETATION (color/theme-aware stacking)
+// ============================================================
+
+const INTERPRETATION_SYSTEM = `
+You are a parking regulation interpreter.
+
+Your goal is to convert fragmented OCR data into logical, actionable parking rules.
+
+=================================================
+SIGN STACKING & COLOR MATCHING (CRITICAL)
+=================================================
+Parking signs on a pole use color coding to group rules.
+
+1. COLOR MATCHING RULE:
+   An arrow plate applies ONLY to text plates that have the SAME Background Color and/or Theme.
+   Example: a Green arrow plate modifies the Green text plate above it. It does
+   NOT apply to a White or Black plate in the same stack.
+
+2. THEME CONSISTENCY:
+   If a plate is entirely Black with White text and a White arrow, that arrow
+   is specific to that Black plate's rule.
+
+3. ARROW INHERITANCE:
+   - If a separate arrow plate is found, search UPWARDS for the nearest text plate with a matching background color.
+   - If multiple text plates share the same color as the arrow plate below them, the arrow applies to ALL of them.
+
+4. MERGING:
+   Merge text and their corresponding arrows into a single logical rule.
+`.trim();
+
+interface InterpretedRule {
+  logical_rule_index: number;
+  original_plate_indices: number[];
+  restriction_type: string; // e.g. time_limited, no_parking, loading_only, permit, street_cleaning, metered, tow_away
+  days: string[];           // ["Monday", ...]
+  start_time: string | null;
+  end_time: string | null;
+  parking_allowed: boolean;
+  time_limit_minutes: number | null;
+  arrow: "LEFT" | "RIGHT" | "BOTH" | "NONE";
+  notes: string | null;
+}
+
+interface InterpretationResult {
+  rules: InterpretedRule[];
+  confidence: number;
+}
+
+const INTERPRETATION_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["rules", "confidence"],
+  properties: {
+    rules: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: [
+          "logical_rule_index",
+          "original_plate_indices",
+          "restriction_type",
+          "days",
+          "start_time",
+          "end_time",
+          "parking_allowed",
+          "time_limit_minutes",
+          "arrow",
+          "notes",
+        ],
+        properties: {
+          logical_rule_index: { type: "integer" },
+          original_plate_indices: { type: "array", items: { type: "integer" } },
+          restriction_type: { type: "string" },
+          days: { type: "array", items: { type: "string" } },
+          start_time: { type: ["string", "null"] },
+          end_time: { type: ["string", "null"] },
+          parking_allowed: { type: "boolean" },
+          time_limit_minutes: { type: ["integer", "null"] },
+          arrow: { type: "string", enum: ["LEFT", "RIGHT", "BOTH", "NONE"] },
+          notes: { type: ["string", "null"] },
+        },
+      },
+    },
+    confidence: { type: "number", minimum: 0, maximum: 1 },
+  },
+} as const;
+
+async function runInterpretation(
+  extraction: ExtractionResult,
+  apiKey: string,
+): Promise<InterpretationResult> {
+  const ocrJson = JSON.stringify(extraction, null, 2);
+  const userPrompt =
+    `Convert the following OCR data into a normalized list of parking rules.\n\n` +
+    `Ensure each rule has the correct arrow direction assigned to it based on the stacking logic.\n\n` +
+    `OCR JSON:\n${ocrJson}\n\n` +
+    `Return ONLY valid JSON matching the requested schema.`;
+
+  const res = await fetch(AI_GATEWAY_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Lovable-API-Key": apiKey,
+      "X-Lovable-AIG-SDK": "raw-fetch",
+    },
+    body: JSON.stringify({
+      model: AI_MODEL,
+      messages: [
+        { role: "system", content: INTERPRETATION_SYSTEM },
+        { role: "user", content: userPrompt },
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: { name: "sign_interpretation", strict: true, schema: INTERPRETATION_SCHEMA },
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    if (res.status === 429) throw new Error("Sign interpreter is rate-limited. Try again in a moment.");
+    if (res.status === 402) throw new Error("AI credits exhausted. Add credits in workspace settings.");
+    throw new Error(`Sign interpretation failed (${res.status}): ${body.slice(0, 200)}`);
+  }
+  const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+  const content = data.choices?.[0]?.message?.content ?? "{}";
+  try {
+    return JSON.parse(content) as InterpretationResult;
+  } catch {
+    throw new Error("Sign interpreter returned non-JSON output.");
+  }
+}
+
+// ============================================================
+// PUBLIC API: callSignScanAi — orchestrates extraction + interpretation
+// and returns the legacy AiScanResult shape consumed by scan.functions.ts.
+// ============================================================
+
 export interface RawAiRule {
   type: string;                // free-form, e.g. "NO PARKING", "STREET CLEANING"
   days: string[];              // ["MON","TUE",...]
   start: string | null;        // "HH:MM"
   end: string | null;          // "HH:MM"
-  permit_zone: string | null;  // e.g. "ZONE 5"
+  permit_zone: string | null;
   time_limit_minutes: number | null;
   notes: string | null;
-  /** Directional arrow on the sign: "left" (←), "right" (→), "both" (↔). null = no arrow. */
   arrow: ArrowDirection;
-  confidence: number;          // 0..1
+  confidence: number;
 }
 
 export interface AiScanResult {
@@ -115,6 +399,17 @@ const DAY_TOKENS: Record<string, number> = {
   SUN: 0, MON: 1, TUE: 2, WED: 3, THU: 4, FRI: 5, SAT: 6,
   SUNDAY: 0, MONDAY: 1, TUESDAY: 2, WEDNESDAY: 3, THURSDAY: 4, FRIDAY: 5, SATURDAY: 6,
 };
+const DAY_3 = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"] as const;
+
+function dayWordsTo3Letter(days: string[]): string[] {
+  const out = new Set<string>();
+  for (const d of days) {
+    const key = d.trim().toUpperCase();
+    const idx = DAY_TOKENS[key];
+    if (idx != null) out.add(DAY_3[idx]);
+  }
+  return [...out];
+}
 
 function parseDays(tokens: string[]): number[] {
   const out = new Set<number>();
@@ -129,12 +424,21 @@ function isHHMM(s: string | null | undefined): s is string {
   return !!s && /^\d{2}:\d{2}$/.test(s);
 }
 
-/**
- * Convert AI output into the same NormalizedRule[] shape the SDOT provider
- * emits, so the rest of the pipeline (conflict resolver + engine) works
- * unchanged. Returns one rule per sign — multiple signs combine into multiple
- * rules on the synthesized "scan segment".
- */
+function arrowFromUpper(a: string | null | undefined): ArrowDirection {
+  switch ((a ?? "").toUpperCase()) {
+    case "LEFT": return "left";
+    case "RIGHT": return "right";
+    case "BOTH": return "both";
+    default: return null; // NONE / UNCLEAR
+  }
+}
+
+function restrictionTextFromType(t: string): string {
+  // Convert snake_case / kebab-case interpreter codes into something
+  // normalizeCategory can classify (it matches on substrings).
+  return (t ?? "").replace(/[_-]+/g, " ").trim();
+}
+
 export interface NormalizedScanRule extends NormalizedRule {
   arrow: ArrowDirection;
 }
@@ -144,8 +448,7 @@ export function aiRulesToNormalized(rules: RawAiRule[]): NormalizedScanRule[] {
     const classified = normalizeCategory(r.type);
     const days = parseDays(r.days);
     return {
-      // Posted signs override SDOT data — give them a stronger priority bump
-      // (lower number = higher priority in the engine).
+      // Posted signs override SDOT data — give them a stronger priority bump.
       priority: Math.max(1, classified.priority - 20) + idx,
       restriction_code: classified.code,
       days_of_week: days.length ? days : [0, 1, 2, 3, 4, 5, 6],
@@ -161,123 +464,67 @@ export function aiRulesToNormalized(rules: RawAiRule[]): NormalizedScanRule[] {
   });
 }
 
-const SYSTEM_PROMPT = `You are a parking-sign vision assistant.
-You will receive one photo that may contain one or more US street parking signs.
-Transcribe each sign verbatim and convert each sign into a structured rule.
+/**
+ * Orchestrate the OCR Extraction → Interpretation pipeline and map the
+ * result into the legacy AiScanResult shape so the downstream evaluation
+ * pipeline is unchanged.
+ */
+export async function callSignScanAi(
+  imageBase64: string,
+  mime: string,
+  apiKey: string,
+): Promise<AiScanResult> {
+  // Stage A — verbatim plate extraction with strict arrow detection.
+  const extraction = await runExtraction(imageBase64, mime, apiKey);
 
-Sign types you must recognize:
-- NO PARKING, NO STOPPING, TOW AWAY ZONE
-- STREET CLEANING / STREET SWEEPING
-- LOADING ZONE (commercial / passenger)
-- PERMIT PARKING / RPZ / RESIDENTIAL ZONE (capture the zone label)
-- TIME LIMIT (e.g. "2 HOUR PARKING") — extract the limit in minutes
-- METERED / PAID PARKING
-- BUS ZONE / TRANSIT ZONE
+  // Stage B — color/theme-aware interpretation into logical rules.
+  let interpretation: InterpretationResult;
+  try {
+    interpretation = await runInterpretation(extraction, apiKey);
+  } catch {
+    interpretation = { rules: [], confidence: 0 };
+  }
 
-DIRECTIONAL ARROWS — critical:
-Many sign blocks include a directional arrow indicating which side of the
-post the rule applies to:
-- "←" or arrow pointing left  → arrow = "left"  (rule applies to the left side of the post)
-- "→" or arrow pointing right → arrow = "right" (rule applies to the right side of the post)
-- "↔" or double-headed arrow  → arrow = "both"  (rule applies in both directions)
-- No arrow visible            → arrow = null    (rule applies to this whole pole)
-Set arrow per sign — different signs on the same pole can have different arrows.
+  // Build raw_text from the verbatim plates (preserves what the OCR actually saw).
+  const raw_text = extraction.plates
+    .map((p) => {
+      const arrowTag = p.arrow && p.arrow !== "NONE" ? ` [arrow:${p.arrow}]` : "";
+      return `Plate ${p.plate_index} (${p.background_color} / ${p.text_color})${arrowTag}:\n${p.text}`;
+    })
+    .join("\n\n");
 
-Output STRICT JSON matching the schema exactly. Days use 3-letter uppercase
-codes (MON, TUE, ...). Times use 24-hour HH:MM. Use null when a field is not
-posted. Confidence is 0..1 per sign and overall.`;
-
-const RESPONSE_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    raw_text: { type: "string", description: "All sign text transcribed verbatim, one sign per paragraph." },
-    sign_count: { type: "integer", minimum: 0 },
-    overall_confidence: { type: "number", minimum: 0, maximum: 1 },
-    rules: {
-      type: "array",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["type", "days", "start", "end", "permit_zone", "time_limit_minutes", "notes", "arrow", "confidence"],
-        properties: {
-          type: { type: "string" },
-          days: { type: "array", items: { type: "string" } },
-          start: { type: ["string", "null"] },
-          end: { type: ["string", "null"] },
-          permit_zone: { type: ["string", "null"] },
-          time_limit_minutes: { type: ["integer", "null"] },
-          notes: { type: ["string", "null"] },
-          arrow: { type: ["string", "null"], enum: ["left", "right", "both", null] },
-          confidence: { type: "number", minimum: 0, maximum: 1 },
-        },
-      },
-    },
-  },
-  required: ["raw_text", "sign_count", "overall_confidence", "rules"],
-} as const;
-
-interface GatewayMessage {
-  role: "system" | "user";
-  content: string | Array<
-    | { type: "text"; text: string }
-    | { type: "image_url"; image_url: { url: string } }
-  >;
-}
-
-/** Call Lovable AI Gateway with the parking-sign prompt and structured output. */
-export async function callSignScanAi(imageBase64: string, mime: string, apiKey: string): Promise<AiScanResult> {
-  const messages: GatewayMessage[] = [
-    { role: "system", content: SYSTEM_PROMPT },
-    {
-      role: "user",
-      content: [
-        { type: "text", text: "Transcribe and parse every parking sign visible in this image." },
-        { type: "image_url", image_url: { url: `data:${mime};base64,${imageBase64}` } },
-      ],
-    },
-  ];
-
-  const res = await fetch(AI_GATEWAY_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Lovable-API-Key": apiKey,
-      "X-Lovable-AIG-SDK": "raw-fetch",
-    },
-    body: JSON.stringify({
-      model: AI_MODEL,
-      messages,
-      response_format: {
-        type: "json_schema",
-        json_schema: { name: "parking_sign_extraction", strict: true, schema: RESPONSE_SCHEMA },
-      },
-    }),
+  // Map interpreter rules → RawAiRule.
+  const rules: RawAiRule[] = interpretation.rules.map((r) => {
+    const perRuleConfidence = (() => {
+      const ids = new Set(r.original_plate_indices);
+      const matchedPlates = extraction.plates.filter((p) => ids.has(p.plate_index));
+      if (matchedPlates.length === 0) return extraction.overall_confidence;
+      const sum = matchedPlates.reduce((a, p) => a + (p.confidence ?? 0), 0);
+      return sum / matchedPlates.length;
+    })();
+    return {
+      type: restrictionTextFromType(r.restriction_type),
+      days: dayWordsTo3Letter(r.days),
+      start: r.start_time,
+      end: r.end_time,
+      permit_zone: null,
+      time_limit_minutes: r.time_limit_minutes,
+      notes: r.notes,
+      arrow: arrowFromUpper(r.arrow),
+      confidence: perRuleConfidence,
+    };
   });
 
-  if (!res.ok) {
-    const body = await res.text();
-    if (res.status === 429) throw new Error("Sign scanner is rate-limited. Try again in a moment.");
-    if (res.status === 402) throw new Error("AI credits exhausted. Add credits in workspace settings.");
-    throw new Error(`Sign scanner failed (${res.status}): ${body.slice(0, 200)}`);
-  }
-
-  const data = await res.json() as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  const content = data.choices?.[0]?.message?.content ?? "{}";
-  let parsed: AiScanResult;
-  try {
-    parsed = JSON.parse(content) as AiScanResult;
-  } catch {
-    throw new Error("Sign scanner returned non-JSON output.");
-  }
+  const overall_confidence = Math.min(
+    extraction.overall_confidence || 0,
+    interpretation.confidence || extraction.overall_confidence || 0,
+  );
 
   return {
-    raw_text: parsed.raw_text ?? "",
-    sign_count: parsed.sign_count ?? (parsed.rules?.length ?? 0),
-    overall_confidence: typeof parsed.overall_confidence === "number" ? parsed.overall_confidence : 0,
-    rules: Array.isArray(parsed.rules) ? parsed.rules : [],
+    raw_text,
+    sign_count: extraction.plates.length,
+    overall_confidence,
+    rules,
     model: AI_MODEL,
   };
 }
