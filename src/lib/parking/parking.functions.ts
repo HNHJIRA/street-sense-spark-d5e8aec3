@@ -378,6 +378,8 @@ export const syncProvider = createServerFn({ method: "POST" })
       minLng: z.number(), minLat: z.number(),
       maxLng: z.number(), maxLat: z.number(),
       force: z.boolean().optional(),
+      /** Optional explicit provider id; defaults to the city's first segment provider. */
+      providerId: z.string().min(1).max(64).optional(),
     }).parse(input),
   )
   .handler(async ({ data }): Promise<SyncRunResult> => {
@@ -385,10 +387,11 @@ export const syncProvider = createServerFn({ method: "POST" })
     const h = Math.abs(data.maxLat - data.minLat);
     if (!data.force && w * h > 0.05) return { imported: 0, skipped: 0, provider: "unknown", error: "Zoom in to load detailed street data." };
 
-    const { getProviderForCity } = await import("./providers/registry.server");
-    const provider = getProviderForCity(data.citySlug);
+    const { getProviderForCity, getProviderById } = await import("./providers/registry.server");
+    const { isOverlayProvider } = await import("./providers/types");
+    const provider = data.providerId ? getProviderById(data.providerId) : getProviderForCity(data.citySlug);
     if (!provider) {
-      return { imported: 0, skipped: 0, provider: "none", error: `No provider for city "${data.citySlug}"` };
+      return { imported: 0, skipped: 0, provider: data.providerId ?? "none", error: `No provider for "${data.providerId ?? data.citySlug}"` };
     }
 
     const admin = await getAdmin();
@@ -399,11 +402,31 @@ export const syncProvider = createServerFn({ method: "POST" })
     const startedAt = Date.now();
     const logId = await recordSyncStart(admin, provider.id, city.id, bbox);
 
+    // ---- Overlay provider path ----
+    if (isOverlayProvider(provider)) {
+      try {
+        const r = await provider.applyOverlay(data.citySlug, bbox, { cityId: city.id as string, admin });
+        const res = { imported: r.rules_inserted, skipped: 0 };
+        await recordSyncFinish(admin, logId, provider.id, city.id, res, startedAt);
+        // Annotate health with overlay-specific note (polygons fetched + segments touched).
+        await admin.from("provider_health").update({
+          notes: `Overlay: ${r.polygons_fetched} polygons → ${r.segments_touched} segments tagged with permit rules.`,
+        }).eq("provider", provider.id).eq("city_id", city.id);
+        return { ...res, provider: provider.id };
+      } catch (e) {
+        const res = { imported: 0, skipped: 0, error: (e as Error).message };
+        await recordSyncFinish(admin, logId, provider.id, city.id, res, startedAt);
+        return { ...res, provider: provider.id };
+      }
+    }
+
+    // ---- Segment provider path ----
     try {
       const normalized = await provider.fetchSegments(data.citySlug, bbox);
       if (normalized.length === 0) {
         const res = { imported: 0, skipped: 0 };
         await recordSyncFinish(admin, logId, provider.id, city.id, res, startedAt);
+        await maybeWriteProviderNotes(admin, provider.id, city.id as string);
         return { ...res, provider: provider.id };
       }
 
@@ -470,6 +493,7 @@ export const syncProvider = createServerFn({ method: "POST" })
 
       const res = { imported, skipped: inserts.length - imported };
       await recordSyncFinish(admin, logId, provider.id, city.id, res, startedAt);
+      await maybeWriteProviderNotes(admin, provider.id, city.id as string);
       return { ...res, provider: provider.id };
     } catch (e) {
       const res = { imported: 0, skipped: 0, error: (e as Error).message };
@@ -478,11 +502,26 @@ export const syncProvider = createServerFn({ method: "POST" })
     }
   });
 
+/** Known dataset limitations surfaced on provider_health.notes after a successful sync. */
+const PROVIDER_NOTES: Record<string, string> = {
+  "pasadena-opendata":
+    "Dataset limitation: City of Pasadena open data publishes only 6 city-wide sweeping zone polygons (no per-block polylines, no posted time-of-day, no permit, no meter inventory). Sync is healthy; block-level coverage requires non-public data or OSM-grid explosion of zones.",
+  "ladot": null as unknown as string,
+};
+
+async function maybeWriteProviderNotes(admin: AdminClient, providerId: string, cityId: string) {
+  const note = PROVIDER_NOTES[providerId];
+  if (!note) return;
+  await admin.from("provider_health").update({ notes: note }).eq("provider", providerId).eq("city_id", cityId);
+}
+
 /** Back-compat alias for the existing MapView import. */
 export const importSeattleBlockface = syncProvider;
 
 /** Sync EVERY provider registered for a city in series. Used by the cron and
- *  the admin LA-sync endpoint to layer multiple datasets onto the same city. */
+ *  the admin LA-sync endpoint to layer multiple datasets onto the same city.
+ *  Segment providers run first, overlays last (overlays depend on segments
+ *  having been imported). */
 export const syncAllProvidersForCity = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     z.object({
@@ -493,10 +532,14 @@ export const syncAllProvidersForCity = createServerFn({ method: "POST" })
     }).parse(input),
   )
   .handler(async ({ data }) => {
-    const { getProvidersForCity } = await import("./providers/registry.server");
-    const providers = getProvidersForCity(data.citySlug);
+    const { getSegmentProvidersForCity, getOverlayProvidersForCity } =
+      await import("./providers/registry.server");
+    const ordered = [
+      ...getSegmentProvidersForCity(data.citySlug),
+      ...getOverlayProvidersForCity(data.citySlug),
+    ];
     const results: Array<SyncRunResult & { providerName: string }> = [];
-    for (const p of providers) {
+    for (const p of ordered) {
       try {
         const r = await syncProvider({
           data: {
@@ -504,6 +547,7 @@ export const syncAllProvidersForCity = createServerFn({ method: "POST" })
             minLng: data.minLng, minLat: data.minLat,
             maxLng: data.maxLng, maxLat: data.maxLat,
             force: data.force,
+            providerId: p.id,
           },
         });
         results.push({ ...r, providerName: p.name });
