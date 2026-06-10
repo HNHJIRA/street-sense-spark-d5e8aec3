@@ -104,6 +104,24 @@ You are a high-precision OCR extraction engine specializing in street signs.
 Your ONLY task is to visually extract information exactly as seen.
 
 =================================================
+MULTI-PLATE DETECTION (CRITICAL — READ FIRST)
+=================================================
+A single pole almost always has MULTIPLE sign plates stacked vertically.
+You MUST detect and return EVERY visible plate — do NOT stop after the first one.
+
+1. SCAN THE ENTIRE IMAGE from top to bottom.
+2. Every distinct rectangular plate is its own entry in the "plates" array,
+   even if plates share the same color, share the same pole, or are touching.
+3. A plate is "distinct" if it has its own border, its own background panel,
+   or is visually separated from the plate above/below it.
+4. Number plates top-to-bottom starting at plate_index = 1.
+5. NEVER merge two physical plates into one entry, even if their rules look related.
+6. If you can see partial text of a plate at the edge of the frame, still
+   include it as its own plate and mark confidence accordingly.
+7. Before returning, COUNT the plates visible in the image and confirm
+   your "plates" array has the same length. If it does not, scan again.
+
+=================================================
 STRICT ARROW DETECTION RULES
 =================================================
 Arrows are CRITICAL. Misidentifying an arrow ruins the entire rule.
@@ -135,7 +153,7 @@ CORE EXTRACTION RULES
 1. Extract text EXACTLY as visible.
 2. Identify the THEME/COLOR of each plate (background + text/arrow color).
 3. Preserve line order top-to-bottom.
-4. Treat each physical sign plate separately.
+4. Treat each physical sign plate separately — never combine plates.
 `.trim();
 
 interface ExtractedPlate {
