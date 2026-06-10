@@ -1,7 +1,7 @@
 // AI Sign Scanner — capture/upload a parking-sign photo, send to the engine
 // pipeline, render the engine's verdict.
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
 import {
@@ -197,12 +197,10 @@ function ScanPage() {
 function ScanResult({
   result, previewUrl, onReset,
 }: { result: SignScanResponse; previewUrl: string | null; onReset: () => void }) {
-  // When the AI detected directional arrows on the sign block, expose a
-  // Left / Both / Right selector so the user picks which side of the post
-  // they're parked on. Default to "both" — that's the conservative composite.
   const [side, setSide] = useState<"left" | "both" | "right">("both");
   const sideEval = result.sides ? result.sides[side] : null;
   const s = sideEval?.summary ?? result.summary;
+  const decision = sideEval?.decision ?? result.decision;
 
   const palette =
     s.status === "YES"
@@ -215,24 +213,96 @@ function ScanResult({
 
   const Icon = palette.icon;
 
-  // Find the next timeline entry that isn't "now" to get the "until" time.
+  const TZ = "America/Los_Angeles";
+  const fmtClock = (iso: string | null | undefined): string | null => {
+    if (!iso) return null;
+    try {
+      return new Date(iso).toLocaleTimeString("en-US", {
+        hour: "numeric", minute: "2-digit", timeZone: TZ,
+      });
+    } catch { return null; }
+  };
+
   const nextChange = s.timeline.find((t) => t.when !== "now");
   const untilTime = nextChange?.when_label ?? null;
 
-  // For LIMITED parking, compute "you must move by" = scanned_at + time_limit,
-  // capped at the next rule change. This is the user-actionable "until" time.
-  let moveByLabel: string | null = null;
-  if (s.status === "LIMITED" && result.time_limit_minutes) {
+  // Applies-To derived from arrow detection + selected side.
+  const appliesTo: "LEFT" | "RIGHT" | "BOTH" | "NONE" =
+    s.status === "UNKNOWN" && result.parsed_rules.length === 0
+      ? "NONE"
+      : result.sides
+        ? (side === "left" ? "LEFT" : side === "right" ? "RIGHT" : "BOTH")
+        : "BOTH";
+  const sideClause =
+    appliesTo === "LEFT"  ? "on the LEFT side of this sign" :
+    appliesTo === "RIGHT" ? "on the RIGHT side of this sign" :
+    appliesTo === "BOTH"  ? (result.sides ? "on both sides of this sign" : "across this entire curb area")
+                          : "";
+
+  // Allowed Until: arrival + time_limit, capped at the next restriction start.
+  // For YES/LIMITED with a time limit this is distinct from "Next Restriction Starts".
+  let allowedUntilIso: string | null = decision.allowed_until ?? null;
+  if (result.time_limit_minutes && (s.status === "LIMITED" || s.status === "YES")) {
     const start = new Date(result.scanned_at).getTime();
     let moveBy = start + result.time_limit_minutes * 60_000;
-    if (nextChange?.when) {
-      const changeMs = new Date(nextChange.when).getTime();
+    if (decision.restriction_starts_at) {
+      const changeMs = new Date(decision.restriction_starts_at).getTime();
       if (Number.isFinite(changeMs) && changeMs < moveBy) moveBy = changeMs;
     }
-    moveByLabel = new Date(moveBy).toLocaleTimeString("en-US", {
-      hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles",
-    });
+    allowedUntilIso = new Date(moveBy).toISOString();
   }
+  const allowedUntilLabel = fmtClock(allowedUntilIso);
+  const nextStartLabel = fmtClock(decision.restriction_starts_at);
+  const nextEndLabel = fmtClock(decision.restriction_ends_at);
+
+  // Live countdown to allowed_until.
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  let timeRemainingLabel: string | null = null;
+  if (allowedUntilIso) {
+    const diff = Math.floor((new Date(allowedUntilIso).getTime() - nowMs) / 1000);
+    if (diff <= 0) timeRemainingLabel = "Expired";
+    else {
+      const h = Math.floor(diff / 3600);
+      const m = Math.floor((diff % 3600) / 60);
+      const sec = diff % 60;
+      timeRemainingLabel = h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${sec.toString().padStart(2, "0")}s` : `${sec}s`;
+    }
+  }
+
+  const maxStayLabel = result.time_limit_minutes
+    ? (result.time_limit_minutes % 60 === 0
+        ? `${result.time_limit_minutes / 60} Hour${result.time_limit_minutes === 60 ? "" : "s"}`
+        : `${result.time_limit_minutes} minutes`)
+    : null;
+
+  const reasonLabel = result.current_rule?.label ?? s.reason ?? "Posted restriction";
+  const nextReasonLabel = result.next_rule?.label ?? result.next_restriction_reason ?? null;
+
+  // moveByLabel kept for the existing "Until card" UI below.
+  const moveByLabel = allowedUntilLabel && (s.status === "LIMITED" || (s.status === "YES" && result.time_limit_minutes))
+    ? allowedUntilLabel : null;
+
+  const arrivalClock = new Date(result.scanned_at).toLocaleTimeString("en-US", {
+    hour: "numeric", minute: "2-digit", timeZone: TZ,
+  });
+  const officerParagraph = buildOfficerParagraph({
+    status: s.status,
+    reason: reasonLabel,
+    sideClause,
+    arrivalClock,
+    allowedUntilLabel,
+    timeRemainingLabel,
+    maxStayLabel,
+    nextReasonLabel,
+    nextStartLabel,
+    nextEndLabel,
+    permitZone: decision.permit_zone,
+  });
+
 
   return (
     <div className="mt-5 space-y-5">
@@ -314,21 +384,40 @@ function ScanResult({
         </div>
       )}
 
-      {/* AI driver summary — produced by the deterministic Driver Summary
-          Generator from the engine decision (never raw OCR). */}
+      {/* Parking details — structured, enforcement-grade readout. */}
+      <div className="rounded-3xl border border-border bg-background p-5">
+        <div className="mb-3 text-sm font-bold text-foreground">Parking details</div>
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+          <DetailRow label="Current status" value={
+            <span className={cn("font-bold", palette.text)}>{s.status}</span>
+          } />
+          <DetailRow label="Reason" value={reasonLabel} />
+          <DetailRow label="Allowed until" value={allowedUntilLabel ?? "—"} />
+          <DetailRow label="Time remaining" value={timeRemainingLabel ?? "—"} />
+          <DetailRow label="Maximum stay" value={maxStayLabel ?? "No limit"} />
+          <DetailRow label="Next restriction" value={nextReasonLabel ?? "None scheduled"} />
+          <DetailRow label="Restriction starts" value={nextStartLabel ?? "—"} />
+          <DetailRow label="Restriction ends" value={nextEndLabel ?? "—"} />
+          <DetailRow label="Applies to" value={
+            appliesTo === "BOTH" && !result.sides
+              ? "BOTH (no arrows)"
+              : appliesTo === "LEFT" ? "LEFT side"
+              : appliesTo === "RIGHT" ? "RIGHT side"
+              : appliesTo === "BOTH" ? "BOTH sides" : "NONE"
+          } />
+          <DetailRow label="Confidence" value={`${Math.round(result.decision_confidence * 100)}%`} />
+        </dl>
+      </div>
+
+      {/* AI driver summary — enforcement-officer style paragraph. */}
       <div className="rounded-3xl border border-border bg-background p-5">
         <div className="mb-2 flex items-center gap-2">
           <MessageSquare className="h-4 w-4 text-primary" />
-          <span className="text-sm font-bold text-foreground">Driver summary</span>
+          <span className="text-sm font-bold text-foreground">AI summary</span>
         </div>
-        <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
-          {result.driver_summary}
+        <p className="whitespace-pre-line text-sm leading-relaxed text-foreground/90">
+          {officerParagraph}
         </p>
-        {result.time_remaining_human && (
-          <p className="mt-3 text-xs font-semibold text-foreground">
-            Time remaining: {result.time_remaining_human}
-          </p>
-        )}
         {(result.left_summary || result.right_summary) && (
           <div className="mt-4 space-y-1 border-t border-border pt-3 text-xs text-muted-foreground">
             {result.left_summary && <p>{result.left_summary}</p>}
@@ -341,6 +430,7 @@ function ScanResult({
           <span>Decision {Math.round(result.decision_confidence * 100)}%</span>
         </div>
       </div>
+
 
       {/* Upcoming rules timeline (Edge case 1 / 10) */}
       {(result.current_rule || result.next_rule || result.following_rule) && (
@@ -446,4 +536,69 @@ function fileToBase64(file: File): Promise<string> {
     reader.readAsDataURL(file);
   });
 }
+
+function DetailRow({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div>
+      <dt className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{label}</dt>
+      <dd className="mt-0.5 text-sm font-semibold text-foreground">{value}</dd>
+    </div>
+  );
+}
+
+interface OfficerArgs {
+  status: "YES" | "NO" | "LIMITED" | "UNKNOWN";
+  reason: string;
+  sideClause: string;
+  arrivalClock: string;
+  allowedUntilLabel: string | null;
+  timeRemainingLabel: string | null;
+  maxStayLabel: string | null;
+  nextReasonLabel: string | null;
+  nextStartLabel: string | null;
+  nextEndLabel: string | null;
+  permitZone: string | null;
+}
+
+function buildOfficerParagraph(a: OfficerArgs): string {
+  const sideTail = a.sideClause ? ` ${a.sideClause}` : "";
+  const parts: string[] = [];
+
+  if (a.status === "UNKNOWN") {
+    return "We could not verify the rule from this sign with enough confidence. Please read the posted signage carefully before parking — do not rely on this scan alone.";
+  }
+
+  if (a.status === "YES") {
+    parts.push(`You can park here right now${sideTail}.`);
+    parts.push(`A ${a.reason.toLowerCase()} rule is currently in effect.`);
+    if (a.maxStayLabel && a.allowedUntilLabel) {
+      parts.push(`Because you arrived at ${a.arrivalClock}, the ${a.maxStayLabel.toLowerCase()} limit means you may remain parked until ${a.allowedUntilLabel}.`);
+    } else if (a.allowedUntilLabel) {
+      parts.push(`You may remain parked until ${a.allowedUntilLabel}.`);
+    }
+    if (a.permitZone) parts.push(`Permit zone ${a.permitZone} is required.`);
+  } else if (a.status === "LIMITED") {
+    parts.push(`You can park here right now${sideTail}, but with restrictions.`);
+    parts.push(`A ${a.reason.toLowerCase()} rule is currently active.`);
+    if (a.maxStayLabel) parts.push(`The maximum stay is ${a.maxStayLabel}.`);
+    if (a.allowedUntilLabel) parts.push(`Based on your arrival at ${a.arrivalClock}, you must move your vehicle by ${a.allowedUntilLabel}.`);
+    if (a.permitZone) parts.push(`Permit zone ${a.permitZone} is required.`);
+  } else {
+    parts.push(`You cannot park here right now${sideTail}.`);
+    parts.push(`A ${a.reason.toLowerCase()} restriction is currently in effect.`);
+    if (a.nextEndLabel) parts.push(`This restriction ends at ${a.nextEndLabel}, after which parking becomes available again.`);
+  }
+
+  if (a.nextReasonLabel && a.nextStartLabel) {
+    const windowTail = a.nextEndLabel ? ` and runs until ${a.nextEndLabel}` : "";
+    parts.push(`At ${a.nextStartLabel} the curb changes to ${a.nextReasonLabel}${windowTail}. If you plan to stay beyond that time, move your vehicle before it begins.`);
+  }
+
+  if (a.sideClause.includes("entire curb area")) {
+    parts.push("This sign does not contain directional arrows, so the rule applies to this entire curb area.");
+  }
+
+  return parts.join(" ");
+}
+
 
