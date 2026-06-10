@@ -92,6 +92,25 @@ export interface SignScanResponse {
   source_label: string;
   /** ISO timestamp of when this scan was evaluated (the moment the photo was processed). */
   scanned_at: string;
+  // ===== Driver-facing contract (Phase 10) =====
+  status: "YES" | "NO" | "LIMITED" | "UNKNOWN";
+  driver_summary: string;
+  street_name: string;
+  allowed_until: string | null;
+  time_remaining_seconds: number | null;
+  time_remaining_minutes: number | null;
+  time_remaining_human: string | null;
+  next_restriction_reason: string | null;
+  next_restriction_start: string | null;
+  next_restriction_end: string | null;
+  permit_required: boolean;
+  time_limit_minutes: number | null;
+  left_summary: string | null;
+  right_summary: string | null;
+  ocr_confidence: number;
+  interpretation_confidence: number;
+  decision_confidence: number;
+  narrative: DriverNarrative;
 }
 
 function verdictFromColor(c: ParkingStatus["color"]): "YES" | "NO" | "LIMITED" {
