@@ -428,6 +428,40 @@ export const scanSign = createServerFn({ method: "POST" })
     // Persist the summary on the scan row for the accuracy dashboard.
     await admin.from("parking_sign_scans").update({ summary }).eq("id", scanId);
 
+    // ===== Driver Summary Generator (Phase 5/6/7/8) =====
+    const narrative = buildDriverNarrative({
+      decision,
+      parsedRules: aiRules,
+      now: scannedAt,
+      timezone: data.timezone,
+    });
+
+    const leftCaption = sides
+      ? buildSideCaption({
+          side: "left",
+          decision: sides.left.decision,
+          parsedRules: sides.left.rules,
+          timezone: data.timezone,
+        })
+      : null;
+    const rightCaption = sides
+      ? buildSideCaption({
+          side: "right",
+          decision: sides.right.decision,
+          parsedRules: sides.right.rules,
+          timezone: data.timezone,
+        })
+      : null;
+
+    // ===== Confidence breakdown (Phase 9) =====
+    const ocr_confidence = ai.overall_confidence;
+    const interpretation_confidence = ai.rules.length
+      ? ai.rules.reduce((a, r) => a + (r.confidence ?? 0), 0) / ai.rules.length
+      : ai.overall_confidence;
+    const decision_confidence =
+      decision.code === "unknown"
+        ? Math.min(ocr_confidence, interpretation_confidence) * 0.5
+        : Math.min(ocr_confidence, interpretation_confidence);
 
     return {
       scan_id: scanId,
@@ -445,6 +479,25 @@ export const scanSign = createServerFn({ method: "POST" })
       validations,
       source_label: SOURCE_LABELS[segmentSource] ?? segmentSource,
       scanned_at: scannedAt.toISOString(),
+      // Driver-facing contract
+      status: narrative.status,
+      driver_summary: narrative.summary,
+      street_name: segmentName,
+      allowed_until: narrative.allowed_until,
+      time_remaining_seconds: narrative.time_remaining_seconds,
+      time_remaining_minutes: narrative.time_remaining_minutes,
+      time_remaining_human: narrative.time_remaining_human,
+      next_restriction_reason: narrative.next_restriction_reason,
+      next_restriction_start: narrative.next_restriction_start,
+      next_restriction_end: narrative.next_restriction_end,
+      permit_required: narrative.permit_required,
+      time_limit_minutes: narrative.time_limit_minutes,
+      left_summary: leftCaption,
+      right_summary: rightCaption,
+      ocr_confidence,
+      interpretation_confidence,
+      decision_confidence,
+      narrative,
     };
   });
 
