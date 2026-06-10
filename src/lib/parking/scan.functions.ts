@@ -11,7 +11,7 @@ import { evaluateRulesAt } from "./engine";
 import { aiRulesToNormalized, callSignScanAi, validateSignImage, type AiScanResult, type ArrowDirection, type NormalizedScanRule } from "./sign-ai";
 import { resolveRuleConflicts } from "./providers/normalize";
 import { buildScanSummary, type ScanSummary } from "./scan-summary";
-import { buildDriverNarrative, buildSideCaption, type DriverNarrative } from "./driver-narrative";
+import { buildDriverNarrative, buildSideCaption, buildRuleTimeline, deriveRiskLevel, type DriverNarrative, type RuleSummary, type RiskLevel } from "./driver-narrative";
 import type {
   ParkingRule,
   ParkingStatus,
@@ -111,6 +111,15 @@ export interface SignScanResponse {
   interpretation_confidence: number;
   decision_confidence: number;
   narrative: DriverNarrative;
+  // ===== Edge-case sprint =====
+  risk_level: RiskLevel;
+  current_rule: RuleSummary | null;
+  next_rule: RuleSummary | null;
+  following_rule: RuleSummary | null;
+  countdown_to_next_rule: string | null;
+  countdown_to_following_rule: string | null;
+  conflict_detected: boolean;
+  conflict_summary: string | null;
 }
 
 function verdictFromColor(c: ParkingStatus["color"]): "YES" | "NO" | "LIMITED" {
@@ -463,6 +472,34 @@ export const scanSign = createServerFn({ method: "POST" })
         ? Math.min(ocr_confidence, interpretation_confidence) * 0.5
         : Math.min(ocr_confidence, interpretation_confidence);
 
+    // ===== Edge-case sprint: rule timeline, risk, conflict, confidence gate =====
+    const timeline = buildRuleTimeline(aiRules, scannedAt, data.timezone);
+    const risk_level: RiskLevel = deriveRiskLevel(aiRules, ai.raw_text);
+
+    const conflicting = validations.filter((v) => v.outcome === "conflict");
+    const conflict_detected = conflicting.length > 0;
+    const conflict_summary = conflict_detected
+      ? conflicting.map((v) => v.detail).join(" ")
+      : null;
+
+    // EDGE CASE 8 — low-confidence OCR forces UNKNOWN.
+    let finalStatus = narrative.status;
+    let finalSummary = narrative.summary;
+    if (ocr_confidence < 0.65) {
+      finalStatus = "UNKNOWN";
+      finalSummary =
+        "Parking legality cannot be verified. Please inspect the sign manually.";
+    } else if (
+      narrative.permit_required &&
+      finalStatus === "YES"
+    ) {
+      // EDGE CASE 6 — permit requirement without a matching user profile.
+      finalStatus = "LIMITED";
+      finalSummary +=
+        ` Permit ${narrative.allowed_until ? "" : ""}` +
+        `is required — only return YES once your permit zone matches.`;
+    }
+
     return {
       scan_id: scanId,
       image_url: signedUrl,
@@ -480,8 +517,8 @@ export const scanSign = createServerFn({ method: "POST" })
       source_label: SOURCE_LABELS[segmentSource] ?? segmentSource,
       scanned_at: scannedAt.toISOString(),
       // Driver-facing contract
-      status: narrative.status,
-      driver_summary: narrative.summary,
+      status: finalStatus,
+      driver_summary: finalSummary,
       street_name: segmentName,
       allowed_until: narrative.allowed_until,
       time_remaining_seconds: narrative.time_remaining_seconds,
@@ -498,6 +535,15 @@ export const scanSign = createServerFn({ method: "POST" })
       interpretation_confidence,
       decision_confidence,
       narrative,
+      // Edge-case sprint fields
+      risk_level,
+      current_rule: timeline.current_rule,
+      next_rule: timeline.next_rule,
+      following_rule: timeline.following_rule,
+      countdown_to_next_rule: timeline.countdown_to_next_rule,
+      countdown_to_following_rule: timeline.countdown_to_following_rule,
+      conflict_detected,
+      conflict_summary,
     };
   });
 
