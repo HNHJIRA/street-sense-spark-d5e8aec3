@@ -384,21 +384,40 @@ function ScanResult({
         </div>
       )}
 
-      {/* AI driver summary — produced by the deterministic Driver Summary
-          Generator from the engine decision (never raw OCR). */}
+      {/* Parking details — structured, enforcement-grade readout. */}
+      <div className="rounded-3xl border border-border bg-background p-5">
+        <div className="mb-3 text-sm font-bold text-foreground">Parking details</div>
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+          <DetailRow label="Current status" value={
+            <span className={cn("font-bold", palette.text)}>{s.status}</span>
+          } />
+          <DetailRow label="Reason" value={reasonLabel} />
+          <DetailRow label="Allowed until" value={allowedUntilLabel ?? "—"} />
+          <DetailRow label="Time remaining" value={timeRemainingLabel ?? "—"} />
+          <DetailRow label="Maximum stay" value={maxStayLabel ?? "No limit"} />
+          <DetailRow label="Next restriction" value={nextReasonLabel ?? "None scheduled"} />
+          <DetailRow label="Restriction starts" value={nextStartLabel ?? "—"} />
+          <DetailRow label="Restriction ends" value={nextEndLabel ?? "—"} />
+          <DetailRow label="Applies to" value={
+            appliesTo === "BOTH" && !result.sides
+              ? "BOTH (no arrows)"
+              : appliesTo === "LEFT" ? "LEFT side"
+              : appliesTo === "RIGHT" ? "RIGHT side"
+              : appliesTo === "BOTH" ? "BOTH sides" : "NONE"
+          } />
+          <DetailRow label="Confidence" value={`${Math.round(result.decision_confidence * 100)}%`} />
+        </dl>
+      </div>
+
+      {/* AI driver summary — enforcement-officer style paragraph. */}
       <div className="rounded-3xl border border-border bg-background p-5">
         <div className="mb-2 flex items-center gap-2">
           <MessageSquare className="h-4 w-4 text-primary" />
-          <span className="text-sm font-bold text-foreground">Driver summary</span>
+          <span className="text-sm font-bold text-foreground">AI summary</span>
         </div>
-        <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
-          {result.driver_summary}
+        <p className="whitespace-pre-line text-sm leading-relaxed text-foreground/90">
+          {officerParagraph}
         </p>
-        {result.time_remaining_human && (
-          <p className="mt-3 text-xs font-semibold text-foreground">
-            Time remaining: {result.time_remaining_human}
-          </p>
-        )}
         {(result.left_summary || result.right_summary) && (
           <div className="mt-4 space-y-1 border-t border-border pt-3 text-xs text-muted-foreground">
             {result.left_summary && <p>{result.left_summary}</p>}
@@ -411,6 +430,7 @@ function ScanResult({
           <span>Decision {Math.round(result.decision_confidence * 100)}%</span>
         </div>
       </div>
+
 
       {/* Upcoming rules timeline (Edge case 1 / 10) */}
       {(result.current_rule || result.next_rule || result.following_rule) && (
