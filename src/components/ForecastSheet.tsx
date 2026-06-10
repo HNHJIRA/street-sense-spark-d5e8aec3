@@ -4,6 +4,7 @@ import { useAppStore } from "@/stores/app-store";
 import { cn } from "@/lib/utils";
 
 const QUICK_HOURS = [9, 12, 15, 17, 19, 21];
+type Meridiem = "AM" | "PM";
 
 function setHour(base: Date, hour: number): Date {
   const d = new Date(base);
@@ -19,8 +20,18 @@ function setHourMinute(base: Date, hour: number, minute: number, allowPast: bool
   return d;
 }
 
-function toTimeInputValue(d: Date): string {
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+function toClockParts(d: Date): { hour: string; minute: string; period: Meridiem } {
+  const hours = d.getHours();
+  return {
+    hour: String(((hours + 11) % 12) + 1),
+    minute: String(d.getMinutes()).padStart(2, "0"),
+    period: hours >= 12 ? "PM" : "AM",
+  };
+}
+
+function to24Hour(hour: number, period: Meridiem): number {
+  if (period === "AM") return hour === 12 ? 0 : hour;
+  return hour === 12 ? 12 : hour + 12;
 }
 
 export function ForecastSheet() {
@@ -29,7 +40,10 @@ export function ForecastSheet() {
   const setForecastAt = useAppStore((s) => s.setForecastAt);
   const forecastAt = useAppStore((s) => s.forecastAt);
   const [day, setDay] = useState<0 | 1 | 2>(0);
-  const [customTime, setCustomTime] = useState<string>(() => toTimeInputValue(forecastAt ?? new Date()));
+  const initialClock = toClockParts(forecastAt ?? new Date());
+  const [customHour, setCustomHour] = useState(initialClock.hour);
+  const [customMinute, setCustomMinute] = useState(initialClock.minute);
+  const [customPeriod, setCustomPeriod] = useState<Meridiem>(initialClock.period);
 
   if (!open) return null;
 
@@ -105,20 +119,47 @@ export function ForecastSheet() {
             </div>
 
             <div className="mt-4 rounded-2xl border border-border bg-surface p-3">
-              <label className="flex items-center justify-between gap-3">
+              <div className="flex items-center justify-between gap-3">
                 <span className="text-xs font-semibold text-muted-foreground">Pick a custom time</span>
-                <input
-                  type="time"
-                  value={customTime}
-                  onChange={(e) => setCustomTime(e.target.value)}
-                  className="rounded-xl border border-border bg-elevated px-3 py-2 text-sm font-bold text-foreground focus:border-primary focus:outline-none"
-                />
-              </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    inputMode="numeric"
+                    aria-label="Hour"
+                    value={customHour}
+                    onChange={(e) => setCustomHour(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                    className="w-12 rounded-xl border border-border bg-elevated px-2 py-2 text-center text-sm font-bold text-foreground focus:border-primary focus:outline-none"
+                  />
+                  <span className="font-bold text-muted-foreground">:</span>
+                  <input
+                    inputMode="numeric"
+                    aria-label="Minute"
+                    value={customMinute}
+                    onChange={(e) => setCustomMinute(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                    className="w-12 rounded-xl border border-border bg-elevated px-2 py-2 text-center text-sm font-bold text-foreground focus:border-primary focus:outline-none"
+                  />
+                  <div className="flex rounded-xl border border-border bg-elevated p-1">
+                    {(["AM", "PM"] as const).map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setCustomPeriod(p)}
+                        className={cn(
+                          "rounded-lg px-2 py-1 text-xs font-bold transition",
+                          customPeriod === p ? "bg-primary text-primary-foreground" : "text-muted-foreground",
+                        )}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
               <button
                 onClick={() => {
-                  const [hh, mm] = customTime.split(":").map((n) => parseInt(n, 10));
-                  if (isNaN(hh) || isNaN(mm)) return;
-                  const target = setHourMinute(dayBase, hh, mm, day > 0);
+                  const hour = parseInt(customHour, 10);
+                  const minute = parseInt(customMinute, 10);
+                  if (isNaN(hour) || isNaN(minute) || hour < 1 || hour > 12 || minute < 0 || minute > 59) return;
+                  const target = setHourMinute(dayBase, to24Hour(hour, customPeriod), minute, day > 0);
                   setForecastAt(target);
                   setOpen(false);
                 }}
