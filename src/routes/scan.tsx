@@ -599,11 +599,11 @@ interface OfficerArgs {
 }
 
 function sidePhrase(appliesTo: OfficerArgs["appliesTo"], hasArrows: boolean): string {
-  if (!hasArrows) return "there are no arrows, so the rule applies here";
-  if (appliesTo === "LEFT") return "this applies on the left side of this sign";
-  if (appliesTo === "RIGHT") return "this applies on the right side of this sign";
-  if (appliesTo === "BOTH") return "this applies on both sides of this sign";
-  return "there are no arrows, so the rule applies here";
+  if (!hasArrows) return "applies here";
+  if (appliesTo === "LEFT") return "applies on the left side of this sign";
+  if (appliesTo === "RIGHT") return "applies on the right side of this sign";
+  if (appliesTo === "BOTH") return "applies on both sides of this sign";
+  return "applies here";
 }
 
 function buildOfficerParagraph(a: OfficerArgs): string {
