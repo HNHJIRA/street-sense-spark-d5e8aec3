@@ -197,12 +197,10 @@ function ScanPage() {
 function ScanResult({
   result, previewUrl, onReset,
 }: { result: SignScanResponse; previewUrl: string | null; onReset: () => void }) {
-  // When the AI detected directional arrows on the sign block, expose a
-  // Left / Both / Right selector so the user picks which side of the post
-  // they're parked on. Default to "both" — that's the conservative composite.
   const [side, setSide] = useState<"left" | "both" | "right">("both");
   const sideEval = result.sides ? result.sides[side] : null;
   const s = sideEval?.summary ?? result.summary;
+  const decision = sideEval?.decision ?? result.decision;
 
   const palette =
     s.status === "YES"
@@ -215,24 +213,96 @@ function ScanResult({
 
   const Icon = palette.icon;
 
-  // Find the next timeline entry that isn't "now" to get the "until" time.
+  const TZ = "America/Los_Angeles";
+  const fmtClock = (iso: string | null | undefined): string | null => {
+    if (!iso) return null;
+    try {
+      return new Date(iso).toLocaleTimeString("en-US", {
+        hour: "numeric", minute: "2-digit", timeZone: TZ,
+      });
+    } catch { return null; }
+  };
+
   const nextChange = s.timeline.find((t) => t.when !== "now");
   const untilTime = nextChange?.when_label ?? null;
 
-  // For LIMITED parking, compute "you must move by" = scanned_at + time_limit,
-  // capped at the next rule change. This is the user-actionable "until" time.
-  let moveByLabel: string | null = null;
-  if (s.status === "LIMITED" && result.time_limit_minutes) {
+  // Applies-To derived from arrow detection + selected side.
+  const appliesTo: "LEFT" | "RIGHT" | "BOTH" | "NONE" =
+    s.status === "UNKNOWN" && result.parsed_rules.length === 0
+      ? "NONE"
+      : result.sides
+        ? (side === "left" ? "LEFT" : side === "right" ? "RIGHT" : "BOTH")
+        : "BOTH";
+  const sideClause =
+    appliesTo === "LEFT"  ? "on the LEFT side of this sign" :
+    appliesTo === "RIGHT" ? "on the RIGHT side of this sign" :
+    appliesTo === "BOTH"  ? (result.sides ? "on both sides of this sign" : "across this entire curb area")
+                          : "";
+
+  // Allowed Until: arrival + time_limit, capped at the next restriction start.
+  // For YES/LIMITED with a time limit this is distinct from "Next Restriction Starts".
+  let allowedUntilIso: string | null = decision.allowed_until ?? null;
+  if (result.time_limit_minutes && (s.status === "LIMITED" || s.status === "YES")) {
     const start = new Date(result.scanned_at).getTime();
     let moveBy = start + result.time_limit_minutes * 60_000;
-    if (nextChange?.when) {
-      const changeMs = new Date(nextChange.when).getTime();
+    if (decision.restriction_starts_at) {
+      const changeMs = new Date(decision.restriction_starts_at).getTime();
       if (Number.isFinite(changeMs) && changeMs < moveBy) moveBy = changeMs;
     }
-    moveByLabel = new Date(moveBy).toLocaleTimeString("en-US", {
-      hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles",
-    });
+    allowedUntilIso = new Date(moveBy).toISOString();
   }
+  const allowedUntilLabel = fmtClock(allowedUntilIso);
+  const nextStartLabel = fmtClock(decision.restriction_starts_at);
+  const nextEndLabel = fmtClock(decision.restriction_ends_at);
+
+  // Live countdown to allowed_until.
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  let timeRemainingLabel: string | null = null;
+  if (allowedUntilIso) {
+    const diff = Math.floor((new Date(allowedUntilIso).getTime() - nowMs) / 1000);
+    if (diff <= 0) timeRemainingLabel = "Expired";
+    else {
+      const h = Math.floor(diff / 3600);
+      const m = Math.floor((diff % 3600) / 60);
+      const sec = diff % 60;
+      timeRemainingLabel = h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${sec.toString().padStart(2, "0")}s` : `${sec}s`;
+    }
+  }
+
+  const maxStayLabel = result.time_limit_minutes
+    ? (result.time_limit_minutes % 60 === 0
+        ? `${result.time_limit_minutes / 60} Hour${result.time_limit_minutes === 60 ? "" : "s"}`
+        : `${result.time_limit_minutes} minutes`)
+    : null;
+
+  const reasonLabel = result.current_rule?.label ?? s.reason ?? "Posted restriction";
+  const nextReasonLabel = result.next_rule?.label ?? result.next_restriction_reason ?? null;
+
+  // moveByLabel kept for the existing "Until card" UI below.
+  const moveByLabel = allowedUntilLabel && (s.status === "LIMITED" || (s.status === "YES" && result.time_limit_minutes))
+    ? allowedUntilLabel : null;
+
+  const arrivalClock = new Date(result.scanned_at).toLocaleTimeString("en-US", {
+    hour: "numeric", minute: "2-digit", timeZone: TZ,
+  });
+  const officerParagraph = buildOfficerParagraph({
+    status: s.status,
+    reason: reasonLabel,
+    sideClause,
+    arrivalClock,
+    allowedUntilLabel,
+    timeRemainingLabel,
+    maxStayLabel,
+    nextReasonLabel,
+    nextStartLabel,
+    nextEndLabel,
+    permitZone: decision.permit_zone,
+  });
+
 
   return (
     <div className="mt-5 space-y-5">
