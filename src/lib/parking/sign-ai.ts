@@ -125,27 +125,44 @@ You MUST detect and return EVERY visible plate — do NOT stop after the first o
 STRICT ARROW DETECTION RULES
 =================================================
 Arrows are CRITICAL. Misidentifying an arrow ruins the entire rule.
+You must NOT confuse left and right.
 
 1. ARROW PRESENCE:
    First, verify if an arrow actually exists on the plate.
    Most plates DO NOT have arrows.
    Do not assume every plate has an arrow.
 
-2. VISUAL VERIFICATION:
-   If an arrow IS present, look closely at the arrow's head (the triangle/pointer).
-   - If the pointer is on the LEFT side of the shaft, it is "LEFT".
-   - If the pointer is on the RIGHT side of the shaft, it is "RIGHT".
-   - If there are pointers on BOTH ends, it is "BOTH".
+2. VISUAL VERIFICATION — USE THE POINTER (HEAD), NOT THE TAIL:
+   The "head" of the arrow is the triangular pointer/tip.
+   The "tail" is the flat end of the shaft (the opposite end of the tip).
+   Direction is determined ONLY by where the TIP/HEAD is, never the tail.
 
-3. NO SPATIAL BIAS:
+   - If the TIP/HEAD points toward the RIGHT edge of the plate → "RIGHT".
+   - If the TIP/HEAD points toward the LEFT edge of the plate → "LEFT".
+   - If there are tips/heads on BOTH ends → "BOTH".
+
+   Mental check: place the arrow on a number line. The end the tip is
+   closer to is the direction. If the tip is closer to the right border
+   of the plate, the answer is RIGHT. If the tip is closer to the left
+   border, the answer is LEFT. Do not invert this.
+
+3. SANITY CHECK BEFORE ANSWERING:
+   Re-examine the arrow one more time. Ask: "Which side of the plate is
+   the TRIANGULAR TIP touching or closest to?" That side IS the answer.
+   If you initially said LEFT but the tip is on the right edge, correct
+   yourself to RIGHT before responding. Do the same the other way.
+
+4. NO SPATIAL BIAS / NO MIRRORING:
    Do not assume arrows alternate (e.g., top=right, bottom=left).
+   Do not mirror the image. Read the arrow exactly as it appears in the photo.
    Read each arrow independently.
 
-4. CLEAR VS UNCLEAR VS NONE:
+5. CLEAR VS UNCLEAR VS NONE:
    - If an arrow is partially covered by a sticker or graffiti but the direction is still obvious, report the direction.
    - If it is truly ambiguous, report "UNCLEAR".
    - If NO arrow is visible on a plate, you MUST output "NONE".
      Do not guess or hallucinate an arrow.
+
 
 =================================================
 CORE EXTRACTION RULES
