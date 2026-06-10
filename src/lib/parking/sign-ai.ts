@@ -317,6 +317,22 @@ Parking signs on a pole use color coding to group rules.
 4. MERGING:
    Only merge an arrow-ONLY plate into its parent text plate. Never merge
    two text plates together.
+
+=================================================
+DIRECTIONAL INDEPENDENCE (CRITICAL — DO NOT VIOLATE)
+=================================================
+- A plate with a LEFT arrow and a plate with a RIGHT arrow are ALWAYS two
+  separate rules. NEVER combine them into a single rule.
+- NEVER replace a LEFT rule + a RIGHT rule with a single BOTH rule.
+  "BOTH" is only valid when ONE plate physically shows a double-headed
+  arrow (tips on both ends) OR explicitly has no arrow modifier and the
+  extraction marked it BOTH.
+- NEVER collapse different parking durations (e.g. "15 MINUTE" and
+  "2 HOUR") into one rule, even if their time windows or days match.
+- Preserve directional differences. Preserve duration differences.
+- If the OCR shows plates with arrows LEFT and RIGHT, the output MUST
+  contain at least one rule with arrow="LEFT" and at least one with
+  arrow="RIGHT".
 `.trim();
 
 
