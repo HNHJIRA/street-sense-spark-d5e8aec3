@@ -14,6 +14,82 @@ const AI_MODEL = "google/gemini-3-flash-preview";
 
 export type ArrowDirection = "left" | "right" | "both" | null;
 
+export interface SignValidationResult {
+  is_valid: boolean;
+  reason: string;
+}
+
+/**
+ * Strict pre-check: confirm the photo actually shows a parking-related
+ * regulatory sign before we spend tokens on full OCR + rule extraction.
+ */
+export async function validateSignImage(
+  imageBase64: string,
+  mime: string,
+  apiKey: string,
+): Promise<SignValidationResult> {
+  const res = await fetch(AI_GATEWAY_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Lovable-API-Key": apiKey,
+      "X-Lovable-AIG-SDK": "raw-fetch",
+    },
+    body: JSON.stringify({
+      model: AI_MODEL,
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a strict gatekeeper. Decide if the image clearly contains at least one US street parking regulatory sign: NO PARKING, NO STOPPING, TOW AWAY, STREET CLEANING/SWEEPING, LOADING ZONE, PERMIT/RPZ, TIME-LIMITED PARKING, METERED PARKING, BUS/TRANSIT ZONE, or RED CURB. Reject photos of people, vehicles, storefronts, food, app screenshots, generic street scenes without legible parking signs, traffic-only signs (STOP, YIELD, speed limits), or blurry/unreadable images.",
+        },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: 'Reply with JSON: {"is_valid": boolean, "reason": string}. Reason is one short sentence.' },
+            { type: "image_url", image_url: { url: `data:${mime};base64,${imageBase64}` } },
+          ],
+        },
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "parking_sign_validation",
+          strict: true,
+          schema: {
+            type: "object",
+            additionalProperties: false,
+            required: ["is_valid", "reason"],
+            properties: {
+              is_valid: { type: "boolean" },
+              reason: { type: "string" },
+            },
+          },
+        },
+      },
+    }),
+  });
+  if (!res.ok) {
+    // Fail open — let OCR run rather than blocking the user on a gateway hiccup.
+    return { is_valid: true, reason: "Validation skipped (gateway error)." };
+  }
+  const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+  const raw = data.choices?.[0]?.message?.content ?? "{}";
+  try {
+    const parsed = JSON.parse(raw) as SignValidationResult;
+    return {
+      is_valid: !!parsed.is_valid,
+      reason:
+        parsed.reason?.trim() ||
+        (parsed.is_valid
+          ? "Parking restriction sign detected"
+          : "Image does not contain a parking regulation sign"),
+    };
+  } catch {
+    return { is_valid: true, reason: "Validation skipped (unparseable response)." };
+  }
+}
+
 export interface RawAiRule {
   type: string;                // free-form, e.g. "NO PARKING", "STREET CLEANING"
   days: string[];              // ["MON","TUE",...]

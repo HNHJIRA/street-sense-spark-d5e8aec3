@@ -8,9 +8,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { LineString } from "geojson";
 import { evaluateRulesAt } from "./engine";
-import { aiRulesToNormalized, callSignScanAi, type AiScanResult, type ArrowDirection, type NormalizedScanRule } from "./sign-ai";
+import { aiRulesToNormalized, callSignScanAi, validateSignImage, type AiScanResult, type ArrowDirection, type NormalizedScanRule } from "./sign-ai";
 import { resolveRuleConflicts } from "./providers/normalize";
 import { buildScanSummary, type ScanSummary } from "./scan-summary";
+import { buildDriverNarrative, buildSideCaption, type DriverNarrative } from "./driver-narrative";
 import type {
   ParkingRule,
   ParkingStatus,
@@ -91,6 +92,25 @@ export interface SignScanResponse {
   source_label: string;
   /** ISO timestamp of when this scan was evaluated (the moment the photo was processed). */
   scanned_at: string;
+  // ===== Driver-facing contract (Phase 10) =====
+  status: "YES" | "NO" | "LIMITED" | "UNKNOWN";
+  driver_summary: string;
+  street_name: string;
+  allowed_until: string | null;
+  time_remaining_seconds: number | null;
+  time_remaining_minutes: number | null;
+  time_remaining_human: string | null;
+  next_restriction_reason: string | null;
+  next_restriction_start: string | null;
+  next_restriction_end: string | null;
+  permit_required: boolean;
+  time_limit_minutes: number | null;
+  left_summary: string | null;
+  right_summary: string | null;
+  ocr_confidence: number;
+  interpretation_confidence: number;
+  decision_confidence: number;
+  narrative: DriverNarrative;
 }
 
 function verdictFromColor(c: ParkingStatus["color"]): "YES" | "NO" | "LIMITED" {
@@ -181,6 +201,15 @@ export const scanSign = createServerFn({ method: "POST" })
 
     const admin = await getAdmin();
     const restrictionTypes = await loadRestrictionTypes(admin);
+
+    // 0) PHASE 1 — strict validation gate. Stop early if the photo isn't a
+    //    parking-regulation sign so we don't burn OCR tokens on garbage.
+    const validation = await validateSignImage(data.imageBase64, data.mimeType, apiKey);
+    if (!validation.is_valid) {
+      throw new Error(
+        "This image does not appear to contain a parking, stopping, loading, tow-away, or street restriction sign.",
+      );
+    }
 
     // 1) Run the AI vision pipeline. aiRulesToNormalized preserves the
     //    per-sign `arrow` direction so we can evaluate left/right separately.
@@ -399,6 +428,40 @@ export const scanSign = createServerFn({ method: "POST" })
     // Persist the summary on the scan row for the accuracy dashboard.
     await admin.from("parking_sign_scans").update({ summary }).eq("id", scanId);
 
+    // ===== Driver Summary Generator (Phase 5/6/7/8) =====
+    const narrative = buildDriverNarrative({
+      decision,
+      parsedRules: aiRules,
+      now: scannedAt,
+      timezone: data.timezone,
+    });
+
+    const leftCaption = sides
+      ? buildSideCaption({
+          side: "left",
+          decision: sides.left.decision,
+          parsedRules: sides.left.rules,
+          timezone: data.timezone,
+        })
+      : null;
+    const rightCaption = sides
+      ? buildSideCaption({
+          side: "right",
+          decision: sides.right.decision,
+          parsedRules: sides.right.rules,
+          timezone: data.timezone,
+        })
+      : null;
+
+    // ===== Confidence breakdown (Phase 9) =====
+    const ocr_confidence = ai.overall_confidence;
+    const interpretation_confidence = ai.rules.length
+      ? ai.rules.reduce((a, r) => a + (r.confidence ?? 0), 0) / ai.rules.length
+      : ai.overall_confidence;
+    const decision_confidence =
+      decision.code === "unknown"
+        ? Math.min(ocr_confidence, interpretation_confidence) * 0.5
+        : Math.min(ocr_confidence, interpretation_confidence);
 
     return {
       scan_id: scanId,
@@ -416,6 +479,25 @@ export const scanSign = createServerFn({ method: "POST" })
       validations,
       source_label: SOURCE_LABELS[segmentSource] ?? segmentSource,
       scanned_at: scannedAt.toISOString(),
+      // Driver-facing contract
+      status: narrative.status,
+      driver_summary: narrative.summary,
+      street_name: segmentName,
+      allowed_until: narrative.allowed_until,
+      time_remaining_seconds: narrative.time_remaining_seconds,
+      time_remaining_minutes: narrative.time_remaining_minutes,
+      time_remaining_human: narrative.time_remaining_human,
+      next_restriction_reason: narrative.next_restriction_reason,
+      next_restriction_start: narrative.next_restriction_start,
+      next_restriction_end: narrative.next_restriction_end,
+      permit_required: narrative.permit_required,
+      time_limit_minutes: narrative.time_limit_minutes,
+      left_summary: leftCaption,
+      right_summary: rightCaption,
+      ocr_confidence,
+      interpretation_confidence,
+      decision_confidence,
+      narrative,
     };
   });
 

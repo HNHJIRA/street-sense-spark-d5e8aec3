@@ -260,16 +260,32 @@ function ScanResult({
         </div>
       )}
 
-      {/* AI summary */}
+      {/* AI driver summary — produced by the deterministic Driver Summary
+          Generator from the engine decision (never raw OCR). */}
       <div className="rounded-3xl border border-border bg-background p-5">
         <div className="mb-2 flex items-center gap-2">
           <MessageSquare className="h-4 w-4 text-primary" />
-          <span className="text-sm font-bold text-foreground">AI summary</span>
+          <span className="text-sm font-bold text-foreground">Driver summary</span>
         </div>
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          {s.plain}
-          {s.time_guidance ? ` ${s.time_guidance}` : ""}
+        <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
+          {result.driver_summary}
         </p>
+        {result.time_remaining_human && (
+          <p className="mt-3 text-xs font-semibold text-foreground">
+            Time remaining: {result.time_remaining_human}
+          </p>
+        )}
+        {(result.left_summary || result.right_summary) && (
+          <div className="mt-4 space-y-1 border-t border-border pt-3 text-xs text-muted-foreground">
+            {result.left_summary && <p>{result.left_summary}</p>}
+            {result.right_summary && <p>{result.right_summary}</p>}
+          </div>
+        )}
+        <div className="mt-3 flex gap-3 text-[10px] uppercase tracking-wider text-muted-foreground">
+          <span>OCR {Math.round(result.ocr_confidence * 100)}%</span>
+          <span>Interp {Math.round(result.interpretation_confidence * 100)}%</span>
+          <span>Decision {Math.round(result.decision_confidence * 100)}%</span>
+        </div>
       </div>
 
       {previewUrl && (
