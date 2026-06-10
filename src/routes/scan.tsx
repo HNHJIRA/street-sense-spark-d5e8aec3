@@ -776,9 +776,28 @@ function buildOfficerParagraph(a: OfficerArgs): string {
 
   // -------- YES / LIMITED — currently parkable --------
 
-  // Multi-side, different end times → describe each side together.
-  if (a.sidesDiffer && a.leftUntil && a.rightUntil) {
-    return `YES. ${prefix} The restriction for the right side allows parking until ${a.rightUntil}, and the restriction for the left side allows parking until ${a.leftUntil} because different rules apply to each direction.`;
+  // Multi-side combined narrative — different rules and/or end times per direction.
+  if (a.sidesDiffer && (a.leftRuleLabel || a.rightRuleLabel || (a.leftUntil && a.rightUntil))) {
+    const rightLbl = a.rightRuleLabel ?? "posted";
+    const leftLbl = a.leftRuleLabel ?? "posted";
+    const bothActive = a.leftActive && a.rightActive;
+    const neitherActive = !a.leftActive && !a.rightActive;
+    if (bothActive) {
+      const rightTail = a.rightUntil ? ` If you park on the right side, you must leave by ${a.rightUntil}.` : "";
+      const leftTail = a.leftUntil ? ` If you park on the left side, you may remain until ${a.leftUntil}.` : "";
+      return `YES. ${prefix} The ${rightLbl} restriction for the right side and the ${leftLbl} restriction for the left side are currently active.${rightTail}${leftTail}`;
+    }
+    if (neitherActive) {
+      const windowClause = a.bothWindow ? ` ${a.bothWindow}` : "";
+      const untilTailNeither = (a.allowedUntilDayLabel ?? a.allowedUntilLabel)
+        ? ` You can park here until ${a.allowedUntilDayLabel ?? a.allowedUntilLabel}.`
+        : "";
+      return `YES. ${prefix} The ${rightLbl} restriction for the right side and the ${leftLbl} restriction for the left side both apply${windowClause}. Since it is currently outside that window, these time limits are not active.${untilTailNeither}`;
+    }
+    // Mixed: fall back to per-side end times.
+    if (a.leftUntil && a.rightUntil) {
+      return `YES. ${prefix} The ${rightLbl} restriction for the right side allows parking until ${a.rightUntil}, and the ${leftLbl} restriction for the left side allows parking until ${a.leftUntil} because different rules apply to each direction.`;
+    }
   }
 
   const untilLabel = a.allowedUntilDayLabel ?? a.allowedUntilLabel;
