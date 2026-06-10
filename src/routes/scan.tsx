@@ -13,6 +13,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { LocationStatusCard } from "@/components/LocationStatusCard";
 import { getCityInfo } from "@/lib/parking/parking.functions";
 import { scanSign, type SignScanResponse } from "@/lib/parking/scan.functions";
+import type { NormalizedRule } from "@/lib/parking/providers/types";
 import { useLocationStore } from "@/stores/location-store";
 import { cn } from "@/lib/utils";
 
@@ -263,12 +264,22 @@ function ScanResult({
     appliesTo === "BOTH"  ? (result.sides ? "on both sides of this sign" : "across this entire curb area")
                           : "";
 
+  // Per-side rule + time-limit: when arrows split the sign, LEFT vs RIGHT
+  // can carry independent rules (e.g. RIGHT=15-min, LEFT=2-hour). The
+  // selected `side` must drive these — never the merged top-level result.
+  const sideRules = sideEval?.rules ?? result.parsed_rules;
+  const sidePrimaryRule = sideRules[0] ?? null;
+  const sideTimeLimit =
+    sideEval
+      ? (sidePrimaryRule?.time_limit_minutes ?? sideEval.decision.time_limit_minutes ?? null)
+      : result.time_limit_minutes;
+
   // Allowed Until: arrival + time_limit, capped at the next restriction start.
   // For YES/LIMITED with a time limit this is distinct from "Next Restriction Starts".
   let allowedUntilIso: string | null = decision.allowed_until ?? null;
-  if (result.time_limit_minutes && (s.status === "LIMITED" || s.status === "YES")) {
+  if (sideTimeLimit && (s.status === "LIMITED" || s.status === "YES")) {
     const start = new Date(result.scanned_at).getTime();
-    let moveBy = start + result.time_limit_minutes * 60_000;
+    let moveBy = start + sideTimeLimit * 60_000;
     if (decision.restriction_starts_at) {
       const changeMs = new Date(decision.restriction_starts_at).getTime();
       if (Number.isFinite(changeMs) && changeMs < moveBy) moveBy = changeMs;
@@ -299,9 +310,10 @@ function ScanResult({
   };
   const currentRuleWindow = ruleWindow(result.current_rule ?? null);
   const nextRuleWindow = ruleWindow(result.next_rule ?? null);
-  // Fallback: posted parsed rule window (HH:MM) when engine has no current rule.
+  // Posted parsed rule window driven by the selected SIDE (so switching
+  // LEFT/RIGHT updates the narrated window).
   const parsedWindow = (() => {
-    const r = result.parsed_rules?.[0];
+    const r = sidePrimaryRule;
     if (!r) return null;
     const a = fmtHHMM(r.time_start), b = fmtHHMM(r.time_end);
     return a && b ? `between ${a} and ${b}` : null;
@@ -325,18 +337,27 @@ function ScanResult({
     }
   }
 
-  const maxStayLabel = result.time_limit_minutes
-    ? (result.time_limit_minutes % 60 === 0
-        ? `${result.time_limit_minutes / 60} Hour${result.time_limit_minutes === 60 ? "" : "s"}`
-        : `${result.time_limit_minutes} minutes`)
+  const maxStayLabel = sideTimeLimit
+    ? (sideTimeLimit % 60 === 0
+        ? `${sideTimeLimit / 60} Hour${sideTimeLimit === 60 ? "" : "s"}`
+        : `${sideTimeLimit} minutes`)
     : null;
 
-  const reasonLabel = result.current_rule?.label ?? s.reason ?? "Posted restriction";
+  // Reason label — prefer the SIDE's own rule when arrows split the sign.
+  const sideReasonFromRule = sidePrimaryRule
+    ? (sidePrimaryRule.time_limit_minutes
+        ? `${sidePrimaryRule.time_limit_minutes % 60 === 0 ? `${sidePrimaryRule.time_limit_minutes/60}-hour` : `${sidePrimaryRule.time_limit_minutes}-minute`} parking`
+        : (sidePrimaryRule.restriction_code ?? "").replace(/_/g, " "))
+    : null;
+  const reasonLabel = sideEval
+    ? (sideReasonFromRule || s.reason || "Posted restriction")
+    : (result.current_rule?.label ?? s.reason ?? "Posted restriction");
   const nextReasonLabel = result.next_rule?.label ?? result.next_restriction_reason ?? null;
 
   // moveByLabel kept for the existing "Until card" UI below.
-  const moveByLabel = allowedUntilLabel && (s.status === "LIMITED" || (s.status === "YES" && result.time_limit_minutes))
+  const moveByLabel = allowedUntilLabel && (s.status === "LIMITED" || (s.status === "YES" && sideTimeLimit))
     ? allowedUntilLabel : null;
+
 
   const arrivalClock = new Date(result.scanned_at).toLocaleTimeString("en-US", {
     hour: "numeric", minute: "2-digit", timeZone: TZ,
@@ -346,15 +367,17 @@ function ScanResult({
   });
 
   // Compute per-side "allowed until" labels when arrows split the sign.
+  // Uses the SIDE's own time_limit (not the merged top-level value).
   const computeAllowedUntilForSide = (sideKey: "left" | "right"): string | null => {
     if (!result.sides) return null;
     const sEval = result.sides[sideKey];
     if (!sEval) return null;
     const dec = sEval.decision;
+    const sideLimit = sEval.rules[0]?.time_limit_minutes ?? dec.time_limit_minutes ?? null;
     let iso: string | null = dec.allowed_until ?? null;
-    if (result.time_limit_minutes && (sEval.summary.status === "LIMITED" || sEval.summary.status === "YES")) {
+    if (sideLimit && (sEval.summary.status === "LIMITED" || sEval.summary.status === "YES")) {
       const start = new Date(result.scanned_at).getTime();
-      let moveBy = start + result.time_limit_minutes * 60_000;
+      let moveBy = start + sideLimit * 60_000;
       if (dec.restriction_starts_at) {
         const changeMs = new Date(dec.restriction_starts_at).getTime();
         if (Number.isFinite(changeMs) && changeMs < moveBy) moveBy = changeMs;
@@ -365,7 +388,42 @@ function ScanResult({
   };
   const leftUntil = computeAllowedUntilForSide("left");
   const rightUntil = computeAllowedUntilForSide("right");
-  const sidesDiffer = !!(result.sides && leftUntil && rightUntil && leftUntil !== rightUntil && side === "both");
+
+  // Per-side rule labels for the combined "both" narrative.
+  const limitLabelFor = (min: number | null | undefined): string | null =>
+    !min ? null : (min % 60 === 0 ? `${min / 60}-hour` : `${min}-minute`);
+  const ruleNounFor = (r: NormalizedRule | null | undefined): string | null => {
+    if (!r) return null;
+    const lim = limitLabelFor(r.time_limit_minutes);
+    if (lim) return `${lim} parking`;
+    const code = (r.restriction_code ?? "").replace(/_/g, " ").trim();
+    return code || null;
+  };
+  const leftRule = result.sides?.left.rules[0] ?? null;
+  const rightRule = result.sides?.right.rules[0] ?? null;
+  const leftRuleLabel = ruleNounFor(leftRule);
+  const rightRuleLabel = ruleNounFor(rightRule);
+  const leftActive = result.sides
+    ? (result.sides.left.summary.status === "LIMITED" ||
+       (result.sides.left.summary.status === "YES" && !!leftRule?.time_limit_minutes))
+    : false;
+  const rightActive = result.sides
+    ? (result.sides.right.summary.status === "LIMITED" ||
+       (result.sides.right.summary.status === "YES" && !!rightRule?.time_limit_minutes))
+    : false;
+  const rulesDiffer = !!(
+    result.sides && side === "both" && leftRule && rightRule &&
+    (leftRule.time_limit_minutes !== rightRule.time_limit_minutes ||
+      leftRule.restriction_code !== rightRule.restriction_code)
+  );
+  const sidesDiffer = !!(result.sides && leftUntil && rightUntil && leftUntil !== rightUntil && side === "both") || rulesDiffer;
+
+  const sideWindowFor = (r: NormalizedRule | null): string | null => {
+    if (!r) return null;
+    const a = fmtHHMM(r.time_start), b = fmtHHMM(r.time_end);
+    return a && b ? `from ${a} to ${b}` : null;
+  };
+  const bothWindow = sideWindowFor(leftRule) ?? sideWindowFor(rightRule);
 
   const officerParagraph = buildOfficerParagraph({
     status: s.status,
@@ -377,7 +435,7 @@ function ScanResult({
     allowedUntilLabel,
     allowedUntilDayLabel,
     maxStayLabel,
-    timeLimitMinutes: result.time_limit_minutes ?? null,
+    timeLimitMinutes: sideTimeLimit ?? null,
     nextReasonLabel,
     nextStartLabel,
     nextStartDayLabel,
@@ -390,6 +448,11 @@ function ScanResult({
     sidesDiffer,
     leftUntil,
     rightUntil,
+    leftRuleLabel,
+    rightRuleLabel,
+    leftActive,
+    rightActive,
+    bothWindow,
     restrictionStartsLabel: nextStartLabel,
     decisionConfidence: result.decision_confidence ?? 0,
   });
@@ -662,6 +725,11 @@ interface OfficerArgs {
   sidesDiffer: boolean;
   leftUntil: string | null;
   rightUntil: string | null;
+  leftRuleLabel: string | null;
+  rightRuleLabel: string | null;
+  leftActive: boolean;
+  rightActive: boolean;
+  bothWindow: string | null;
   restrictionStartsLabel: string | null;
   decisionConfidence: number;
 }
@@ -708,9 +776,28 @@ function buildOfficerParagraph(a: OfficerArgs): string {
 
   // -------- YES / LIMITED — currently parkable --------
 
-  // Multi-side, different end times → describe each side together.
-  if (a.sidesDiffer && a.leftUntil && a.rightUntil) {
-    return `YES. ${prefix} The restriction for the right side allows parking until ${a.rightUntil}, and the restriction for the left side allows parking until ${a.leftUntil} because different rules apply to each direction.`;
+  // Multi-side combined narrative — different rules and/or end times per direction.
+  if (a.sidesDiffer && (a.leftRuleLabel || a.rightRuleLabel || (a.leftUntil && a.rightUntil))) {
+    const rightLbl = a.rightRuleLabel ?? "posted";
+    const leftLbl = a.leftRuleLabel ?? "posted";
+    const bothActive = a.leftActive && a.rightActive;
+    const neitherActive = !a.leftActive && !a.rightActive;
+    if (bothActive) {
+      const rightTail = a.rightUntil ? ` If you park on the right side, you must leave by ${a.rightUntil}.` : "";
+      const leftTail = a.leftUntil ? ` If you park on the left side, you may remain until ${a.leftUntil}.` : "";
+      return `YES. ${prefix} The ${rightLbl} restriction for the right side and the ${leftLbl} restriction for the left side are currently active.${rightTail}${leftTail}`;
+    }
+    if (neitherActive) {
+      const windowClause = a.bothWindow ? ` ${a.bothWindow}` : "";
+      const untilTailNeither = (a.allowedUntilDayLabel ?? a.allowedUntilLabel)
+        ? ` You can park here until ${a.allowedUntilDayLabel ?? a.allowedUntilLabel}.`
+        : "";
+      return `YES. ${prefix} The ${rightLbl} restriction for the right side and the ${leftLbl} restriction for the left side both apply${windowClause}. Since it is currently outside that window, these time limits are not active.${untilTailNeither}`;
+    }
+    // Mixed: fall back to per-side end times.
+    if (a.leftUntil && a.rightUntil) {
+      return `YES. ${prefix} The ${rightLbl} restriction for the right side allows parking until ${a.rightUntil}, and the ${leftLbl} restriction for the left side allows parking until ${a.leftUntil} because different rules apply to each direction.`;
+    }
   }
 
   const untilLabel = a.allowedUntilDayLabel ?? a.allowedUntilLabel;
