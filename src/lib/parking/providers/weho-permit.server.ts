@@ -4,7 +4,7 @@
 // segments; it overlays a `permit` rule onto every WeHo street_segment
 // whose geometry intersects a district polygon, via the
 // `apply_permit_polygon_overlay` PostGIS function.
-import type { OverlayProvider } from "./types";
+import type { OverlayProvider, OverlayResult, OverlayContext, SyncBbox } from "./types";
 import { fetchArcgis } from "./_la-shared.server";
 
 const ENDPOINT =
@@ -21,7 +21,7 @@ export const WestHollywoodPermitOverlay: OverlayProvider = {
   name: "West Hollywood Permit Districts",
   cities: ["west-hollywood"],
 
-  async applyOverlay(_citySlug, bbox, ctx) {
+  async applyOverlay(_citySlug: string, bbox: SyncBbox, ctx: OverlayContext): Promise<OverlayResult> {
     const json = await fetchArcgis(ENDPOINT, {
       geometry: `${bbox.minLng},${bbox.minLat},${bbox.maxLng},${bbox.maxLat}`,
       geometryType: "esriGeometryEnvelope",
