@@ -391,6 +391,7 @@ function ScanResult({
     leftUntil,
     rightUntil,
     restrictionStartsLabel: nextStartLabel,
+    decisionConfidence: result.decision_confidence ?? 0,
   });
   // sideClause/timeRemainingLabel intentionally unused here but kept for other UI.
   void sideClause; void timeRemainingLabel;
