@@ -20,10 +20,6 @@ function setHourMinute(base: Date, hour: number, minute: number, allowPast: bool
   return d;
 }
 
-function toTimeInputValue(d: Date): string {
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-}
-
 function toClockParts(d: Date): { hour: string; minute: string; period: Meridiem } {
   const hours = d.getHours();
   return {
