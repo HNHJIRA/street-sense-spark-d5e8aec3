@@ -289,19 +289,52 @@ function ScanResult({
   const arrivalClock = new Date(result.scanned_at).toLocaleTimeString("en-US", {
     hour: "numeric", minute: "2-digit", timeZone: TZ,
   });
+  const nowDay = new Date(result.scanned_at).toLocaleDateString("en-US", {
+    weekday: "long", timeZone: TZ,
+  });
+
+  // Compute per-side "allowed until" labels when arrows split the sign.
+  const computeAllowedUntilForSide = (sideKey: "left" | "right"): string | null => {
+    if (!result.sides) return null;
+    const sEval = result.sides[sideKey];
+    if (!sEval) return null;
+    const dec = sEval.decision;
+    let iso: string | null = dec.allowed_until ?? null;
+    if (result.time_limit_minutes && (sEval.summary.status === "LIMITED" || sEval.summary.status === "YES")) {
+      const start = new Date(result.scanned_at).getTime();
+      let moveBy = start + result.time_limit_minutes * 60_000;
+      if (dec.restriction_starts_at) {
+        const changeMs = new Date(dec.restriction_starts_at).getTime();
+        if (Number.isFinite(changeMs) && changeMs < moveBy) moveBy = changeMs;
+      }
+      iso = new Date(moveBy).toISOString();
+    }
+    return fmtClock(iso);
+  };
+  const leftUntil = computeAllowedUntilForSide("left");
+  const rightUntil = computeAllowedUntilForSide("right");
+  const sidesDiffer = !!(result.sides && leftUntil && rightUntil && leftUntil !== rightUntil && side === "both");
+
   const officerParagraph = buildOfficerParagraph({
     status: s.status,
     reason: reasonLabel,
-    sideClause,
-    arrivalClock,
+    appliesTo,
+    hasArrows: !!result.sides,
+    nowClock: arrivalClock,
+    nowDay,
     allowedUntilLabel,
-    timeRemainingLabel,
     maxStayLabel,
+    timeLimitMinutes: result.time_limit_minutes ?? null,
     nextReasonLabel,
     nextStartLabel,
     nextEndLabel,
-    permitZone: decision.permit_zone,
+    sidesDiffer,
+    leftUntil,
+    rightUntil,
+    restrictionStartsLabel: nextStartLabel,
   });
+  // sideClause/timeRemainingLabel intentionally unused here but kept for other UI.
+  void sideClause; void timeRemainingLabel;
 
 
   return (
