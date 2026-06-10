@@ -263,3 +263,4 @@ export function buildSideCaption(args: {
   }
   return `The ${sideLabel} side could not be interpreted — verify the posted sign.`;
 }
+
