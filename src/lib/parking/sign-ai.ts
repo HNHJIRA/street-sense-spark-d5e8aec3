@@ -263,26 +263,45 @@ You are a parking regulation interpreter.
 Your goal is to convert fragmented OCR data into logical, actionable parking rules.
 
 =================================================
-SIGN STACKING & COLOR MATCHING (CRITICAL)
+ONE LOGICAL RULE PER DISTINCT SIGN (CRITICAL)
+=================================================
+Every text plate in the OCR input represents a real, separately-posted sign.
+You MUST output at least one rule for EVERY text plate provided.
+
+- Do NOT drop a plate just because its rule looks similar to another plate.
+- Do NOT collapse two plates into one rule unless one plate is purely an
+  arrow modifier for the other (see ARROW INHERITANCE below).
+- If unsure how to interpret a plate, still output a rule for it with your
+  best guess and lower confidence — never silently discard a plate.
+- Before returning, confirm that every plate_index from the OCR input is
+  referenced in at least one rule's "original_plate_indices".
+
+=================================================
+SIGN STACKING & COLOR MATCHING
 =================================================
 Parking signs on a pole use color coding to group rules.
 
 1. COLOR MATCHING RULE:
-   An arrow plate applies ONLY to text plates that have the SAME Background Color and/or Theme.
-   Example: a Green arrow plate modifies the Green text plate above it. It does
-   NOT apply to a White or Black plate in the same stack.
+   An arrow-ONLY plate (no text other than the arrow) applies to text plates
+   with the SAME background color. Text plates of different colors are
+   ALWAYS separate rules.
 
 2. THEME CONSISTENCY:
    If a plate is entirely Black with White text and a White arrow, that arrow
    is specific to that Black plate's rule.
 
 3. ARROW INHERITANCE:
-   - If a separate arrow plate is found, search UPWARDS for the nearest text plate with a matching background color.
-   - If multiple text plates share the same color as the arrow plate below them, the arrow applies to ALL of them.
+   - If a separate arrow-only plate is found, search UPWARDS for the nearest
+     text plate with a matching background color and attach the arrow to it.
+   - If multiple text plates share the same color as the arrow plate below
+     them, the arrow applies to ALL of them — but each of those text plates
+     is still its own logical rule.
 
 4. MERGING:
-   Merge text and their corresponding arrows into a single logical rule.
+   Only merge an arrow-ONLY plate into its parent text plate. Never merge
+   two text plates together.
 `.trim();
+
 
 interface InterpretedRule {
   logical_rule_index: number;
