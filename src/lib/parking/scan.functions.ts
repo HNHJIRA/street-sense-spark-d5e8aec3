@@ -202,6 +202,15 @@ export const scanSign = createServerFn({ method: "POST" })
     const admin = await getAdmin();
     const restrictionTypes = await loadRestrictionTypes(admin);
 
+    // 0) PHASE 1 — strict validation gate. Stop early if the photo isn't a
+    //    parking-regulation sign so we don't burn OCR tokens on garbage.
+    const validation = await validateSignImage(data.imageBase64, data.mimeType, apiKey);
+    if (!validation.is_valid) {
+      throw new Error(
+        "This image does not appear to contain a parking, stopping, loading, tow-away, or street restriction sign.",
+      );
+    }
+
     // 1) Run the AI vision pipeline. aiRulesToNormalized preserves the
     //    per-sign `arrow` direction so we can evaluate left/right separately.
     const ai: AiScanResult = await callSignScanAi(data.imageBase64, data.mimeType, apiKey);
