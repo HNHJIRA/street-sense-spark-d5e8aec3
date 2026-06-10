@@ -537,3 +537,68 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
+function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div>
+      <dt className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{label}</dt>
+      <dd className="mt-0.5 text-sm font-semibold text-foreground">{value}</dd>
+    </div>
+  );
+}
+
+interface OfficerArgs {
+  status: "YES" | "NO" | "LIMITED" | "UNKNOWN";
+  reason: string;
+  sideClause: string;
+  arrivalClock: string;
+  allowedUntilLabel: string | null;
+  timeRemainingLabel: string | null;
+  maxStayLabel: string | null;
+  nextReasonLabel: string | null;
+  nextStartLabel: string | null;
+  nextEndLabel: string | null;
+  permitZone: string | null;
+}
+
+function buildOfficerParagraph(a: OfficerArgs): string {
+  const sideTail = a.sideClause ? ` ${a.sideClause}` : "";
+  const parts: string[] = [];
+
+  if (a.status === "UNKNOWN") {
+    return "We could not verify the rule from this sign with enough confidence. Please read the posted signage carefully before parking — do not rely on this scan alone.";
+  }
+
+  if (a.status === "YES") {
+    parts.push(`You can park here right now${sideTail}.`);
+    parts.push(`A ${a.reason.toLowerCase()} rule is currently in effect.`);
+    if (a.maxStayLabel && a.allowedUntilLabel) {
+      parts.push(`Because you arrived at ${a.arrivalClock}, the ${a.maxStayLabel.toLowerCase()} limit means you may remain parked until ${a.allowedUntilLabel}.`);
+    } else if (a.allowedUntilLabel) {
+      parts.push(`You may remain parked until ${a.allowedUntilLabel}.`);
+    }
+    if (a.permitZone) parts.push(`Permit zone ${a.permitZone} is required.`);
+  } else if (a.status === "LIMITED") {
+    parts.push(`You can park here right now${sideTail}, but with restrictions.`);
+    parts.push(`A ${a.reason.toLowerCase()} rule is currently active.`);
+    if (a.maxStayLabel) parts.push(`The maximum stay is ${a.maxStayLabel}.`);
+    if (a.allowedUntilLabel) parts.push(`Based on your arrival at ${a.arrivalClock}, you must move your vehicle by ${a.allowedUntilLabel}.`);
+    if (a.permitZone) parts.push(`Permit zone ${a.permitZone} is required.`);
+  } else {
+    parts.push(`You cannot park here right now${sideTail}.`);
+    parts.push(`A ${a.reason.toLowerCase()} restriction is currently in effect.`);
+    if (a.nextEndLabel) parts.push(`This restriction ends at ${a.nextEndLabel}, after which parking becomes available again.`);
+  }
+
+  if (a.nextReasonLabel && a.nextStartLabel) {
+    const windowTail = a.nextEndLabel ? ` and runs until ${a.nextEndLabel}` : "";
+    parts.push(`At ${a.nextStartLabel} the curb changes to ${a.nextReasonLabel}${windowTail}. If you plan to stay beyond that time, move your vehicle before it begins.`);
+  }
+
+  if (a.sideClause.includes("entire curb area")) {
+    parts.push("This sign does not contain directional arrows, so the rule applies to this entire curb area.");
+  }
+
+  return parts.join(" ");
+}
+
+
