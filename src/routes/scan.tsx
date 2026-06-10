@@ -219,6 +219,21 @@ function ScanResult({
   const nextChange = s.timeline.find((t) => t.when !== "now");
   const untilTime = nextChange?.when_label ?? null;
 
+  // For LIMITED parking, compute "you must move by" = scanned_at + time_limit,
+  // capped at the next rule change. This is the user-actionable "until" time.
+  let moveByLabel: string | null = null;
+  if (s.status === "LIMITED" && result.time_limit_minutes) {
+    const start = new Date(result.scanned_at).getTime();
+    let moveBy = start + result.time_limit_minutes * 60_000;
+    if (nextChange?.when) {
+      const changeMs = new Date(nextChange.when).getTime();
+      if (Number.isFinite(changeMs) && changeMs < moveBy) moveBy = changeMs;
+    }
+    moveByLabel = new Date(moveBy).toLocaleTimeString("en-US", {
+      hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles",
+    });
+  }
+
   return (
     <div className="mt-5 space-y-5">
       {/* Directional arrow chooser — only shown when AI detected ←/→ arrows */}
