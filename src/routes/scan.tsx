@@ -55,19 +55,27 @@ function ScanPage() {
       setError("Image must be under 6 MB. Try a different photo.");
       return;
     }
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setPreviewUrl(URL.createObjectURL(file));
+    // HEIC/HEIF from iOS cameras won't render in <img>. Catch early.
+    const isHeic = /heic|heif/i.test(file.type) || /\.(heic|heif)$/i.test(file.name);
+    if (isHeic) {
+      setError("HEIC images aren't supported in the browser. In iPhone Settings → Camera → Formats, choose 'Most Compatible', or upload a JPG/PNG.");
+      return;
+    }
 
     setLoading(true);
     try {
       const base64 = await fileToBase64(file);
+      const mimeType = file.type || "image/jpeg";
+      // Use a data URL for preview so it renders reliably across browsers
+      // (blob: URLs can be flaky on some mobile WebViews / privacy modes).
+      setPreviewUrl(`data:${mimeType};base64,${base64}`);
       // Use the global GPS store — live fix, then last-known, then null.
       const fix = liveLocation ?? lastKnown;
       const res = await scan({
         data: {
           cityId: city.id, citySlug: city.slug, timezone: "America/Los_Angeles",
           imageBase64: base64,
-          mimeType: file.type || "image/jpeg",
+          mimeType,
           lng: fix?.lng ?? null, lat: fix?.lat ?? null,
         },
       });
