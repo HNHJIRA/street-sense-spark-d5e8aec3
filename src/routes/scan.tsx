@@ -537,7 +537,7 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
-function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
+function DetailRow({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div>
       <dt className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{label}</dt>
