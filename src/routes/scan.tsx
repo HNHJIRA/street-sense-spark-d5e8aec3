@@ -288,6 +288,71 @@ function ScanResult({
         </div>
       </div>
 
+      {/* Upcoming rules timeline (Edge case 1 / 10) */}
+      {(result.current_rule || result.next_rule || result.following_rule) && (
+        <div className="rounded-3xl border border-border bg-background p-5">
+          <div className="mb-3 text-sm font-bold text-foreground">Rule timeline</div>
+          <div className="space-y-3 text-xs">
+            {result.current_rule && (
+              <div>
+                <div className="font-semibold text-foreground">Current: {result.current_rule.label}</div>
+                <div className="text-muted-foreground">Active until {result.current_rule.ends_at_human}</div>
+              </div>
+            )}
+            {result.next_rule && (
+              <div>
+                <div className="font-semibold text-foreground">Next: {result.next_rule.label}</div>
+                <div className="text-muted-foreground">
+                  Begins {result.next_rule.starts_at_human}
+                  {result.countdown_to_next_rule ? ` · in ${result.countdown_to_next_rule}` : ""}
+                </div>
+              </div>
+            )}
+            {result.following_rule && (
+              <div>
+                <div className="font-semibold text-foreground">Following: {result.following_rule.label}</div>
+                <div className="text-muted-foreground">
+                  Begins {result.following_rule.starts_at_human}
+                  {result.countdown_to_following_rule ? ` · in ${result.countdown_to_following_rule}` : ""}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Risk + conflict badges */}
+      <div className="flex flex-wrap gap-2">
+        <span
+          className={cn(
+            "rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wider",
+            result.risk_level === "HIGH" && "bg-park-red/15 text-park-red",
+            result.risk_level === "MEDIUM" && "bg-park-yellow/15 text-park-yellow",
+            result.risk_level === "LOW" && "bg-park-green/15 text-park-green",
+          )}
+        >
+          Risk: {result.risk_level}
+        </span>
+        {result.permit_required && (
+          <span className="rounded-full bg-primary/15 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-primary">
+            Permit required
+          </span>
+        )}
+        {result.time_limit_minutes && (
+          <span className="rounded-full bg-surface px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+            {result.time_limit_minutes} min limit
+          </span>
+        )}
+      </div>
+
+      {result.conflict_detected && (
+        <div className="rounded-3xl border border-park-yellow/40 bg-park-yellow-soft p-5 text-sm">
+          <div className="mb-1 font-bold text-park-yellow">City data ≠ scanned sign</div>
+          <p className="text-xs text-foreground/80">{result.conflict_summary}</p>
+        </div>
+      )}
+
+
       {previewUrl && (
         <img src={previewUrl} alt="Captured sign" className="w-full rounded-3xl border border-border opacity-80" />
       )}
