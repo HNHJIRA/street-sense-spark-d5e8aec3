@@ -97,7 +97,7 @@ export const getLACoverage = createServerFn({ method: "GET" })
     if (cityIds.length) {
       const { data } = await admin
         .from("provider_health")
-        .select("provider, city_id, status, last_success_at, last_error, last_error_at, segments_imported")
+        .select("provider, city_id, healthy, last_success_at, last_error, last_error_at, segments_total, notes")
         .in("city_id", cityIds);
       health = (data ?? []) as any[];
     }
