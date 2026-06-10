@@ -663,56 +663,68 @@ interface OfficerArgs {
   leftUntil: string | null;
   rightUntil: string | null;
   restrictionStartsLabel: string | null;
+  decisionConfidence: number;
 }
 
+// Narrator-only side phrase. Uses ONLY the supplied arrow value — never guesses.
 function sidePhrase(appliesTo: OfficerArgs["appliesTo"], hasArrows: boolean): string {
-  if (!hasArrows) return "";
+  if (!hasArrows || appliesTo === "NONE") return "there are no arrows, so the rule applies here";
   if (appliesTo === "LEFT") return "on the left side of this sign";
   if (appliesTo === "RIGHT") return "on the right side of this sign";
   if (appliesTo === "BOTH") return "on both sides of this sign";
-  return "";
+  return "there are no arrows, so the rule applies here";
 }
 
+/**
+ * Anti-hallucination narrator. This function does NOT decide parking legality
+ * and does NOT invent any facts. Every clause it emits must trace back to a
+ * structured input field. If a field is missing, the corresponding clause is
+ * dropped — never guessed, never estimated.
+ */
 function buildOfficerParagraph(a: OfficerArgs): string {
   const prefix = `it is currently ${a.nowClock} on ${a.nowDay}.`;
 
-  if (a.status === "UNKNOWN") {
+  // Confidence gate — below 0.65 we refuse to narrate the decision.
+  if (a.status === "UNKNOWN" || a.decisionConfidence < 0.65) {
     return `UNKNOWN. ${prefix} The sign could not be interpreted with sufficient confidence. Please inspect the sign manually.`;
   }
 
   const side = sidePhrase(a.appliesTo, a.hasArrows);
-  const sideSuffix = side ? ` ${side}` : "";
-  const sideAnd = side ? ` and ${side}` : "";
+  // Only attach a side suffix when we have a real directional side. The
+  // "no arrows" phrasing is appended as its own clause via `sideAnd`.
+  const directional = a.hasArrows && (a.appliesTo === "LEFT" || a.appliesTo === "RIGHT" || a.appliesTo === "BOTH");
+  const sideSuffix = directional ? ` ${side}` : "";
+  const sideAnd = ` and ${side}`;
 
   if (a.status === "NO") {
-    const reasonLc = a.reason.toLowerCase();
+    const reasonLc = (a.reason || "posted").toLowerCase();
     const window = a.currentRuleWindow ?? a.parsedWindow;
     const windowClause = window ? ` ${window}` : "";
+    // Only emit "becomes available" when the engine actually provided an end.
     const endTail = a.becomesFreeDayLabel
       ? ` Parking becomes available at ${a.becomesFreeDayLabel}.`
-      : a.nextEndLabel ? ` Parking becomes available at ${a.nextEndLabel}.` : "";
+      : a.nextEndLabel
+        ? ` Parking becomes available at ${a.nextEndLabel}.`
+        : "";
     return `NO. ${prefix} A ${reasonLc} restriction is active${sideSuffix}${windowClause}.${endTail}`;
   }
 
-  // YES or LIMITED — currently parkable.
-  // Multi-side different end times → no single "park until" tail.
+  // YES / LIMITED — currently parkable.
+  // Multi-side, different end times → no single "park until" tail.
   if (a.sidesDiffer && a.leftUntil && a.rightUntil) {
     return `YES. ${prefix} The right side of this sign allows parking until ${a.rightUntil}, while the left side allows parking until ${a.leftUntil} because different restrictions apply to each direction.`;
   }
 
-  // Build the explanatory middle sentence.
   let middle: string;
   const reasonLc = (a.reason || "").toLowerCase();
 
   if (a.currentRuleActive && (a.status === "LIMITED" || (a.timeLimitMinutes && a.timeLimitMinutes > 0))) {
-    // A timed restriction (e.g. 1-hour, 2-hour) is currently in effect.
-    const limit = a.maxStayLabel ? a.maxStayLabel.toLowerCase() : `${a.timeLimitMinutes}-minute`;
+    const limit = a.maxStayLabel ? a.maxStayLabel.toLowerCase() : (a.timeLimitMinutes ? `${a.timeLimitMinutes}-minute` : "posted");
     const window = a.currentRuleWindow ? ` ${a.currentRuleWindow}` : "";
     middle = `A ${limit} parking restriction applies here${window}${sideAnd}.`;
   } else if (!a.currentRuleActive && a.nextStartLabel && (a.nextRuleWindow || a.parsedWindow)) {
-    // Restriction exists on the sign but is not active right now.
-    const window = a.nextRuleWindow ?? a.parsedWindow!;
-    const what = a.nextReasonLabel ? a.nextReasonLabel.toLowerCase() : reasonLc || "posted";
+    const window = (a.nextRuleWindow ?? a.parsedWindow)!;
+    const what = a.nextReasonLabel ? a.nextReasonLabel.toLowerCase() : (reasonLc || "posted");
     middle = `The ${what} restriction${sideSuffix} only applies ${window.replace(/^between /, "from ").replace(/ and /, " to ")} and is no longer active. Parking is currently allowed.`;
   } else if (a.currentRuleActive && reasonLc && reasonLc !== "free parking") {
     const window = a.currentRuleWindow ? ` ${a.currentRuleWindow}` : "";
