@@ -283,14 +283,31 @@ function ScanResult({
       </div>
 
       {/* Until card */}
-      {untilTime && (
+      {(untilTime || moveByLabel) && (
         <div className="rounded-3xl bg-surface p-5">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-            {palette.untilLabel}
-          </div>
-          <div className="mt-1 font-display text-3xl font-extrabold text-foreground">
-            {untilTime}
-          </div>
+          {moveByLabel && (
+            <>
+              <div className="text-[11px] font-bold uppercase tracking-wider text-park-yellow">
+                Park until
+              </div>
+              <div className="mt-1 font-display text-3xl font-extrabold text-foreground">
+                {moveByLabel}
+              </div>
+              <div className="mt-1 text-xs text-muted-foreground">
+                Move your car by this time to avoid a ticket.
+              </div>
+            </>
+          )}
+          {untilTime && (
+            <div className={cn(moveByLabel && "mt-4 border-t border-border pt-4")}>
+              <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                {palette.untilLabel}
+              </div>
+              <div className="mt-1 font-display text-2xl font-extrabold text-foreground">
+                {untilTime}
+              </div>
+            </div>
+          )}
           <button className="mt-4 flex w-full items-center justify-center gap-2 rounded-full border-2 border-primary py-3 text-sm font-bold text-primary">
             <Bell className="h-4 w-4" /> Set a reminder
           </button>
