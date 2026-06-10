@@ -59,3 +59,35 @@ export interface ParkingProvider {
    */
   fetchSegments(citySlug: string, bbox: SyncBbox): Promise<NormalizedSegment[]>;
 }
+
+/** Minimal supabase-admin surface passed to overlay providers. */
+export interface OverlayContext {
+  cityId: string;
+  admin: { rpc: (n: string, a?: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }> };
+}
+
+export interface OverlayResult {
+  segments_touched: number;
+  rules_inserted: number;
+  polygons_fetched: number;
+  error?: string;
+}
+
+/**
+ * Overlay providers attach rules onto existing segments via PostGIS spatial
+ * joins instead of creating new segments. They are dispatched separately by
+ * `syncProvider`.
+ */
+export interface OverlayProvider {
+  readonly kind: "overlay";
+  readonly id: string;
+  readonly name: string;
+  readonly cities: string[];
+  applyOverlay(citySlug: string, bbox: SyncBbox, ctx: OverlayContext): Promise<OverlayResult>;
+}
+
+export type AnyProvider = ParkingProvider | OverlayProvider;
+
+export function isOverlayProvider(p: AnyProvider): p is OverlayProvider {
+  return (p as OverlayProvider).kind === "overlay";
+}

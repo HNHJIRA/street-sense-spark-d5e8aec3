@@ -108,7 +108,7 @@ function LACoveragePage() {
         <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, background: "white", overflow: "auto" }}>
           <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
             <thead style={{ background: "#f8fafc" }}>
-              <tr>{["Provider", "Status", "Last Success", "Last Error", "Imported"].map((h) => (
+              <tr>{["Provider", "Status", "Last Success", "Last Error / Note", "Imported"].map((h) => (
                 <th key={h} style={th}>{h}</th>
               ))}</tr>
             </thead>
@@ -118,7 +118,9 @@ function LACoveragePage() {
                   <td style={td}>{p.provider}</td>
                   <td style={td}>{p.status}</td>
                   <td style={td}>{p.last_success_at ? new Date(p.last_success_at).toLocaleString() : "—"}</td>
-                  <td style={{ ...td, color: p.last_error ? "#dc2626" : undefined }}>{p.last_error ?? "—"}</td>
+                  <td style={{ ...td, color: p.last_error ? "#dc2626" : "#475569" }}>
+                    {p.last_error ?? p.notes ?? "—"}
+                  </td>
                   <td style={td}>{p.segments_imported ?? 0}</td>
                 </tr>
               ))}

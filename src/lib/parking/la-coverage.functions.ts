@@ -97,9 +97,18 @@ export const getLACoverage = createServerFn({ method: "GET" })
     if (cityIds.length) {
       const { data } = await admin
         .from("provider_health")
-        .select("provider, city_id, status, last_success_at, last_error, last_error_at, segments_imported")
+        .select("provider, city_id, healthy, last_success_at, last_error, last_error_at, segments_total, notes")
         .in("city_id", cityIds);
-      health = (data ?? []) as any[];
+      health = ((data ?? []) as any[]).map((h) => ({
+        provider: h.provider,
+        city_id: h.city_id,
+        status: h.healthy ? "healthy" : "error",
+        last_success_at: h.last_success_at,
+        last_error: h.last_error,
+        last_error_at: h.last_error_at,
+        segments_imported: h.segments_total,
+        notes: h.notes,
+      }));
     }
     return { areas: out, provider_health: health };
   });

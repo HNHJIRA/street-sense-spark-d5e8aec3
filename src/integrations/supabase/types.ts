@@ -425,6 +425,7 @@ export type Database = {
           last_error: string | null
           last_error_at: string | null
           last_success_at: string | null
+          notes: string | null
           provider: string
           segments_total: number
           updated_at: string
@@ -436,6 +437,7 @@ export type Database = {
           last_error?: string | null
           last_error_at?: string | null
           last_success_at?: string | null
+          notes?: string | null
           provider: string
           segments_total?: number
           updated_at?: string
@@ -447,6 +449,7 @@ export type Database = {
           last_error?: string | null
           last_error_at?: string | null
           last_success_at?: string | null
+          notes?: string | null
           provider?: string
           segments_total?: number
           updated_at?: string
@@ -887,6 +890,19 @@ export type Database = {
             }
             Returns: string
           }
+      apply_permit_polygon_overlay: {
+        Args: {
+          p_city_id: string
+          p_notes_prefix?: string
+          p_polygons: Json
+          p_priority?: number
+          p_provider: string
+        }
+        Returns: {
+          rules_inserted: number
+          segments_touched: number
+        }[]
+      }
       city_center_geojson: { Args: { p_slug: string }; Returns: string }
       disablelongtransactions: { Args: never; Returns: string }
       dropgeometrycolumn:
