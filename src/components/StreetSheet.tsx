@@ -131,8 +131,11 @@ export function StreetSheet({ timezone, restrictionTypes, cityId, citySlug }: St
       <div className="absolute inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={() => selectSegment(null)} />
       <div className="absolute inset-x-0 bottom-0 z-50 safe-bottom animate-in slide-in-from-bottom duration-200">
         <div className="mx-auto max-w-md px-3 pb-3">
-          <div className="rounded-3xl border border-border bg-elevated p-5 shadow-2xl">
-            <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-muted" />
+          <div className="flex max-h-[85vh] flex-col overflow-hidden rounded-3xl border border-border bg-elevated shadow-2xl">
+            <div className="shrink-0 px-5 pt-3">
+              <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-muted" />
+            </div>
+            <div className="overflow-y-auto overscroll-contain px-5 pb-5 pt-2">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="font-display text-xl font-bold leading-tight">
