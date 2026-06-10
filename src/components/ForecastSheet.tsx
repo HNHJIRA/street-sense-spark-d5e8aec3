@@ -29,6 +29,7 @@ export function ForecastSheet() {
   const setForecastAt = useAppStore((s) => s.setForecastAt);
   const forecastAt = useAppStore((s) => s.forecastAt);
   const [day, setDay] = useState<0 | 1 | 2>(0);
+  const [customTime, setCustomTime] = useState<string>(() => toTimeInputValue(forecastAt ?? new Date()));
 
   if (!open) return null;
 
