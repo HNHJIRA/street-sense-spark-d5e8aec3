@@ -725,6 +725,11 @@ interface OfficerArgs {
   sidesDiffer: boolean;
   leftUntil: string | null;
   rightUntil: string | null;
+  leftRuleLabel: string | null;
+  rightRuleLabel: string | null;
+  leftActive: boolean;
+  rightActive: boolean;
+  bothWindow: string | null;
   restrictionStartsLabel: string | null;
   decisionConfidence: number;
 }
