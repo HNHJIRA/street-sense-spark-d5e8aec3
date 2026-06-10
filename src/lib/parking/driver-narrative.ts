@@ -264,3 +264,126 @@ export function buildSideCaption(args: {
   return `The ${sideLabel} side could not be interpreted — verify the posted sign.`;
 }
 
+// ============================================================
+// Rule timeline + risk projection (Edge-case sprint)
+// ============================================================
+
+export interface RuleSummary {
+  restriction_type: string;
+  label: string;
+  starts_at: string;
+  ends_at: string;
+  starts_at_human: string;
+  ends_at_human: string;
+  time_until_seconds: number;
+  time_until_human: string;
+  permit_zone: string | null;
+  time_limit_minutes: number | null;
+  notes: string | null;
+}
+
+export type RiskLevel = "LOW" | "MEDIUM" | "HIGH";
+
+const HIGH_RISK_CODES = new Set([
+  "no_parking", "no_stopping", "no_standing", "tow_away", "red_curb", "bus_zone", "transit_zone",
+]);
+const MED_RISK_CODES = new Set(["street_cleaning", "street_sweeping"]);
+
+export function deriveRiskLevel(rules: NormalizedRule[], rawText: string): RiskLevel {
+  const text = (rawText || "").toUpperCase();
+  if (text.includes("TOW AWAY") || text.includes("NO STANDING") || text.includes("ANY TIME") || text.includes("ANYTIME")) return "HIGH";
+  for (const r of rules) if (HIGH_RISK_CODES.has(r.restriction_code)) return "HIGH";
+  for (const r of rules) if (MED_RISK_CODES.has(r.restriction_code)) return "MEDIUM";
+  return "LOW";
+}
+
+interface ZonedNow { weekday: number; minutes: number }
+function zonedNow(d: Date, tz: string): ZonedNow {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz, weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false,
+  }).formatToParts(d);
+  const wd = parts.find((p) => p.type === "weekday")?.value ?? "Sun";
+  const h = parseInt(parts.find((p) => p.type === "hour")?.value ?? "0", 10);
+  const m = parseInt(parts.find((p) => p.type === "minute")?.value ?? "0", 10);
+  const wdMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  return { weekday: wdMap[wd] ?? 0, minutes: (h % 24) * 60 + m };
+}
+function parseHHMM(s: string | null): number | null {
+  if (!s) return null;
+  const [h, m] = s.split(":").map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return null;
+  return h * 60 + m;
+}
+
+interface Occurrence { startIso: string; endIso: string; rule: NormalizedRule; active: boolean }
+function nextOccurrence(rule: NormalizedRule, now: Date, tz: string): Occurrence | null {
+  const z = zonedNow(now, tz);
+  const startM = parseHHMM(rule.time_start) ?? 0;
+  const endM = parseHHMM(rule.time_end) ?? 1440;
+  if (endM <= startM) return null;
+  for (let day = 0; day < 8; day++) {
+    const candWd = (z.weekday + day) % 7;
+    if (!rule.days_of_week.includes(candWd)) continue;
+    if (day === 0 && z.minutes >= startM && z.minutes < endM) {
+      const startIso = new Date(now.getTime() - (z.minutes - startM) * 60000).toISOString();
+      const endIso = new Date(now.getTime() + (endM - z.minutes) * 60000).toISOString();
+      return { startIso, endIso, rule, active: true };
+    }
+    if (day === 0 && z.minutes >= endM) continue;
+    const offsetMin = day * 1440 + startM - z.minutes;
+    const startIso = new Date(now.getTime() + offsetMin * 60000).toISOString();
+    const endIso = new Date(new Date(startIso).getTime() + (endM - startM) * 60000).toISOString();
+    return { startIso, endIso, rule, active: false };
+  }
+  return null;
+}
+
+function toRuleSummary(o: Occurrence, now: Date, tz: string): RuleSummary {
+  const untilSec = Math.max(0, Math.floor((new Date(o.startIso).getTime() - now.getTime()) / 1000));
+  return {
+    restriction_type: o.rule.restriction_code,
+    label: reasonLabel(o.rule.restriction_code),
+    starts_at: o.startIso,
+    ends_at: o.endIso,
+    starts_at_human: fmtDayClock(o.startIso, tz, now),
+    ends_at_human: fmtDayClock(o.endIso, tz, now),
+    time_until_seconds: untilSec,
+    time_until_human: o.active ? "Active now" : humanDuration(untilSec),
+    permit_zone: o.rule.permit_zone,
+    time_limit_minutes: o.rule.time_limit_minutes,
+    notes: o.rule.notes,
+  };
+}
+
+export interface RuleTimeline {
+  current_rule: RuleSummary | null;
+  next_rule: RuleSummary | null;
+  following_rule: RuleSummary | null;
+  countdown_to_next_rule: string | null;
+  countdown_to_following_rule: string | null;
+}
+
+export function buildRuleTimeline(rules: NormalizedRule[], now: Date, tz: string): RuleTimeline {
+  const occurrences: Occurrence[] = [];
+  for (const r of rules) {
+    const occ = nextOccurrence(r, now, tz);
+    if (occ) occurrences.push(occ);
+  }
+  occurrences.sort((a, b) => {
+    if (a.active !== b.active) return a.active ? -1 : 1;
+    return new Date(a.startIso).getTime() - new Date(b.startIso).getTime();
+  });
+  const active = occurrences.find((o) => o.active) ?? null;
+  const future = occurrences.filter((o) => !o.active);
+  const next = future[0] ?? null;
+  const following = future[1] ?? null;
+  return {
+    current_rule: active ? toRuleSummary(active, now, tz) : null,
+    next_rule: next ? toRuleSummary(next, now, tz) : null,
+    following_rule: following ? toRuleSummary(following, now, tz) : null,
+    countdown_to_next_rule: next ? humanDuration(Math.max(0, Math.floor((new Date(next.startIso).getTime() - now.getTime()) / 1000))) : null,
+    countdown_to_following_rule: following ? humanDuration(Math.max(0, Math.floor((new Date(following.startIso).getTime() - now.getTime()) / 1000))) : null,
+  };
+}
+
+
