@@ -289,19 +289,52 @@ function ScanResult({
   const arrivalClock = new Date(result.scanned_at).toLocaleTimeString("en-US", {
     hour: "numeric", minute: "2-digit", timeZone: TZ,
   });
+  const nowDay = new Date(result.scanned_at).toLocaleDateString("en-US", {
+    weekday: "long", timeZone: TZ,
+  });
+
+  // Compute per-side "allowed until" labels when arrows split the sign.
+  const computeAllowedUntilForSide = (sideKey: "left" | "right"): string | null => {
+    if (!result.sides) return null;
+    const sEval = result.sides[sideKey];
+    if (!sEval) return null;
+    const dec = sEval.decision;
+    let iso: string | null = dec.allowed_until ?? null;
+    if (result.time_limit_minutes && (sEval.summary.status === "LIMITED" || sEval.summary.status === "YES")) {
+      const start = new Date(result.scanned_at).getTime();
+      let moveBy = start + result.time_limit_minutes * 60_000;
+      if (dec.restriction_starts_at) {
+        const changeMs = new Date(dec.restriction_starts_at).getTime();
+        if (Number.isFinite(changeMs) && changeMs < moveBy) moveBy = changeMs;
+      }
+      iso = new Date(moveBy).toISOString();
+    }
+    return fmtClock(iso);
+  };
+  const leftUntil = computeAllowedUntilForSide("left");
+  const rightUntil = computeAllowedUntilForSide("right");
+  const sidesDiffer = !!(result.sides && leftUntil && rightUntil && leftUntil !== rightUntil && side === "both");
+
   const officerParagraph = buildOfficerParagraph({
     status: s.status,
     reason: reasonLabel,
-    sideClause,
-    arrivalClock,
+    appliesTo,
+    hasArrows: !!result.sides,
+    nowClock: arrivalClock,
+    nowDay,
     allowedUntilLabel,
-    timeRemainingLabel,
     maxStayLabel,
+    timeLimitMinutes: result.time_limit_minutes ?? null,
     nextReasonLabel,
     nextStartLabel,
     nextEndLabel,
-    permitZone: decision.permit_zone,
+    sidesDiffer,
+    leftUntil,
+    rightUntil,
+    restrictionStartsLabel: nextStartLabel,
   });
+  // sideClause/timeRemainingLabel intentionally unused here but kept for other UI.
+  void sideClause; void timeRemainingLabel;
 
 
   return (
@@ -549,56 +582,77 @@ function DetailRow({ label, value }: { label: string; value: ReactNode }) {
 interface OfficerArgs {
   status: "YES" | "NO" | "LIMITED" | "UNKNOWN";
   reason: string;
-  sideClause: string;
-  arrivalClock: string;
+  appliesTo: "LEFT" | "RIGHT" | "BOTH" | "NONE";
+  hasArrows: boolean;
+  nowClock: string;
+  nowDay: string;
   allowedUntilLabel: string | null;
-  timeRemainingLabel: string | null;
   maxStayLabel: string | null;
+  timeLimitMinutes: number | null;
   nextReasonLabel: string | null;
   nextStartLabel: string | null;
   nextEndLabel: string | null;
-  permitZone: string | null;
+  sidesDiffer: boolean;
+  leftUntil: string | null;
+  rightUntil: string | null;
+  restrictionStartsLabel: string | null;
+}
+
+function sidePhrase(appliesTo: OfficerArgs["appliesTo"], hasArrows: boolean): string {
+  if (!hasArrows) return "there are no arrows, so the rule applies here";
+  if (appliesTo === "LEFT") return "this applies on the left side of this sign";
+  if (appliesTo === "RIGHT") return "this applies on the right side of this sign";
+  if (appliesTo === "BOTH") return "this applies on both sides of this sign";
+  return "there are no arrows, so the rule applies here";
 }
 
 function buildOfficerParagraph(a: OfficerArgs): string {
-  const sideTail = a.sideClause ? ` ${a.sideClause}` : "";
-  const parts: string[] = [];
+  const prefix = `it is currently ${a.nowClock} on ${a.nowDay}.`;
 
   if (a.status === "UNKNOWN") {
-    return "We could not verify the rule from this sign with enough confidence. Please read the posted signage carefully before parking — do not rely on this scan alone.";
+    return `UNKNOWN. ${prefix} The sign could not be interpreted with sufficient confidence. Please inspect the sign manually.`;
   }
 
-  if (a.status === "YES") {
-    parts.push(`You can park here right now${sideTail}.`);
-    parts.push(`A ${a.reason.toLowerCase()} rule is currently in effect.`);
-    if (a.maxStayLabel && a.allowedUntilLabel) {
-      parts.push(`Because you arrived at ${a.arrivalClock}, the ${a.maxStayLabel.toLowerCase()} limit means you may remain parked until ${a.allowedUntilLabel}.`);
-    } else if (a.allowedUntilLabel) {
-      parts.push(`You may remain parked until ${a.allowedUntilLabel}.`);
-    }
-    if (a.permitZone) parts.push(`Permit zone ${a.permitZone} is required.`);
-  } else if (a.status === "LIMITED") {
-    parts.push(`You can park here right now${sideTail}, but with restrictions.`);
-    parts.push(`A ${a.reason.toLowerCase()} rule is currently active.`);
-    if (a.maxStayLabel) parts.push(`The maximum stay is ${a.maxStayLabel}.`);
-    if (a.allowedUntilLabel) parts.push(`Based on your arrival at ${a.arrivalClock}, you must move your vehicle by ${a.allowedUntilLabel}.`);
-    if (a.permitZone) parts.push(`Permit zone ${a.permitZone} is required.`);
+  const side = sidePhrase(a.appliesTo, a.hasArrows);
+
+  if (a.status === "NO") {
+    const reasonLc = a.reason.toLowerCase();
+    const endTail = a.nextEndLabel ? ` Parking becomes available at ${a.nextEndLabel}.` : "";
+    return `NO. ${prefix} ${capitalize(reasonLc)} is active and ${side}.${endTail}`;
+  }
+
+  // YES or LIMITED — both currently parkable
+  // Multi-side different end times → no single "park until" tail
+  if (a.sidesDiffer && a.leftUntil && a.rightUntil) {
+    return `YES. ${prefix} The right side of this sign allows parking until ${a.rightUntil}, while the left side allows parking until ${a.leftUntil} because different restrictions apply to each direction.`;
+  }
+
+  // Build the explanatory middle sentence
+  let middle: string;
+  if (a.status === "LIMITED" || (a.timeLimitMinutes && a.timeLimitMinutes > 0)) {
+    const limit = a.maxStayLabel ? a.maxStayLabel.toLowerCase() : `${a.timeLimitMinutes}-minute`;
+    middle = `A ${limit} parking restriction is currently active and ${side}.`;
+  } else if (a.nextStartLabel && a.reason.toLowerCase().includes("free")) {
+    middle = `Parking is currently unrestricted.`;
+  } else if (a.reason && a.reason.toLowerCase() !== "free parking") {
+    middle = `${capitalize(a.reason)} is currently in effect and ${side}.`;
   } else {
-    parts.push(`You cannot park here right now${sideTail}.`);
-    parts.push(`A ${a.reason.toLowerCase()} restriction is currently in effect.`);
-    if (a.nextEndLabel) parts.push(`This restriction ends at ${a.nextEndLabel}, after which parking becomes available again.`);
+    middle = `Parking is currently unrestricted.`;
   }
 
-  if (a.nextReasonLabel && a.nextStartLabel) {
-    const windowTail = a.nextEndLabel ? ` and runs until ${a.nextEndLabel}` : "";
-    parts.push(`At ${a.nextStartLabel} the curb changes to ${a.nextReasonLabel}${windowTail}. If you plan to stay beyond that time, move your vehicle before it begins.`);
-  }
+  const until = a.allowedUntilLabel
+    ? ` You can park here until ${a.allowedUntilLabel}.`
+    : "";
 
-  if (a.sideClause.includes("entire curb area")) {
-    parts.push("This sign does not contain directional arrows, so the rule applies to this entire curb area.");
-  }
+  const nextTail = a.nextReasonLabel && a.nextStartLabel && a.nextStartLabel !== a.allowedUntilLabel
+    ? ` ${a.nextReasonLabel} begins at ${a.nextStartLabel}.`
+    : "";
 
-  return parts.join(" ");
+  return `YES. ${prefix} ${middle}${until}${nextTail}`;
+}
+
+function capitalize(s: string): string {
+  return s.length ? s[0].toUpperCase() + s.slice(1) : s;
 }
 
 
