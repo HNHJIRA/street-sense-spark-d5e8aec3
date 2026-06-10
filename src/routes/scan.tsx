@@ -646,11 +646,18 @@ interface OfficerArgs {
   nowClock: string;
   nowDay: string;
   allowedUntilLabel: string | null;
+  allowedUntilDayLabel: string | null;
   maxStayLabel: string | null;
   timeLimitMinutes: number | null;
   nextReasonLabel: string | null;
   nextStartLabel: string | null;
+  nextStartDayLabel: string | null;
   nextEndLabel: string | null;
+  becomesFreeDayLabel: string | null;
+  currentRuleWindow: string | null;
+  nextRuleWindow: string | null;
+  parsedWindow: string | null;
+  currentRuleActive: boolean;
   sidesDiffer: boolean;
   leftUntil: string | null;
   rightUntil: string | null;
@@ -658,11 +665,11 @@ interface OfficerArgs {
 }
 
 function sidePhrase(appliesTo: OfficerArgs["appliesTo"], hasArrows: boolean): string {
-  if (!hasArrows) return "applies here";
-  if (appliesTo === "LEFT") return "applies on the left side of this sign";
-  if (appliesTo === "RIGHT") return "applies on the right side of this sign";
-  if (appliesTo === "BOTH") return "applies on both sides of this sign";
-  return "applies here";
+  if (!hasArrows) return "";
+  if (appliesTo === "LEFT") return "on the left side of this sign";
+  if (appliesTo === "RIGHT") return "on the right side of this sign";
+  if (appliesTo === "BOTH") return "on both sides of this sign";
+  return "";
 }
 
 function buildOfficerParagraph(a: OfficerArgs): string {
@@ -673,42 +680,51 @@ function buildOfficerParagraph(a: OfficerArgs): string {
   }
 
   const side = sidePhrase(a.appliesTo, a.hasArrows);
-  const sideClause = a.hasArrows ? ` and ${side}` : "";
+  const sideSuffix = side ? ` ${side}` : "";
+  const sideAnd = side ? ` and ${side}` : "";
 
   if (a.status === "NO") {
     const reasonLc = a.reason.toLowerCase();
-    const endTail = a.nextEndLabel ? ` Parking becomes available at ${a.nextEndLabel}.` : "";
-    return `NO. ${prefix} ${capitalize(reasonLc)} is active${sideClause}.${endTail}`;
+    const window = a.currentRuleWindow ?? a.parsedWindow;
+    const windowClause = window ? ` ${window}` : "";
+    const endTail = a.becomesFreeDayLabel
+      ? ` Parking becomes available at ${a.becomesFreeDayLabel}.`
+      : a.nextEndLabel ? ` Parking becomes available at ${a.nextEndLabel}.` : "";
+    return `NO. ${prefix} A ${reasonLc} restriction is active${sideSuffix}${windowClause}.${endTail}`;
   }
 
-  // YES or LIMITED — both currently parkable
-  // Multi-side different end times → no single "park until" tail
+  // YES or LIMITED — currently parkable.
+  // Multi-side different end times → no single "park until" tail.
   if (a.sidesDiffer && a.leftUntil && a.rightUntil) {
     return `YES. ${prefix} The right side of this sign allows parking until ${a.rightUntil}, while the left side allows parking until ${a.leftUntil} because different restrictions apply to each direction.`;
   }
 
-  // Build the explanatory middle sentence
+  // Build the explanatory middle sentence.
   let middle: string;
-  if (a.status === "LIMITED" || (a.timeLimitMinutes && a.timeLimitMinutes > 0)) {
+  const reasonLc = (a.reason || "").toLowerCase();
+
+  if (a.currentRuleActive && (a.status === "LIMITED" || (a.timeLimitMinutes && a.timeLimitMinutes > 0))) {
+    // A timed restriction (e.g. 1-hour, 2-hour) is currently in effect.
     const limit = a.maxStayLabel ? a.maxStayLabel.toLowerCase() : `${a.timeLimitMinutes}-minute`;
-    middle = `A ${limit} parking restriction is currently active${sideClause}.`;
-  } else if (a.nextStartLabel && a.reason.toLowerCase().includes("free")) {
-    middle = `Parking is currently unrestricted.`;
-  } else if (a.reason && a.reason.toLowerCase() !== "free parking") {
-    middle = `${capitalize(a.reason)} is currently in effect${sideClause}.`;
+    const window = a.currentRuleWindow ? ` ${a.currentRuleWindow}` : "";
+    middle = `A ${limit} parking restriction applies here${window}${sideAnd}.`;
+  } else if (!a.currentRuleActive && a.nextStartLabel && (a.nextRuleWindow || a.parsedWindow)) {
+    // Restriction exists on the sign but is not active right now.
+    const window = a.nextRuleWindow ?? a.parsedWindow!;
+    const what = a.nextReasonLabel ? a.nextReasonLabel.toLowerCase() : reasonLc || "posted";
+    middle = `The ${what} restriction${sideSuffix} only applies ${window.replace(/^between /, "from ").replace(/ and /, " to ")} and is no longer active. Parking is currently allowed.`;
+  } else if (a.currentRuleActive && reasonLc && reasonLc !== "free parking") {
+    const window = a.currentRuleWindow ? ` ${a.currentRuleWindow}` : "";
+    middle = `${capitalize(reasonLc)} applies here${window}${sideAnd}.`;
   } else {
-    middle = `Parking is currently unrestricted.`;
+    middle = `Parking is currently allowed here.`;
   }
 
-  const until = a.allowedUntilLabel
-    ? ` You can park here until ${a.allowedUntilLabel}.`
-    : "";
+  const untilLabel = a.allowedUntilDayLabel ?? a.allowedUntilLabel;
+  const until = untilLabel ? ` You can park here until ${untilLabel}.` : "";
 
-  const nextTail = a.nextReasonLabel && a.nextStartLabel && a.nextStartLabel !== a.allowedUntilLabel
-    ? ` ${a.nextReasonLabel} begins at ${a.nextStartLabel}.`
-    : "";
-
-  return `YES. ${prefix} ${middle}${until}${nextTail}`;
+  return `YES. ${prefix} ${middle}${until}`;
+}
 }
 
 function capitalize(s: string): string {
