@@ -258,12 +258,16 @@ export const LADOTProvider: ParkingProvider = {
       const allRules: NormalizedRule[] = [];
       if (sweepRule) allRules.push(sweepRule);
       allRules.push(...polRules);
-      // Always include unknown as the catch-all outside posted windows.
-      allRules.push(
-        unknownRule(
-          "Outside posted metered hours, LADOT open data does not confirm whether parking is free, time-limited, or restricted. Verify local signage.",
-        ),
-      );
+      // Only fall back to "unknown" when we have ZERO verified posted rules
+      // for this block. When metered/sweeping rules exist, outside their
+      // windows the engine's default "allowed" (green) is the correct read.
+      if (allRules.length === 0) {
+        allRules.push(
+          unknownRule(
+            "LADOT open data does not contain posted parking restrictions for this block. Verify local signage.",
+          ),
+        );
+      }
 
       out.push({
         external_id: `ladot:meter-block/${++synthId}/${g.blockFace.replace(/\s+/g, "_")}`,
