@@ -286,6 +286,7 @@ export function StreetSheet({ timezone, restrictionTypes, cityId, citySlug }: St
               {data?.source_label ? `Source: ${data.source_label} · ` : ""}Verify posted signs before parking.
             </div>
 
+            </div>
           </div>
         </div>
       </div>
