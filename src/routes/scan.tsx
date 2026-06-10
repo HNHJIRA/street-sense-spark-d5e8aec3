@@ -667,19 +667,24 @@ interface OfficerArgs {
 }
 
 // Narrator-only side phrase. Uses ONLY the supplied arrow value — never guesses.
+// Matches the spec verbiage exactly: "for the right side" / "for the left side"
+// / "for both directions" / "for this location".
 function sidePhrase(appliesTo: OfficerArgs["appliesTo"], hasArrows: boolean): string {
-  if (!hasArrows || appliesTo === "NONE") return "there are no arrows, so the rule applies here";
-  if (appliesTo === "LEFT") return "on the left side of this sign";
-  if (appliesTo === "RIGHT") return "on the right side of this sign";
-  if (appliesTo === "BOTH") return "on both sides of this sign";
-  return "there are no arrows, so the rule applies here";
+  if (!hasArrows || appliesTo === "NONE") return "for this location";
+  if (appliesTo === "LEFT") return "for the left side";
+  if (appliesTo === "RIGHT") return "for the right side";
+  if (appliesTo === "BOTH") return "for both directions";
+  return "for this location";
 }
 
 /**
- * Anti-hallucination narrator. This function does NOT decide parking legality
- * and does NOT invent any facts. Every clause it emits must trace back to a
- * structured input field. If a field is missing, the corresponding clause is
- * dropped — never guessed, never estimated.
+ * Anti-hallucination narrator. Does NOT decide parking legality and does NOT
+ * invent any facts. Every clause traces back to a structured input field; if
+ * a field is missing the clause is dropped — never guessed, never estimated.
+ *
+ * Output style follows the "parking attendant" spec:
+ *   YES./NO./LIMITED./UNKNOWN. it is currently {time} on {day}.
+ *   <one or two short, conversational sentences>
  */
 function buildOfficerParagraph(a: OfficerArgs): string {
   const prefix = `it is currently ${a.nowClock} on ${a.nowDay}.`;
@@ -690,53 +695,61 @@ function buildOfficerParagraph(a: OfficerArgs): string {
   }
 
   const side = sidePhrase(a.appliesTo, a.hasArrows);
-  // Only attach a side suffix when we have a real directional side. The
-  // "no arrows" phrasing is appended as its own clause via `sideAnd`.
-  const directional = a.hasArrows && (a.appliesTo === "LEFT" || a.appliesTo === "RIGHT" || a.appliesTo === "BOTH");
-  const sideSuffix = directional ? ` ${side}` : "";
-  const sideAnd = ` and ${side}`;
 
+  // -------- NO PARKING --------
   if (a.status === "NO") {
-    const reasonLc = (a.reason || "posted").toLowerCase();
+    const reasonLc = (a.reason || "no-parking").toLowerCase();
     const window = a.currentRuleWindow ?? a.parsedWindow;
     const windowClause = window ? ` ${window}` : "";
-    // Only emit "becomes available" when the engine actually provided an end.
-    const endTail = a.becomesFreeDayLabel
-      ? ` Parking becomes available at ${a.becomesFreeDayLabel}.`
-      : a.nextEndLabel
-        ? ` Parking becomes available at ${a.nextEndLabel}.`
-        : "";
-    return `NO. ${prefix} A ${reasonLc} restriction is active${sideSuffix}${windowClause}.${endTail}`;
+    const becomes = a.becomesFreeDayLabel ?? a.nextEndLabel;
+    const endTail = becomes ? ` Parking becomes available again at ${becomes}.` : "";
+    return `NO. ${prefix} A ${reasonLc} restriction ${side} is currently active${windowClause}. Parking is not allowed at this time.${endTail}`;
   }
 
-  // YES / LIMITED — currently parkable.
-  // Multi-side, different end times → no single "park until" tail.
+  // -------- YES / LIMITED — currently parkable --------
+
+  // Multi-side, different end times → describe each side together.
   if (a.sidesDiffer && a.leftUntil && a.rightUntil) {
-    return `YES. ${prefix} The right side of this sign allows parking until ${a.rightUntil}, while the left side allows parking until ${a.leftUntil} because different restrictions apply to each direction.`;
-  }
-
-  let middle: string;
-  const reasonLc = (a.reason || "").toLowerCase();
-
-  if (a.currentRuleActive && (a.status === "LIMITED" || (a.timeLimitMinutes && a.timeLimitMinutes > 0))) {
-    const limit = a.maxStayLabel ? a.maxStayLabel.toLowerCase() : (a.timeLimitMinutes ? `${a.timeLimitMinutes}-minute` : "posted");
-    const window = a.currentRuleWindow ? ` ${a.currentRuleWindow}` : "";
-    middle = `A ${limit} parking restriction applies here${window}${sideAnd}.`;
-  } else if (!a.currentRuleActive && a.nextStartLabel && (a.nextRuleWindow || a.parsedWindow)) {
-    const window = (a.nextRuleWindow ?? a.parsedWindow)!;
-    const what = a.nextReasonLabel ? a.nextReasonLabel.toLowerCase() : (reasonLc || "posted");
-    middle = `The ${what} restriction${sideSuffix} only applies ${window.replace(/^between /, "from ").replace(/ and /, " to ")} and is no longer active. Parking is currently allowed.`;
-  } else if (a.currentRuleActive && reasonLc && reasonLc !== "free parking") {
-    const window = a.currentRuleWindow ? ` ${a.currentRuleWindow}` : "";
-    middle = `${capitalize(reasonLc)} applies here${window}${sideAnd}.`;
-  } else {
-    middle = `Parking is currently allowed here.`;
+    return `YES. ${prefix} The restriction for the right side allows parking until ${a.rightUntil}, and the restriction for the left side allows parking until ${a.leftUntil} because different rules apply to each direction.`;
   }
 
   const untilLabel = a.allowedUntilDayLabel ?? a.allowedUntilLabel;
-  const until = untilLabel ? ` You can park here until ${untilLabel}.` : "";
+  const untilTail = untilLabel ? ` You can park here until ${untilLabel}.` : "";
+  const reasonLc = (a.reason || "").toLowerCase();
+  const hasLimit = !!(a.timeLimitMinutes && a.timeLimitMinutes > 0);
+  const limitLabel = a.maxStayLabel
+    ? a.maxStayLabel.toLowerCase()
+    : hasLimit
+      ? `${a.timeLimitMinutes}-minute`
+      : null;
 
-  return `YES. ${prefix} ${middle}${until}`;
+  // Currently inside a time-limited window (e.g. 15-min / 2-hour parking).
+  if (a.currentRuleActive && hasLimit && limitLabel) {
+    const window = a.currentRuleWindow ? ` between ${a.currentRuleWindow.replace(/^between /, "")}` : "";
+    const upTo = ` You may park here for up to ${limitLabel}.`;
+    return `YES. ${prefix} The ${limitLabel} parking restriction ${side} is currently active${window}.${upTo}${untilTail}`;
+  }
+
+  // Restriction exists but is NOT active right now (we're outside the window).
+  if (!a.currentRuleActive && (a.nextRuleWindow || a.parsedWindow)) {
+    const rawWindow = (a.nextRuleWindow ?? a.parsedWindow)!;
+    const window = rawWindow.replace(/^between /, "from ").replace(/ and /, " to ");
+    const what = limitLabel
+      ? `${limitLabel} parking`
+      : a.nextReasonLabel
+        ? a.nextReasonLabel.toLowerCase()
+        : reasonLc || "posted";
+    return `YES. ${prefix} The ${what} restriction ${side} applies ${window}. Since it is currently outside that window, this time limit is not active.${untilTail}`;
+  }
+
+  // Currently inside a non-time-limited active rule we can still park under.
+  if (a.currentRuleActive && reasonLc && reasonLc !== "free parking") {
+    const window = a.currentRuleWindow ? ` ${a.currentRuleWindow}` : "";
+    return `YES. ${prefix} ${capitalize(reasonLc)} applies ${side}${window}.${untilTail}`;
+  }
+
+  // No posted restriction in play.
+  return `YES. ${prefix} Parking is currently allowed here.${untilTail}`;
 }
 
 function capitalize(s: string): string {
