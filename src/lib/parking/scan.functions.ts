@@ -111,6 +111,15 @@ export interface SignScanResponse {
   interpretation_confidence: number;
   decision_confidence: number;
   narrative: DriverNarrative;
+  // ===== Edge-case sprint =====
+  risk_level: RiskLevel;
+  current_rule: RuleSummary | null;
+  next_rule: RuleSummary | null;
+  following_rule: RuleSummary | null;
+  countdown_to_next_rule: string | null;
+  countdown_to_following_rule: string | null;
+  conflict_detected: boolean;
+  conflict_summary: string | null;
 }
 
 function verdictFromColor(c: ParkingStatus["color"]): "YES" | "NO" | "LIMITED" {
