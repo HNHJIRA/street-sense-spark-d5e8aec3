@@ -8,9 +8,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { LineString } from "geojson";
 import { evaluateRulesAt } from "./engine";
-import { aiRulesToNormalized, callSignScanAi, type AiScanResult, type ArrowDirection, type NormalizedScanRule } from "./sign-ai";
+import { aiRulesToNormalized, callSignScanAi, validateSignImage, type AiScanResult, type ArrowDirection, type NormalizedScanRule } from "./sign-ai";
 import { resolveRuleConflicts } from "./providers/normalize";
 import { buildScanSummary, type ScanSummary } from "./scan-summary";
+import { buildDriverNarrative, buildSideCaption, type DriverNarrative } from "./driver-narrative";
 import type {
   ParkingRule,
   ParkingStatus,
