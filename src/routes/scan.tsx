@@ -263,12 +263,22 @@ function ScanResult({
     appliesTo === "BOTH"  ? (result.sides ? "on both sides of this sign" : "across this entire curb area")
                           : "";
 
+  // Per-side rule + time-limit: when arrows split the sign, LEFT vs RIGHT
+  // can carry independent rules (e.g. RIGHT=15-min, LEFT=2-hour). The
+  // selected `side` must drive these — never the merged top-level result.
+  const sideRules = sideEval?.rules ?? result.parsed_rules;
+  const sidePrimaryRule = sideRules[0] ?? null;
+  const sideTimeLimit =
+    sideEval
+      ? (sidePrimaryRule?.time_limit_minutes ?? sideEval.decision.time_limit_minutes ?? null)
+      : result.time_limit_minutes;
+
   // Allowed Until: arrival + time_limit, capped at the next restriction start.
   // For YES/LIMITED with a time limit this is distinct from "Next Restriction Starts".
   let allowedUntilIso: string | null = decision.allowed_until ?? null;
-  if (result.time_limit_minutes && (s.status === "LIMITED" || s.status === "YES")) {
+  if (sideTimeLimit && (s.status === "LIMITED" || s.status === "YES")) {
     const start = new Date(result.scanned_at).getTime();
-    let moveBy = start + result.time_limit_minutes * 60_000;
+    let moveBy = start + sideTimeLimit * 60_000;
     if (decision.restriction_starts_at) {
       const changeMs = new Date(decision.restriction_starts_at).getTime();
       if (Number.isFinite(changeMs) && changeMs < moveBy) moveBy = changeMs;
@@ -299,9 +309,10 @@ function ScanResult({
   };
   const currentRuleWindow = ruleWindow(result.current_rule ?? null);
   const nextRuleWindow = ruleWindow(result.next_rule ?? null);
-  // Fallback: posted parsed rule window (HH:MM) when engine has no current rule.
+  // Posted parsed rule window driven by the selected SIDE (so switching
+  // LEFT/RIGHT updates the narrated window).
   const parsedWindow = (() => {
-    const r = result.parsed_rules?.[0];
+    const r = sidePrimaryRule;
     if (!r) return null;
     const a = fmtHHMM(r.time_start), b = fmtHHMM(r.time_end);
     return a && b ? `between ${a} and ${b}` : null;
@@ -325,18 +336,27 @@ function ScanResult({
     }
   }
 
-  const maxStayLabel = result.time_limit_minutes
-    ? (result.time_limit_minutes % 60 === 0
-        ? `${result.time_limit_minutes / 60} Hour${result.time_limit_minutes === 60 ? "" : "s"}`
-        : `${result.time_limit_minutes} minutes`)
+  const maxStayLabel = sideTimeLimit
+    ? (sideTimeLimit % 60 === 0
+        ? `${sideTimeLimit / 60} Hour${sideTimeLimit === 60 ? "" : "s"}`
+        : `${sideTimeLimit} minutes`)
     : null;
 
-  const reasonLabel = result.current_rule?.label ?? s.reason ?? "Posted restriction";
+  // Reason label — prefer the SIDE's own rule when arrows split the sign.
+  const sideReasonFromRule = sidePrimaryRule
+    ? (sidePrimaryRule.time_limit_minutes
+        ? `${sidePrimaryRule.time_limit_minutes % 60 === 0 ? `${sidePrimaryRule.time_limit_minutes/60}-hour` : `${sidePrimaryRule.time_limit_minutes}-minute`} parking`
+        : (sidePrimaryRule.restriction_code ?? "").replace(/_/g, " "))
+    : null;
+  const reasonLabel = sideEval
+    ? (sideReasonFromRule || s.reason || "Posted restriction")
+    : (result.current_rule?.label ?? s.reason ?? "Posted restriction");
   const nextReasonLabel = result.next_rule?.label ?? result.next_restriction_reason ?? null;
 
   // moveByLabel kept for the existing "Until card" UI below.
-  const moveByLabel = allowedUntilLabel && (s.status === "LIMITED" || (s.status === "YES" && result.time_limit_minutes))
+  const moveByLabel = allowedUntilLabel && (s.status === "LIMITED" || (s.status === "YES" && sideTimeLimit))
     ? allowedUntilLabel : null;
+
 
   const arrivalClock = new Date(result.scanned_at).toLocaleTimeString("en-US", {
     hour: "numeric", minute: "2-digit", timeZone: TZ,
