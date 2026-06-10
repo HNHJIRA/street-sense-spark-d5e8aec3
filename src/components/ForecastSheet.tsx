@@ -104,6 +104,31 @@ export function ForecastSheet() {
               })}
             </div>
 
+            <div className="mt-4 rounded-2xl border border-border bg-surface p-3">
+              <label className="flex items-center justify-between gap-3">
+                <span className="text-xs font-semibold text-muted-foreground">Pick a custom time</span>
+                <input
+                  type="time"
+                  value={customTime}
+                  onChange={(e) => setCustomTime(e.target.value)}
+                  className="rounded-xl border border-border bg-elevated px-3 py-2 text-sm font-bold text-foreground focus:border-primary focus:outline-none"
+                />
+              </label>
+              <button
+                onClick={() => {
+                  const [hh, mm] = customTime.split(":").map((n) => parseInt(n, 10));
+                  if (isNaN(hh) || isNaN(mm)) return;
+                  const target = setHourMinute(dayBase, hh, mm, day > 0);
+                  setForecastAt(target);
+                  setOpen(false);
+                }}
+                className="mt-3 w-full rounded-xl bg-primary py-2.5 text-sm font-bold text-primary-foreground"
+              >
+                Apply custom time
+              </button>
+            </div>
+
+
             <button
               onClick={() => {
                 setForecastAt(null);
