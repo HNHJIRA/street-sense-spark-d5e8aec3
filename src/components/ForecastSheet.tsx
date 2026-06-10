@@ -12,6 +12,17 @@ function setHour(base: Date, hour: number): Date {
   return d;
 }
 
+function setHourMinute(base: Date, hour: number, minute: number, allowPast: boolean): Date {
+  const d = new Date(base);
+  d.setHours(hour, minute, 0, 0);
+  if (!allowPast && d.getTime() < Date.now()) d.setDate(d.getDate() + 1);
+  return d;
+}
+
+function toTimeInputValue(d: Date): string {
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
 export function ForecastSheet() {
   const open = useAppStore((s) => s.forecastOpen);
   const setOpen = useAppStore((s) => s.setForecastOpen);
