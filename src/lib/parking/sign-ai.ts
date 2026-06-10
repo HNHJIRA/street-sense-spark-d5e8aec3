@@ -563,27 +563,48 @@ export async function callSignScanAi(
     })
     .join("\n\n");
 
-  // Map interpreter rules → RawAiRule.
-  const rules: RawAiRule[] = interpretation.rules.map((r) => {
-    const perRuleConfidence = (() => {
-      const ids = new Set(r.original_plate_indices);
-      const matchedPlates = extraction.plates.filter((p) => ids.has(p.plate_index));
-      if (matchedPlates.length === 0) return extraction.overall_confidence;
-      const sum = matchedPlates.reduce((a, p) => a + (p.confidence ?? 0), 0);
-      return sum / matchedPlates.length;
-    })();
-    return {
-      type: restrictionTextFromType(r.restriction_type),
-      days: dayWordsTo3Letter(r.days),
-      start: r.start_time,
-      end: r.end_time,
-      permit_zone: null,
-      time_limit_minutes: r.time_limit_minutes,
-      notes: r.notes,
-      arrow: arrowFromUpper(r.arrow),
-      confidence: perRuleConfidence,
-    };
-  });
+  // Map interpreter rules → RawAiRule. Also enforce directional independence:
+  // if the interpreter collapsed plates with conflicting LEFT/RIGHT arrows
+  // into one rule, split it back into per-plate rules so opposite directions
+  // never get merged.
+  const rules: RawAiRule[] = [];
+  for (const r of interpretation.rules) {
+    const ids = new Set(r.original_plate_indices);
+    const matchedPlates = extraction.plates.filter((p) => ids.has(p.plate_index));
+    const arrows = new Set(matchedPlates.map((p) => p.arrow).filter(Boolean));
+    const hasConflict =
+      arrows.has("LEFT") && arrows.has("RIGHT") && r.arrow !== "BOTH"
+        ? true
+        : arrows.has("LEFT") && arrows.has("RIGHT");
+    // Split if the underlying plates point in opposite directions —
+    // never merge LEFT + RIGHT into a single rule (even BOTH).
+    const targets =
+      hasConflict && matchedPlates.length > 1
+        ? matchedPlates.map((p) => ({
+            plate: p,
+            arrow: arrowFromUpper(p.arrow ?? "NONE"),
+          }))
+        : [{ plate: null as null | typeof matchedPlates[number], arrow: arrowFromUpper(r.arrow) }];
+
+    for (const t of targets) {
+      const plates = t.plate ? [t.plate] : matchedPlates;
+      const perRuleConfidence =
+        plates.length === 0
+          ? extraction.overall_confidence
+          : plates.reduce((a, p) => a + (p.confidence ?? 0), 0) / plates.length;
+      rules.push({
+        type: restrictionTextFromType(r.restriction_type),
+        days: dayWordsTo3Letter(r.days),
+        start: r.start_time,
+        end: r.end_time,
+        permit_zone: null,
+        time_limit_minutes: r.time_limit_minutes,
+        notes: r.notes,
+        arrow: t.arrow,
+        confidence: perRuleConfidence,
+      });
+    }
+  }
 
   const overall_confidence = Math.min(
     extraction.overall_confidence || 0,
