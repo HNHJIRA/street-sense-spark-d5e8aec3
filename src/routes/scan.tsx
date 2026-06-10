@@ -49,21 +49,35 @@ function ScanPage() {
     if (cameraRef.current) cameraRef.current.value = "";
   };
 
-  const onFile = async (file: File) => {
+  const onFile = async (inputFile: File) => {
     setError(null); setResult(null);
-    if (file.size > 6 * 1024 * 1024) {
-      setError("Image must be under 6 MB. Try a different photo.");
-      return;
-    }
-    // HEIC/HEIF from iOS cameras won't render in <img>. Catch early.
-    const isHeic = /heic|heif/i.test(file.type) || /\.(heic|heif)$/i.test(file.name);
-    if (isHeic) {
-      setError("HEIC images aren't supported in the browser. In iPhone Settings → Camera → Formats, choose 'Most Compatible', or upload a JPG/PNG.");
+    if (inputFile.size > 12 * 1024 * 1024) {
+      setError("Image must be under 12 MB. Try a different photo.");
       return;
     }
 
     setLoading(true);
     try {
+      let file = inputFile;
+      // HEIC/HEIF from iOS cameras won't render in <img>. Convert to JPEG client-side.
+      const isHeic = /heic|heif/i.test(file.type) || /\.(heic|heif)$/i.test(file.name);
+      if (isHeic) {
+        try {
+          const { default: heic2any } = await import("heic2any");
+          const converted = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
+          const blob = Array.isArray(converted) ? converted[0] : converted;
+          file = new File([blob], file.name.replace(/\.(heic|heif)$/i, ".jpg"), { type: "image/jpeg" });
+        } catch {
+          setError("Couldn't convert this HEIC image. Try uploading a JPG/PNG instead.");
+          setLoading(false);
+          return;
+        }
+      }
+      if (file.size > 8 * 1024 * 1024) {
+        setError("Image must be under 8 MB after conversion. Try a smaller photo.");
+        setLoading(false);
+        return;
+      }
       const base64 = await fileToBase64(file);
       const mimeType = file.type || "image/jpeg";
       // Use a data URL for preview so it renders reliably across browsers
