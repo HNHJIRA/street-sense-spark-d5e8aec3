@@ -1,7 +1,7 @@
 // AI Sign Scanner — capture/upload a parking-sign photo, send to the engine
 // pipeline, render the engine's verdict.
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
 import {
