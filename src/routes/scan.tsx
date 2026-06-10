@@ -599,11 +599,11 @@ interface OfficerArgs {
 }
 
 function sidePhrase(appliesTo: OfficerArgs["appliesTo"], hasArrows: boolean): string {
-  if (!hasArrows) return "there are no arrows, so the rule applies here";
-  if (appliesTo === "LEFT") return "this applies on the left side of this sign";
-  if (appliesTo === "RIGHT") return "this applies on the right side of this sign";
-  if (appliesTo === "BOTH") return "this applies on both sides of this sign";
-  return "there are no arrows, so the rule applies here";
+  if (!hasArrows) return "applies here";
+  if (appliesTo === "LEFT") return "applies on the left side of this sign";
+  if (appliesTo === "RIGHT") return "applies on the right side of this sign";
+  if (appliesTo === "BOTH") return "applies on both sides of this sign";
+  return "applies here";
 }
 
 function buildOfficerParagraph(a: OfficerArgs): string {
@@ -614,11 +614,12 @@ function buildOfficerParagraph(a: OfficerArgs): string {
   }
 
   const side = sidePhrase(a.appliesTo, a.hasArrows);
+  const sideClause = a.hasArrows ? ` and ${side}` : "";
 
   if (a.status === "NO") {
     const reasonLc = a.reason.toLowerCase();
     const endTail = a.nextEndLabel ? ` Parking becomes available at ${a.nextEndLabel}.` : "";
-    return `NO. ${prefix} ${capitalize(reasonLc)} is active and ${side}.${endTail}`;
+    return `NO. ${prefix} ${capitalize(reasonLc)} is active${sideClause}.${endTail}`;
   }
 
   // YES or LIMITED — both currently parkable
@@ -631,11 +632,11 @@ function buildOfficerParagraph(a: OfficerArgs): string {
   let middle: string;
   if (a.status === "LIMITED" || (a.timeLimitMinutes && a.timeLimitMinutes > 0)) {
     const limit = a.maxStayLabel ? a.maxStayLabel.toLowerCase() : `${a.timeLimitMinutes}-minute`;
-    middle = `A ${limit} parking restriction is currently active and ${side}.`;
+    middle = `A ${limit} parking restriction is currently active${sideClause}.`;
   } else if (a.nextStartLabel && a.reason.toLowerCase().includes("free")) {
     middle = `Parking is currently unrestricted.`;
   } else if (a.reason && a.reason.toLowerCase() !== "free parking") {
-    middle = `${capitalize(a.reason)} is currently in effect and ${side}.`;
+    middle = `${capitalize(a.reason)} is currently in effect${sideClause}.`;
   } else {
     middle = `Parking is currently unrestricted.`;
   }
