@@ -913,10 +913,6 @@ function buildOfficerParagraph(a: OfficerArgs): string {
   // time limit, that limit is a LOADING limit, not a parking allowance.
   if (a.activeCode && a.loadingActivity) {
     const reasonNoLimit = (a.reason || "").replace(/\s*\([^)]*\)\s*$/, "").trim() || "Loading Only";
-    const sideClauseLoading =
-      a.appliesTo === "LEFT"  ? "This sign applies to the LEFT side." :
-      a.appliesTo === "RIGHT" ? "This sign applies to the RIGHT side." :
-      a.appliesTo === "BOTH"  ? "This sign applies to BOTH sides." : "";
     const start = a.currentRuleStartLabel;
     const end = a.currentRuleEndLabel ?? a.restrictionEndLabel;
     const activeWindow = start && end
@@ -940,7 +936,6 @@ function buildOfficerParagraph(a: OfficerArgs): string {
     })();
     return [
       `LIMITED. ${prefix}`,
-      sideClauseLoading,
       activeWindow,
       "General parking is not permitted during this period.",
       a.loadingActivity,
