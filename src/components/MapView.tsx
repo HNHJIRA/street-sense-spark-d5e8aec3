@@ -472,23 +472,31 @@ export function MapView({ token, city }: MapViewProps) {
 
 
 
-            map.on("click", ["seg-left", "seg-right"] as any, (e: any) => {
-              const f = e.features?.[0];
-              const id = f?.properties?.segmentId as string | undefined;
-              if (f?.properties?.sourceType === "availability") {
-                toast.message(f.properties.label ?? "Live meter availability");
-                return;
-              }
-              if (id) selectSegment(id);
-            });
+            // Register interaction handlers only ONCE per map instance —
+            // style.load fires again after each setStyle() call, but Mapbox
+            // keeps map-level event handlers across style swaps.
+            if (!mapRef.current) {
+              map.on("click", ["seg-left", "seg-right"] as any, (e: any) => {
+                const f = e.features?.[0];
+                const id = f?.properties?.segmentId as string | undefined;
+                if (f?.properties?.sourceType === "availability") {
+                  toast.message(f.properties.label ?? "Live meter availability");
+                  return;
+                }
+                if (id) selectSegment(id);
+              });
 
-            for (const id of ["seg-left", "seg-right"]) {
-              map.on("mouseenter", id, () => { map.getCanvas().style.cursor = "pointer"; });
-              map.on("mouseleave", id, () => { map.getCanvas().style.cursor = ""; });
+              for (const id of ["seg-left", "seg-right"]) {
+                map.on("mouseenter", id, () => { map.getCanvas().style.cursor = "pointer"; });
+                map.on("mouseleave", id, () => { map.getCanvas().style.cursor = ""; });
+              }
             }
 
             mapRef.current = map;
             setReady(true);
+            // Bump version so dependent effects (rec-highlight, etc.) re-run
+            // after style swaps that wipe user-added sources/data.
+            setStyleVersion((v) => v + 1);
             // Force resize in case the container measured 0px during construction
             // (e.g., suspense fallback flicker). Tiles only fetch once sized.
             window.requestAnimationFrame(() => map.resize());
