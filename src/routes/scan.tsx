@@ -281,15 +281,17 @@ function ScanResult({
     ? (fmtClock(decision.restriction_ends_at) ?? nextChange?.when_label ?? null)
     : (nextChange?.when_label ?? null);
 
-  // Applies-To derived from arrow detection + selected side.
-  // Applies-To: server is the source of truth (driven by physical arrows).
-  // Multiple plates with one arrow are multiple time windows for the SAME
-  // direction — never BOTH unless the photo shows it.
-  const appliesTo: "LEFT" | "RIGHT" | "BOTH" | "NONE" = result.applies_to;
+  // Applies-To is selected-side aware. When the user picks LEFT or RIGHT, the
+  // display and narrator must not leak rules or wording from the opposite side.
+  const physicalAppliesTo: "LEFT" | "RIGHT" | "BOTH" | "NONE" = result.applies_to;
+  const selectedAppliesTo: "LEFT" | "RIGHT" | "BOTH" | "NONE" =
+    result.sides && side === "left" ? "LEFT" :
+    result.sides && side === "right" ? "RIGHT" :
+    physicalAppliesTo;
   const sideClause =
-    appliesTo === "LEFT"  ? "on the LEFT side of this sign" :
-    appliesTo === "RIGHT" ? "on the RIGHT side of this sign" :
-    appliesTo === "BOTH"  ? (result.sides ? "on both sides of this sign" : "across this entire curb area")
+    selectedAppliesTo === "LEFT"  ? "on the LEFT side of this sign" :
+    selectedAppliesTo === "RIGHT" ? "on the RIGHT side of this sign" :
+    selectedAppliesTo === "BOTH"  ? (result.sides ? "on both sides of this sign" : "across this entire curb area")
                           : "";
 
   // Per-side rule + time-limit: when arrows split the sign, LEFT vs RIGHT
@@ -318,11 +320,22 @@ function ScanResult({
     allowedUntilIso = decision.restriction_starts_at;
   }
   const scannedRef = new Date(result.scanned_at);
+  const selectedTimeline = sideEval ? buildRuleTimeline(sideRules, scannedRef, TZ) : null;
+  const selectedCurrentRule = selectedTimeline?.current_rule ?? result.current_rule;
+  const selectedNextRule = selectedTimeline?.next_rule ?? result.next_rule;
+  const selectedFollowingRule = selectedTimeline?.following_rule ?? result.following_rule;
+  const selectedTimelineRules = selectedTimeline
+    ? [
+        selectedTimeline.current_rule ? { slot: "CURRENT" as const, ...selectedTimeline.current_rule } : null,
+        selectedTimeline.next_rule ? { slot: "NEXT" as const, ...selectedTimeline.next_rule } : null,
+        selectedTimeline.following_rule ? { slot: "FOLLOWING" as const, ...selectedTimeline.following_rule } : null,
+      ].filter((x): x is NonNullable<typeof x> => x !== null)
+    : result.debug.timeline_rules;
   const allowedUntilLabel = fmtClock(allowedUntilIso);
   const allowedUntilDayLabel = fmtDayClock(allowedUntilIso, scannedRef);
-  const nextStartIso = decision.restriction_starts_at ?? result.next_rule?.starts_at ?? null;
-  const nextEndIso = decision.restriction_ends_at ?? result.next_rule?.ends_at ?? null;
-  const activeRestrictionEndIso = decision.restriction_ends_at ?? result.current_rule?.ends_at ?? null;
+  const nextStartIso = decision.restriction_starts_at ?? selectedNextRule?.starts_at ?? null;
+  const nextEndIso = decision.restriction_ends_at ?? selectedNextRule?.ends_at ?? null;
+  const activeRestrictionEndIso = decision.restriction_ends_at ?? selectedCurrentRule?.ends_at ?? null;
   const nextStartLabel = fmtClock(nextStartIso);
   const nextStartDayLabel = fmtDayClock(nextStartIso, scannedRef);
   // For NO: "Parking becomes available" should land 1 minute after the
@@ -339,8 +352,8 @@ function ScanResult({
     const a = fmtClock(rs.starts_at), b = fmtClock(rs.ends_at);
     return a && b ? `between ${a} and ${b}` : null;
   };
-  const currentRuleWindow = ruleWindow(result.current_rule ?? null);
-  const nextRuleWindow = ruleWindow(result.next_rule ?? null);
+  const currentRuleWindow = ruleWindow(selectedCurrentRule ?? null);
+  const nextRuleWindow = ruleWindow(selectedNextRule ?? null);
   // Posted parsed rule window driven by the selected SIDE (so switching
   // LEFT/RIGHT updates the narrated window).
   const parsedWindow = (() => {
