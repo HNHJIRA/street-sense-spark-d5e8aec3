@@ -706,30 +706,40 @@ function ScanResult({
         <div className="mb-3 text-sm font-bold text-foreground">Parking details</div>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
           <DetailRow label="Current status" value={
-            <span className={cn("font-bold", palette.text)}>{s.status}</span>
+            mixedMode
+              ? <span className="font-bold text-park-yellow">MIXED RULES</span>
+              : <span className={cn("font-bold", palette.text)}>{s.status}</span>
           } />
-          <DetailRow label="Reason" value={reasonLabel} />
+          <DetailRow label="Reason" value={mixedMode ? "Different rule on each side" : reasonLabel} />
           <DetailRow
             label={isLoading ? "Restriction until" : "Allowed until"}
             value={
-              isLoading
-                ? (fmtClock(decision.restriction_ends_at) ?? "—")
-                : (allowedUntilLabel ?? "—")
+              mixedMode
+                ? "Differs by side"
+                : isLoading
+                  ? (fmtClock(decision.restriction_ends_at) ?? "—")
+                  : (allowedUntilLabel ?? "—")
             }
           />
-          <DetailRow label="Time remaining" value={timeRemainingLabel ?? "—"} />
-          <DetailRow label={isLoading ? "Loading time limit" : "Maximum stay"} value={maxStayLabel ?? "No limit"} />
+          <DetailRow label="Time remaining" value={mixedMode ? "Differs by side" : (timeRemainingLabel ?? "—")} />
+          <DetailRow
+            label={isLoading ? "Loading time limit" : "Maximum stay"}
+            value={mixedMode ? "Differs by side" : (maxStayLabel ?? "No limit")}
+          />
           <DetailRow label="Next restriction" value={nextReasonLabel ?? "None scheduled"} />
-          <DetailRow label="Restriction starts" value={nextStartLabel ?? "—"} />
-          <DetailRow label="Restriction ends" value={nextEndLabel ?? "—"} />
+          <DetailRow label="Restriction starts" value={mixedMode ? "Differs by side" : (nextStartLabel ?? "—")} />
+          <DetailRow label="Restriction ends" value={mixedMode ? "Differs by side" : (nextEndLabel ?? "—")} />
           <DetailRow label="Applies to" value={
-            appliesTo === "BOTH" && !result.sides
-              ? "BOTH (no arrows)"
-              : appliesTo === "LEFT" ? "LEFT side"
-              : appliesTo === "RIGHT" ? "RIGHT side"
-              : appliesTo === "BOTH" ? "BOTH sides" : "NONE"
+            mixedMode
+              ? "Mixed (Left and Right differ)"
+              : appliesTo === "BOTH" && !result.sides
+                ? "BOTH (no arrows)"
+                : appliesTo === "LEFT" ? "LEFT side"
+                : appliesTo === "RIGHT" ? "RIGHT side"
+                : appliesTo === "BOTH" ? "BOTH sides" : "NONE"
           } />
           <DetailRow label="Confidence" value={`${Math.round(result.decision_confidence * 100)}%`} />
+
         </dl>
       </div>
 
