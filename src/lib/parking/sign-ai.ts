@@ -122,6 +122,20 @@ You MUST detect and return EVERY visible plate — do NOT stop after the first o
    your "plates" array has the same length. If it does not, scan again.
 
 =================================================
+MANDATORY RULE-SIGN DETECTION
+=================================================
+These are parking regulations and MUST be extracted as text plates whenever
+visible. Never treat them as decorative or generic text:
+
+- PASSENGER LOADING ONLY, COMMERCIAL LOADING ONLY, LOADING ZONE,
+  BUS LOADING, TAXI ZONE
+- NO PARKING, NO STOPPING, TOW AWAY, NO STANDING, FIRE LANE
+- time-limited parking such as 15 MINUTE PARKING or 2 HOUR PARKING
+
+If one of these phrases appears on its own physical sign board, it MUST be
+its own plate entry. Do not merge it with the sign above or below it.
+
+=================================================
 STRICT ARROW DETECTION RULES
 =================================================
 Arrows are CRITICAL. Misidentifying an arrow ruins the entire rule.
@@ -162,6 +176,10 @@ You must NOT confuse left and right.
    - If it is truly ambiguous, report "UNCLEAR".
    - If NO arrow is visible on a plate, you MUST output "NONE".
      Do not guess or hallucinate an arrow.
+   - If only a RIGHT arrow exists anywhere in the visible sign stack, do not
+     output LEFT or BOTH for any plate unless that plate physically shows it.
+   - If only a LEFT arrow exists anywhere in the visible sign stack, do not
+     output RIGHT or BOTH for any plate unless that plate physically shows it.
 
 
 =================================================
@@ -333,6 +351,34 @@ DIRECTIONAL INDEPENDENCE (CRITICAL — DO NOT VIOLATE)
 - If the OCR shows plates with arrows LEFT and RIGHT, the output MUST
   contain at least one rule with arrow="LEFT" and at least one with
   arrow="RIGHT".
+
+=================================================
+MANDATORY RESTRICTION TYPES
+=================================================
+Always convert these text plates into independent rules:
+
+- PASSENGER LOADING ONLY, COMMERCIAL LOADING ONLY, LOADING ZONE,
+  BUS LOADING, TAXI ZONE → loading_zone
+- NO PARKING → no_parking
+- NO STOPPING or NO STANDING → no_stopping
+- TOW AWAY → tow_away unless paired with a more explicit no-parking/no-stopping text
+- FIRE LANE → no_stopping
+- 15 MINUTE PARKING, 2 HOUR PARKING, or similar duration parking → time_limited
+
+Never merge loading/no-parking/no-stopping/tow-away/fire-lane rules into a
+time-limited parking rule. They remain separate even when they share days,
+times, colors, or an arrow plate.
+
+=================================================
+FINAL VALIDATION BEFORE JSON
+=================================================
+Before returning JSON, check:
+1. Every physical text plate has at least one rule.
+2. Every loading-zone plate has its own rule.
+3. Every no-parking/no-stopping/tow-away/no-standing/fire-lane plate has its own rule.
+4. LEFT and RIGHT rules remain separate.
+5. arrow="BOTH" is used only when a physical double-headed arrow was extracted.
+If any check fails, fix the JSON instead of returning a confident merged rule.
 `.trim();
 
 
@@ -509,6 +555,180 @@ function restrictionTextFromType(t: string): string {
   return (t ?? "").replace(/[_-]+/g, " ").trim();
 }
 
+function isPhysicalArrow(a: string | null | undefined): a is "LEFT" | "RIGHT" | "BOTH" {
+  return a === "LEFT" || a === "RIGHT" || a === "BOTH";
+}
+
+function physicalArrowValue(a: string | null | undefined): ArrowDirection {
+  return isPhysicalArrow(a) ? arrowFromUpper(a) : null;
+}
+
+function isArrowOnlyPlate(p: ExtractedPlate): boolean {
+  if (!isPhysicalArrow(p.arrow)) return false;
+  const text = p.text.trim().toUpperCase();
+  if (!text) return true;
+  const stripped = text
+    .replace(/[←→↔⇐⇒⇔]/g, " ")
+    .replace(/\b(LEFT|RIGHT|BOTH|DOUBLE|TWO|WAY|DIRECTION|DIRECTIONAL|ARROW|ARROWS|ONLY|POINTING|TO)\b/g, " ")
+    .replace(/[^A-Z0-9]+/g, "");
+  return stripped.length === 0;
+}
+
+function hasRuleText(p: ExtractedPlate): boolean {
+  return p.text.trim().length > 0 && !isArrowOnlyPlate(p);
+}
+
+function normalizePlateColor(c: string): string {
+  const s = c.toLowerCase();
+  if (s.includes("white")) return "white";
+  if (s.includes("black")) return "black";
+  if (s.includes("red")) return "red";
+  if (s.includes("green")) return "green";
+  if (s.includes("blue")) return "blue";
+  if (s.includes("yellow")) return "yellow";
+  if (s.includes("orange")) return "orange";
+  return s.replace(/[^a-z]+/g, " ").trim() || "unknown";
+}
+
+function samePlateColor(a: ExtractedPlate, b: ExtractedPlate): boolean {
+  const ca = normalizePlateColor(a.background_color);
+  const cb = normalizePlateColor(b.background_color);
+  return ca !== "unknown" && cb !== "unknown" && ca === cb;
+}
+
+function derivedArrowForPlate(plate: ExtractedPlate, plates: ExtractedPlate[]): ArrowDirection {
+  const direct = physicalArrowValue(plate.arrow);
+  if (direct) return direct;
+  const inherited = plates
+    .filter((p) => p.plate_index > plate.plate_index && isArrowOnlyPlate(p) && samePlateColor(plate, p))
+    .sort((a, b) => a.plate_index - b.plate_index)[0];
+  return physicalArrowValue(inherited?.arrow);
+}
+
+function averagePlateConfidence(plates: ExtractedPlate[], fallback: number): number {
+  return plates.length
+    ? plates.reduce((sum, p) => sum + (p.confidence ?? 0), 0) / plates.length
+    : fallback;
+}
+
+function inferTimeLimitMinutes(text: string): number | null {
+  const m = text.toUpperCase().match(/\b(\d{1,3})\s*(MINUTE|MINUTES|MIN|MINS|HOUR|HOURS|HR|HRS)\b/);
+  if (!m) return null;
+  const n = Number(m[1]);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return m[2].startsWith("H") ? n * 60 : n;
+}
+
+const DAY_WORD = "SUN(?:DAY)?|MON(?:DAY)?|TUE(?:S(?:DAY)?)?|WED(?:NESDAY)?|THU(?:R(?:S(?:DAY)?)?)?|FRI(?:DAY)?|SAT(?:URDAY)?";
+
+function dayIndexFromToken(token: string): number | null {
+  const key = token.trim().toUpperCase().slice(0, 3);
+  return DAY_TOKENS[key] ?? null;
+}
+
+function parseDaysFromPlateText(text: string): string[] {
+  const upper = text.toUpperCase();
+  const out = new Set<string>();
+  const rangeRe = new RegExp(`\\b(${DAY_WORD})\\b\\s*(?:-|TO|THRU|THROUGH)\\s*\\b(${DAY_WORD})\\b`, "g");
+  for (const m of upper.matchAll(rangeRe)) {
+    const start = dayIndexFromToken(m[1]);
+    const end = dayIndexFromToken(m[2]);
+    if (start == null || end == null) continue;
+    let d = start;
+    while (true) {
+      out.add(DAY_3[d]);
+      if (d === end) break;
+      d = (d + 1) % 7;
+    }
+  }
+  const singleRe = new RegExp(`\\b(${DAY_WORD})\\b`, "g");
+  for (const m of upper.matchAll(singleRe)) {
+    const idx = dayIndexFromToken(m[1]);
+    if (idx != null) out.add(DAY_3[idx]);
+  }
+  return [...out];
+}
+
+function toHHMM(hourText: string, minuteText: string | undefined, meridiemText: string): string | null {
+  let hour = Number(hourText);
+  const minute = minuteText ? Number(minuteText) : 0;
+  if (!Number.isFinite(hour) || !Number.isFinite(minute) || hour < 1 || hour > 12 || minute < 0 || minute > 59) {
+    return null;
+  }
+  const meridiem = meridiemText.toUpperCase().startsWith("P") ? "PM" : "AM";
+  if (meridiem === "AM" && hour === 12) hour = 0;
+  if (meridiem === "PM" && hour !== 12) hour += 12;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function parseTimeWindowFromPlateText(text: string): { start: string | null; end: string | null } {
+  const matches = [...text.matchAll(/\b(\d{1,2})(?::(\d{2}))?\s*(A\.?M\.?|P\.?M\.?|A|P)\b/gi)];
+  if (matches.length < 2) return { start: null, end: null };
+  const start = toHHMM(matches[0][1], matches[0][2], matches[0][3]);
+  const end = toHHMM(matches[1][1], matches[1][2], matches[1][3]);
+  return { start, end };
+}
+
+function inferRestrictionTypeFromPlateText(text: string): string {
+  const t = text.toUpperCase();
+  if (/\bNO\s+STOPPING\b/.test(t)) return "no stopping";
+  if (/\bNO\s+STANDING\b/.test(t)) return "no standing";
+  if (/\bFIRE\s+LANE\b/.test(t)) return "fire lane";
+  if (/\bNO\s+PARKING\b/.test(t)) return "no parking";
+  if (/\bTOW\s*-?\s*AWAY\b/.test(t)) return "tow away";
+  if (/\b(PASSENGER\s+LOADING\s+ONLY|COMMERCIAL\s+LOADING\s+ONLY|LOADING\s+ZONE|BUS\s+LOADING|TAXI\s+ZONE)\b/.test(t)) {
+    return "loading zone";
+  }
+  if (/\b\d{1,3}\s*(MINUTE|MINUTES|MIN|MINS|HOUR|HOURS|HR|HRS)\s+PARKING\b/.test(t) || /\bTIME\s+LIMIT(?:ED)?\b/.test(t)) {
+    return "time limited parking";
+  }
+  if (/\b(METER|METERED|PAID\s+PARKING)\b/.test(t)) return "metered parking";
+  if (/\b(PERMIT|RESIDENTIAL\s+PERMIT|PREFERENTIAL\s+PARKING)\b/.test(t)) return "permit parking";
+  if (/\b(STREET\s+CLEANING|SWEEPING|SWEEP)\b/.test(t)) return "street cleaning";
+  return "unknown";
+}
+
+function fallbackRuleFromPlate(plate: ExtractedPlate, plates: ExtractedPlate[], reason: string): RawAiRule {
+  const window = parseTimeWindowFromPlateText(plate.text);
+  const type = inferRestrictionTypeFromPlateText(plate.text);
+  const confidenceCap = type === "unknown" ? 0.45 : 0.62;
+  return {
+    type,
+    days: parseDaysFromPlateText(plate.text),
+    start: window.start,
+    end: window.end,
+    permit_zone: null,
+    time_limit_minutes: inferTimeLimitMinutes(plate.text),
+    notes: plate.text.trim() || reason,
+    arrow: derivedArrowForPlate(plate, plates),
+    confidence: Math.min(plate.confidence ?? confidenceCap, confidenceCap),
+  };
+}
+
+function rawRuleKey(r: RawAiRule): string {
+  return [
+    r.type.toLowerCase(),
+    [...r.days].sort().join(","),
+    r.start ?? "",
+    r.end ?? "",
+    r.time_limit_minutes ?? "",
+    r.arrow ?? "none",
+    (r.notes ?? "").toLowerCase(),
+  ].join("|");
+}
+
+function dedupeRawRules(rules: RawAiRule[]): RawAiRule[] {
+  const seen = new Set<string>();
+  const out: RawAiRule[] = [];
+  for (const r of rules) {
+    const key = rawRuleKey(r);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(r);
+  }
+  return out;
+}
+
 export interface NormalizedScanRule extends NormalizedRule {
   arrow: ArrowDirection;
 }
@@ -563,59 +783,90 @@ export async function callSignScanAi(
     })
     .join("\n\n");
 
-  // Map interpreter rules → RawAiRule. Also enforce directional independence:
-  // if the interpreter collapsed plates with conflicting LEFT/RIGHT arrows
-  // into one rule, split it back into per-plate rules so opposite directions
-  // never get merged.
+  // Map interpreter rules → RawAiRule, then deterministically validate the
+  // result against the physical OCR plates. The summary layer must never have
+  // to repair missing plates or invented arrows.
   const rules: RawAiRule[] = [];
+  const textPlates = extraction.plates.filter(hasRuleText);
+  const coveredTextPlateIds = new Set<number>();
+  let validationConfidenceCap = 1;
+
   for (const r of interpretation.rules) {
     const ids = new Set(r.original_plate_indices);
     const matchedPlates = extraction.plates.filter((p) => ids.has(p.plate_index));
-    const arrows = new Set(matchedPlates.map((p) => p.arrow).filter(Boolean));
-    const hasConflict =
-      arrows.has("LEFT") && arrows.has("RIGHT") && r.arrow !== "BOTH"
-        ? true
-        : arrows.has("LEFT") && arrows.has("RIGHT");
-    // Split if the underlying plates point in opposite directions —
-    // never merge LEFT + RIGHT into a single rule (even BOTH).
-    const targets =
-      hasConflict && matchedPlates.length > 1
-        ? matchedPlates.map((p) => ({
-            plate: p,
-            arrow: arrowFromUpper(p.arrow ?? "NONE"),
-          }))
-        : [{ plate: null as null | typeof matchedPlates[number], arrow: arrowFromUpper(r.arrow) }];
+    const ruleTextPlates = matchedPlates.filter(hasRuleText);
 
-    for (const t of targets) {
-      const plates = t.plate ? [t.plate] : matchedPlates;
-      const perRuleConfidence =
-        plates.length === 0
-          ? extraction.overall_confidence
-          : plates.reduce((a, p) => a + (p.confidence ?? 0), 0) / plates.length;
-      rules.push({
-        type: restrictionTextFromType(r.restriction_type),
-        days: dayWordsTo3Letter(r.days),
-        start: r.start_time,
-        end: r.end_time,
-        permit_zone: null,
-        time_limit_minutes: r.time_limit_minutes,
-        notes: r.notes,
-        arrow: t.arrow,
-        confidence: perRuleConfidence,
-      });
+    if (ruleTextPlates.length === 0) {
+      validationConfidenceCap = Math.min(validationConfidenceCap, 0.58);
+      continue;
     }
+
+    if (ruleTextPlates.length > 1) {
+      // The interpreter merged multiple physical text plates. Split them back
+      // into separate plate-derived rules so loading/no-parking/time-limit
+      // signs cannot be swallowed by a neighboring plate.
+      validationConfidenceCap = Math.min(validationConfidenceCap, 0.58);
+      for (const plate of ruleTextPlates) {
+        rules.push(fallbackRuleFromPlate(plate, extraction.plates, "Merged interpreter rule split by physical plate."));
+        coveredTextPlateIds.add(plate.plate_index);
+      }
+      continue;
+    }
+
+    const plate = ruleTextPlates[0];
+    const inferredWindow = parseTimeWindowFromPlateText(plate.text);
+    const inferredType = inferRestrictionTypeFromPlateText(plate.text);
+    const interpretedArrow = arrowFromUpper(r.arrow);
+    const physicalArrow = derivedArrowForPlate(plate, extraction.plates);
+    const hallucinatedArrow = interpretedArrow !== null && interpretedArrow !== physicalArrow;
+    if (hallucinatedArrow) validationConfidenceCap = Math.min(validationConfidenceCap, 0.58);
+
+    const interpretedDays = dayWordsTo3Letter(r.days);
+    const type = restrictionTextFromType(r.restriction_type);
+    const shouldPreferPlateType = type === "" || type === "unknown" || (inferredType !== "unknown" && type === "allowed");
+    const perRuleConfidence = averagePlateConfidence(matchedPlates, extraction.overall_confidence);
+
+    rules.push({
+      type: shouldPreferPlateType ? inferredType : type,
+      days: interpretedDays.length ? interpretedDays : parseDaysFromPlateText(plate.text),
+      start: r.start_time ?? inferredWindow.start,
+      end: r.end_time ?? inferredWindow.end,
+      permit_zone: null,
+      time_limit_minutes: r.time_limit_minutes ?? inferTimeLimitMinutes(plate.text),
+      notes: r.notes ?? (plate.text.trim() || null),
+      arrow: physicalArrow,
+      confidence: hallucinatedArrow ? Math.min(perRuleConfidence, 0.58) : perRuleConfidence,
+    });
+    coveredTextPlateIds.add(plate.plate_index);
   }
+
+  for (const plate of textPlates) {
+    if (coveredTextPlateIds.has(plate.plate_index)) continue;
+    validationConfidenceCap = Math.min(validationConfidenceCap, 0.58);
+    rules.push(fallbackRuleFromPlate(plate, extraction.plates, "Interpreter omitted this physical plate."));
+  }
+
+  if (rules.length === 0 && textPlates.length > 0) {
+    validationConfidenceCap = Math.min(validationConfidenceCap, 0.5);
+  }
+
+  if (extraction.plates.some((p) => p.arrow === "UNCLEAR")) {
+    validationConfidenceCap = Math.min(validationConfidenceCap, 0.6);
+  }
+
+  const finalRules = dedupeRawRules(rules);
 
   const overall_confidence = Math.min(
     extraction.overall_confidence || 0,
     interpretation.confidence || extraction.overall_confidence || 0,
+    validationConfidenceCap,
   );
 
   return {
     raw_text,
     sign_count: extraction.plates.length,
     overall_confidence,
-    rules,
+    rules: finalRules,
     model: AI_MODEL,
   };
 }
