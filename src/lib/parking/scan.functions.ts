@@ -594,6 +594,7 @@ export const scanSign = createServerFn({ method: "POST" })
           ...[...physicalDirs].map((d) => d.toUpperCase()),
         ],
       },
+    };
   });
 
 export interface RecentScan {
