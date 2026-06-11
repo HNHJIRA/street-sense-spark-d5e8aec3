@@ -358,19 +358,27 @@ DIRECTIONAL INDEPENDENCE (CRITICAL — DO NOT VIOLATE)
 =================================================
 MANDATORY RESTRICTION TYPES
 =================================================
-Always convert these text plates into independent rules:
+Always convert these text plates into independent rules. PRESERVE the
+loading subtype — never collapse them all into a generic "loading_zone":
 
-- PASSENGER LOADING ONLY, COMMERCIAL LOADING ONLY, LOADING ZONE,
-  BUS LOADING, TAXI ZONE → loading_zone
+- PASSENGER LOADING ONLY → passenger_loading
+- COMMERCIAL LOADING ONLY → commercial_loading
+- TAXI ZONE / TAXI STAND / TAXI ONLY → taxi_zone
+- BUS ZONE / BUS STOP / BUS LOADING → bus_zone
+- LOADING ZONE / TRUCK LOADING (no passenger/commercial qualifier) → loading_zone
 - NO PARKING → no_parking
 - NO STOPPING or NO STANDING → no_stopping
 - TOW AWAY → tow_away unless paired with a more explicit no-parking/no-stopping text
 - FIRE LANE → no_stopping
 - 15 MINUTE PARKING, 2 HOUR PARKING, or similar duration parking → time_limited
 
-Never merge loading/no-parking/no-stopping/tow-away/fire-lane rules into a
-time-limited parking rule. They remain separate even when they share days,
-times, colors, or an arrow plate.
+LOADING / TAXI / BUS zones are restricted-use zones, NOT no-parking zones.
+They permit a specific activity (passenger pick-up / drop-off, commercial
+loading, taxi service, transit) during the posted window. General parking
+is not permitted during the window, but the rule is "limited use", not
+"no parking". Never merge loading/no-parking/no-stopping/tow-away/fire-lane
+rules into a time-limited parking rule. They remain separate even when they
+share days, times, colors, or an arrow plate.
 
 =================================================
 FINAL VALIDATION BEFORE JSON
@@ -715,9 +723,11 @@ function inferRestrictionTypeFromPlateText(text: string): string {
   if (/\bFIRE\s+LANE\b/.test(t)) return "fire lane";
   if (/\bNO\s+PARKING\b/.test(t)) return "no parking";
   if (/\bTOW\s*-?\s*AWAY\b/.test(t)) return "tow away";
-  if (/\b(PASSENGER\s+LOADING\s+ONLY|COMMERCIAL\s+LOADING\s+ONLY|LOADING\s+ZONE|BUS\s+LOADING|TAXI\s+ZONE)\b/.test(t)) {
-    return "loading zone";
-  }
+  if (/\bPASSENGER\s+LOADING\b/.test(t)) return "passenger loading";
+  if (/\bCOMMERCIAL\s+LOADING\b/.test(t)) return "commercial loading";
+  if (/\bTAXI\s+(ZONE|STAND|ONLY)\b/.test(t)) return "taxi zone";
+  if (/\bBUS\s+(ZONE|STOP|LOADING)\b/.test(t)) return "bus zone";
+  if (/\b(LOADING\s+ZONE|LOADING\s+ONLY|TRUCK\s+LOADING)\b/.test(t)) return "loading zone";
   if (/\b\d{1,3}\s*(MINUTE|MINUTES|MIN|MINS|HOUR|HOURS|HR|HRS)\s+PARKING\b/.test(t) || /\bTIME\s+LIMIT(?:ED)?\b/.test(t)) {
     return "time limited parking";
   }

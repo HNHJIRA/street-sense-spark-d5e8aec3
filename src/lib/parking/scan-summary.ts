@@ -39,8 +39,11 @@ const REASON_LABEL: Record<string, string> = {
   street_sweeping: "Street Cleaning",
   loading_zone: "Loading Zone",
   loading: "Loading Zone",
-  commercial_loading: "Loading Zone",
-  passenger_loading: "Loading Zone",
+  loading_only: "Loading Zone",
+  passenger_loading: "Passenger Loading Only",
+  commercial_loading: "Commercial Loading Only",
+  taxi_zone: "Taxi Zone",
+  bus_zone: "Bus Zone",
   permit: "Permit Parking",
   permit_parking: "Permit Parking",
   rpz: "Permit Parking",
@@ -48,13 +51,21 @@ const REASON_LABEL: Record<string, string> = {
   meter: "Meter Parking",
   paid: "Meter Parking",
   metered: "Meter Parking",
-  bus_zone: "Bus Lane",
+  bus_lane: "Bus Lane",
   transit_zone: "Bus Lane",
   red_curb: "Red Curb (No Stopping)",
   free: "Currently Allowed",
   unrestricted: "Currently Allowed",
   allowed: "Currently Allowed",
   unknown: "Unknown / Verify Sign",
+};
+
+const LOADING_HINTS: Record<string, string> = {
+  passenger_loading: "You may stop only briefly to pick up or drop off passengers.",
+  commercial_loading: "You may stop only for active commercial loading or unloading by qualifying vehicles.",
+  taxi_zone: "Reserved for taxis actively picking up or dropping off passengers.",
+  bus_zone: "Reserved for transit buses — do not stop or park here.",
+  loading_zone: "Stops are allowed only for active loading or unloading.",
 };
 
 function reasonFor(code: string | null | undefined): string {
@@ -128,6 +139,12 @@ function buildPlain(
     return `You cannot park here right now because ${why} is active.`;
   }
   // LIMITED
+  const loadingHint = LOADING_HINTS[decision.code];
+  if (loadingHint) {
+    const limit = decision.time_limit_minutes != null ? ` ${decision.time_limit_minutes}-minute limit.` : "";
+    const ends = endT ? ` This restriction is in effect until ${endT}.` : "";
+    return `${reason} is active — general parking is not permitted right now. ${loadingHint}${limit}${ends}`;
+  }
   if (decision.permit_zone)
     return `Parking is limited — a ${decision.permit_zone} permit is required.`;
   if (decision.time_limit_minutes != null)
@@ -245,7 +262,10 @@ export function buildScanSummary(args: {
   } else if (status === "YES" && (reasonCode === "unknown" || reasonCode === "free")) {
     reasonCode = "free";
   }
-  const reason = reasonFor(reasonCode);
+  const baseReason = reasonFor(reasonCode);
+  const reason = (status !== "YES" && LOADING_HINTS[reasonCode] && decision.time_limit_minutes != null)
+    ? `${baseReason} (${decision.time_limit_minutes}-minute limit)`
+    : baseReason;
   const plain = buildPlain(status, reason, decision, timezone);
   const time_guidance = buildTimeGuidance(status, decision, timezone);
   const confidence = confidenceFor(decision, aiConfidence, signCount);

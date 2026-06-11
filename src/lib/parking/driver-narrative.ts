@@ -30,8 +30,11 @@ const REASON_LABEL: Record<string, string> = {
   street_sweeping: "Street Cleaning",
   loading_zone: "Loading Zone",
   loading: "Loading Zone",
-  commercial_loading: "Loading Zone",
-  passenger_loading: "Loading Zone",
+  loading_only: "Loading Zone",
+  passenger_loading: "Passenger Loading Only",
+  commercial_loading: "Commercial Loading Only",
+  taxi_zone: "Taxi Zone",
+  bus_zone: "Bus Zone",
   permit: "Permit Parking",
   permit_parking: "Permit Parking",
   permit_only: "Permit Parking",
@@ -41,12 +44,27 @@ const REASON_LABEL: Record<string, string> = {
   meter: "Meter Parking",
   paid: "Meter Parking",
   metered: "Meter Parking",
-  bus_zone: "Bus Lane",
+  bus_lane: "Bus Lane",
   transit_zone: "Bus Lane",
   red_curb: "Red Curb (No Stopping)",
   free: "Free Parking",
   unrestricted: "Free Parking",
   unknown: "Unknown — verify posted sign",
+};
+
+const LOADING_CODES = new Set([
+  "loading_zone", "loading", "loading_only",
+  "passenger_loading", "commercial_loading", "taxi_zone", "bus_zone",
+]);
+
+const LOADING_ALLOWED_ACTIVITY: Record<string, string> = {
+  passenger_loading: "You may stop temporarily to pick up or drop off passengers.",
+  commercial_loading: "You may stop only for active commercial loading or unloading by qualifying vehicles.",
+  taxi_zone: "Reserved for taxis actively picking up or dropping off passengers.",
+  bus_zone: "Reserved for transit buses — do not stop or park here.",
+  loading_zone: "Stops are allowed only for active loading or unloading.",
+  loading: "Stops are allowed only for active loading or unloading.",
+  loading_only: "Stops are allowed only for active loading or unloading.",
 };
 
 function reasonLabel(code: string | null | undefined): string {
@@ -174,21 +192,36 @@ export function buildDriverNarrative(args: BuildNarrativeArgs): DriverNarrative 
       : "No permit is required.");
     summary = parts.join(" ");
   } else if (status === "LIMITED") {
-    const parts = [
-      time_limit_minutes
-        ? `You can park here right now, but only for ${time_limit_minutes} minutes.`
-        : "You can park here right now, with restrictions.",
-      `Today is ${weekday} and it is currently ${clockNow}.`,
-    ];
-    if (time_limit_minutes) {
-      parts.push(`The posted time limit is ${formatLimit(time_limit_minutes)}.`);
-      if (allowedClock) {
-        parts.push(`If you park now, you must move your vehicle by ${allowedClock}.`);
-        parts.push(`After ${allowedClock} you may be subject to citation.`);
+    const isLoading = LOADING_CODES.has(reasonCode);
+    if (isLoading) {
+      const parts = [
+        `LIMITED. It is currently ${clockNow} on ${weekday}.`,
+        time_limit_minutes
+          ? `${reason} is in effect with a ${time_limit_minutes}-minute limit.`
+          : `${reason} is in effect.`,
+        "General parking is not permitted during this time.",
+      ];
+      const activity = LOADING_ALLOWED_ACTIVITY[reasonCode];
+      if (activity) parts.push(activity);
+      if (endClock) parts.push(`This restriction remains in effect until ${endClock}.`);
+      summary = parts.join(" ");
+    } else {
+      const parts = [
+        time_limit_minutes
+          ? `You can park here right now, but only for ${time_limit_minutes} minutes.`
+          : "You can park here right now, with restrictions.",
+        `Today is ${weekday} and it is currently ${clockNow}.`,
+      ];
+      if (time_limit_minutes) {
+        parts.push(`The posted time limit is ${formatLimit(time_limit_minutes)}.`);
+        if (allowedClock) {
+          parts.push(`If you park now, you must move your vehicle by ${allowedClock}.`);
+          parts.push(`After ${allowedClock} you may be subject to citation.`);
+        }
       }
+      if (permit_required) parts.push(`Permit ${decision.permit_zone} is required.`);
+      summary = parts.join(" ");
     }
-    if (permit_required) parts.push(`Permit ${decision.permit_zone} is required.`);
-    summary = parts.join(" ");
   } else {
     // NO
     const parts = [
@@ -281,12 +314,20 @@ export function buildSideCaption(args: {
     return `The ${sideLabel} side of this sign allows parking right now.${postedSuffix}`;
   }
   if (status === "LIMITED") {
+    const properReason = reasonLabel(code);
+    if (LOADING_CODES.has(code)) {
+      const limit = decision.time_limit_minutes != null
+        ? ` (${decision.time_limit_minutes}-minute limit)`
+        : "";
+      const until = endClock ? ` until ${endClock}` : "";
+      return `The ${sideLabel} side is reserved for ${properReason}${limit}${until}. General parking is not permitted right now.${postedSuffix}`;
+    }
     if (decision.time_limit_minutes)
-      return `The ${sideLabel} side has a ${formatLimit(decision.time_limit_minutes)} time limit.`;
+      return `The ${sideLabel} side has a ${formatLimit(decision.time_limit_minutes)} time limit.${postedSuffix}`;
     if (decision.permit_zone)
-      return `The ${sideLabel} side requires permit ${decision.permit_zone}.`;
-    if (startClock) return `The ${sideLabel} side has a ${reason} restriction beginning at ${startClock}.`;
-    return `The ${sideLabel} side has limited parking (${reason}).`;
+      return `The ${sideLabel} side requires permit ${decision.permit_zone}.${postedSuffix}`;
+    if (startClock) return `The ${sideLabel} side has a ${reason} restriction beginning at ${startClock}.${postedSuffix}`;
+    return `The ${sideLabel} side has limited parking (${reason}).${postedSuffix}`;
   }
   if (status === "NO") {
     if (endClock) return `The ${sideLabel} side has a ${reason} restriction until ${endClock}.`;
