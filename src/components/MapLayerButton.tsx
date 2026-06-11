@@ -14,9 +14,10 @@ const OPTIONS: { value: MapType; label: string; hint: string }[] = [
 interface Props {
   /** Optional class overrides for positioning (defaults to bottom-right). */
   className?: string;
+  style?: React.CSSProperties;
 }
 
-export function MapLayerButton({ className }: Props) {
+export function MapLayerButton({ className, style }: Props) {
   const mapType = useMapTypeStore((s) => s.mapType);
   const setMapType = useMapTypeStore((s) => s.setMapType);
   const [open, setOpen] = useState(false);
