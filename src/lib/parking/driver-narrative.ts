@@ -192,21 +192,36 @@ export function buildDriverNarrative(args: BuildNarrativeArgs): DriverNarrative 
       : "No permit is required.");
     summary = parts.join(" ");
   } else if (status === "LIMITED") {
-    const parts = [
-      time_limit_minutes
-        ? `You can park here right now, but only for ${time_limit_minutes} minutes.`
-        : "You can park here right now, with restrictions.",
-      `Today is ${weekday} and it is currently ${clockNow}.`,
-    ];
-    if (time_limit_minutes) {
-      parts.push(`The posted time limit is ${formatLimit(time_limit_minutes)}.`);
-      if (allowedClock) {
-        parts.push(`If you park now, you must move your vehicle by ${allowedClock}.`);
-        parts.push(`After ${allowedClock} you may be subject to citation.`);
+    const isLoading = LOADING_CODES.has(reasonCode);
+    if (isLoading) {
+      const parts = [
+        `LIMITED. It is currently ${clockNow} on ${weekday}.`,
+        time_limit_minutes
+          ? `${reason} is in effect with a ${time_limit_minutes}-minute limit.`
+          : `${reason} is in effect.`,
+        "General parking is not permitted during this time.",
+      ];
+      const activity = LOADING_ALLOWED_ACTIVITY[reasonCode];
+      if (activity) parts.push(activity);
+      if (endClock) parts.push(`This restriction remains in effect until ${endClock}.`);
+      summary = parts.join(" ");
+    } else {
+      const parts = [
+        time_limit_minutes
+          ? `You can park here right now, but only for ${time_limit_minutes} minutes.`
+          : "You can park here right now, with restrictions.",
+        `Today is ${weekday} and it is currently ${clockNow}.`,
+      ];
+      if (time_limit_minutes) {
+        parts.push(`The posted time limit is ${formatLimit(time_limit_minutes)}.`);
+        if (allowedClock) {
+          parts.push(`If you park now, you must move your vehicle by ${allowedClock}.`);
+          parts.push(`After ${allowedClock} you may be subject to citation.`);
+        }
       }
+      if (permit_required) parts.push(`Permit ${decision.permit_zone} is required.`);
+      summary = parts.join(" ");
     }
-    if (permit_required) parts.push(`Permit ${decision.permit_zone} is required.`);
-    summary = parts.join(" ");
   } else {
     // NO
     const parts = [
