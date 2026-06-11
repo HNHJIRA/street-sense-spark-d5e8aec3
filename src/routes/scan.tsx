@@ -319,14 +319,17 @@ function ScanResult({
   const scannedRef = new Date(result.scanned_at);
   const allowedUntilLabel = fmtClock(allowedUntilIso);
   const allowedUntilDayLabel = fmtDayClock(allowedUntilIso, scannedRef);
-  const nextStartLabel = fmtClock(decision.restriction_starts_at);
-  const nextStartDayLabel = fmtDayClock(decision.restriction_starts_at, scannedRef);
+  const nextStartIso = decision.restriction_starts_at ?? result.next_rule?.starts_at ?? null;
+  const nextEndIso = decision.restriction_ends_at ?? result.next_rule?.ends_at ?? null;
+  const activeRestrictionEndIso = decision.restriction_ends_at ?? result.current_rule?.ends_at ?? null;
+  const nextStartLabel = fmtClock(nextStartIso);
+  const nextStartDayLabel = fmtDayClock(nextStartIso, scannedRef);
   // For NO: "Parking becomes available" should land 1 minute after the
   // restriction ends ("12:01 PM" rather than "12:00 PM").
-  const becomesFreeIso = decision.restriction_ends_at
-    ? new Date(new Date(decision.restriction_ends_at).getTime() + 60_000).toISOString()
+  const becomesFreeIso = activeRestrictionEndIso
+    ? new Date(new Date(activeRestrictionEndIso).getTime() + 60_000).toISOString()
     : null;
-  const nextEndLabel = fmtClock(decision.restriction_ends_at);
+  const nextEndLabel = fmtClock(nextEndIso);
   const becomesFreeDayLabel = fmtDayClock(becomesFreeIso, scannedRef);
 
   // Rule time windows ("between 9:00 AM and 6:00 PM").
@@ -396,6 +399,9 @@ function ScanResult({
         ? (result.current_rule?.label ?? "Currently allowed")
         : (result.current_rule?.label ?? s.reason ?? "Posted restriction"));
   const nextReasonLabel = result.next_rule?.label ?? result.next_restriction_reason ?? null;
+  const nextRestrictionDetail = result.next_rule
+    ? `${result.next_rule.label}${result.next_rule.time_limit_minutes ? ` · ${result.next_rule.time_limit_minutes} Minute Limit` : ""}`
+    : nextReasonLabel;
 
   // moveByLabel kept for the existing "Until card" UI below.
   // For loading zones the user is NOT legally parked — never surface a
