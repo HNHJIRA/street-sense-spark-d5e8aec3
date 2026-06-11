@@ -631,9 +631,46 @@ function ScanResult({
             ? "This post has different parking rules on each side. Select LEFT or RIGHT for a definitive decision."
             : palette.subtitle}
         </p>
+      </div>
+
+      {/* MIXED RULES comparison — when "both" is selected and each side has a different rule */}
+      {mixedMode && (
+        <div className="rounded-3xl border border-park-yellow/40 bg-park-yellow-soft p-5">
+          <div className="mb-3 text-[11px] font-bold uppercase tracking-wider text-park-yellow">
+            Mixed rules · Left vs Right
+          </div>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="rounded-2xl bg-background p-3">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Left side</div>
+              <div className="mt-1 font-bold text-foreground">{leftRuleHeading}</div>
+              {leftWindow && <div className="mt-0.5 text-xs text-muted-foreground">{leftWindow}</div>}
+              {leftUntil && (
+                <div className="mt-2 text-xs">
+                  <span className="text-muted-foreground">Park until </span>
+                  <span className="font-bold text-foreground">{leftUntil}</span>
+                </div>
+              )}
+            </div>
+            <div className="rounded-2xl bg-background p-3">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Right side</div>
+              <div className="mt-1 font-bold text-foreground">{rightRuleHeading}</div>
+              {rightWindow && <div className="mt-0.5 text-xs text-muted-foreground">{rightWindow}</div>}
+              {rightUntil && (
+                <div className="mt-2 text-xs">
+                  <span className="text-muted-foreground">Park until </span>
+                  <span className="font-bold text-foreground">{rightUntil}</span>
+                </div>
+              )}
+            </div>
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Select LEFT or RIGHT above for a definitive parking decision.
+          </p>
+        </div>
+      )}
 
       {/* Until card */}
-      {(untilTime || moveByLabel) && (
+      {!mixedMode && (untilTime || moveByLabel) && (
         <div className="rounded-3xl bg-surface p-5">
           {moveByLabel && (
             <>
