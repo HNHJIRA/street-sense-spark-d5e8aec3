@@ -339,18 +339,21 @@ Parking signs on a pole use color coding to group rules.
 =================================================
 DIRECTIONAL INDEPENDENCE (CRITICAL — DO NOT VIOLATE)
 =================================================
-- A plate with a LEFT arrow and a plate with a RIGHT arrow are ALWAYS two
-  separate rules. NEVER combine them into a single rule.
-- NEVER replace a LEFT rule + a RIGHT rule with a single BOTH rule.
-  "BOTH" is only valid when ONE plate physically shows a double-headed
-  arrow (tips on both ends) OR explicitly has no arrow modifier and the
-  extraction marked it BOTH.
+- Physical arrows are the ONLY source of truth for direction. Never invent
+  LEFT, RIGHT, or BOTH that the photo does not show.
+- MULTIPLE PLATES DO NOT IMPLY MULTIPLE DIRECTIONS. A stack of two Passenger
+  Loading plates with a single RIGHT arrow below them is TWO rules, both
+  arrow="RIGHT". It is NEVER one LEFT and one RIGHT, and NEVER one BOTH.
+- A plate with a LEFT arrow and a plate with a RIGHT arrow that are
+  physically present in the photo are two separate rules. Keep them separate.
+- "BOTH" is valid ONLY when one plate physically shows a double-headed arrow
+  (tips on both ends). If every photographed arrow points the same way, no
+  rule may be "BOTH".
+- If only RIGHT arrows exist in the OCR input, every rule must be arrow=
+  "RIGHT" or arrow="NONE" — never "LEFT", never "BOTH". Same for LEFT.
 - NEVER collapse different parking durations (e.g. "15 MINUTE" and
   "2 HOUR") into one rule, even if their time windows or days match.
 - Preserve directional differences. Preserve duration differences.
-- If the OCR shows plates with arrows LEFT and RIGHT, the output MUST
-  contain at least one rule with arrow="LEFT" and at least one with
-  arrow="RIGHT".
 
 =================================================
 MANDATORY RESTRICTION TYPES
@@ -599,10 +602,46 @@ function samePlateColor(a: ExtractedPlate, b: ExtractedPlate): boolean {
 function derivedArrowForPlate(plate: ExtractedPlate, plates: ExtractedPlate[]): ArrowDirection {
   const direct = physicalArrowValue(plate.arrow);
   if (direct) return direct;
-  const inherited = plates
+
+  // 1) Nearest arrow-only plate BELOW with the same background color.
+  const inheritedSameColor = plates
     .filter((p) => p.plate_index > plate.plate_index && isArrowOnlyPlate(p) && samePlateColor(plate, p))
     .sort((a, b) => a.plate_index - b.plate_index)[0];
-  return physicalArrowValue(inherited?.arrow);
+  const sameColor = physicalArrowValue(inheritedSameColor?.arrow);
+  if (sameColor) return sameColor;
+
+  // 2) Nearest arrow-only plate BELOW regardless of color (single shared arrow plate).
+  const inheritedAny = plates
+    .filter((p) => p.plate_index > plate.plate_index && isArrowOnlyPlate(p))
+    .sort((a, b) => a.plate_index - b.plate_index)[0];
+  const anyBelow = physicalArrowValue(inheritedAny?.arrow);
+  if (anyBelow) return anyBelow;
+
+  // 3) Stack-wide single-direction inheritance — multiple plates ≠ multiple
+  //    directions. If every physical arrow on the sign points the same way,
+  //    that direction applies to plates that did not show their own arrow.
+  const stackDirs = new Set<ArrowDirection>();
+  for (const p of plates) {
+    const dir = physicalArrowValue(p.arrow);
+    if (dir) stackDirs.add(dir);
+  }
+  if (stackDirs.size === 1) {
+    const [only] = [...stackDirs];
+    return only;
+  }
+  return null;
+}
+
+/** Set of physical arrow directions actually present on the OCR'd sign stack.
+ *  Used to forbid the interpreter from inventing LEFT, RIGHT, or BOTH that
+ *  the photo does not contain. */
+function physicalStackDirections(plates: ExtractedPlate[]): Set<ArrowDirection> {
+  const out = new Set<ArrowDirection>();
+  for (const p of plates) {
+    const dir = physicalArrowValue(p.arrow);
+    if (dir) out.add(dir);
+  }
+  return out;
 }
 
 function averagePlateConfidence(plates: ExtractedPlate[], fallback: number): number {
@@ -852,6 +891,35 @@ export async function callSignScanAi(
 
   if (extraction.plates.some((p) => p.arrow === "UNCLEAR")) {
     validationConfidenceCap = Math.min(validationConfidenceCap, 0.6);
+  }
+
+  // STACK-DIRECTION ENFORCEMENT: the rules engine must never claim a
+  // direction that does not physically exist on the sign. Multiple plates do
+  // NOT imply multiple directions — only physical arrow heads do.
+  const stackDirs = physicalStackDirections(extraction.plates);
+  if (stackDirs.size > 0 && !stackDirs.has("both")) {
+    // No double-headed arrow was photographed → BOTH is never valid.
+    for (const r of rules) {
+      if (r.arrow === "both") {
+        r.arrow = stackDirs.size === 1 ? [...stackDirs][0] : null;
+        r.confidence = Math.min(r.confidence, 0.58);
+        validationConfidenceCap = Math.min(validationConfidenceCap, 0.58);
+      }
+    }
+  }
+  if (stackDirs.size === 1) {
+    const [only] = [...stackDirs];
+    // Only one physical direction on the entire stack → every rule with no
+    // arrow inherits it; rules pointing the opposite way were invented.
+    for (const r of rules) {
+      if (r.arrow == null) {
+        r.arrow = only;
+      } else if (r.arrow !== only) {
+        r.arrow = only;
+        r.confidence = Math.min(r.confidence, 0.55);
+        validationConfidenceCap = Math.min(validationConfidenceCap, 0.55);
+      }
+    }
   }
 
   const finalRules = dedupeRawRules(rules);
