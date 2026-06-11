@@ -605,7 +605,28 @@ export function MapView({ token, city }: MapViewProps) {
       ],
     };
     src.setData(data);
-  }, [ready, recommendedHighlight]);
+  }, [ready, recommendedHighlight, styleVersion]);
+
+  // Map-type switch: swap the underlying base style without recreating the
+  // map. The existing style.load handler re-adds custom sources/layers, and
+  // featuresRef preserves segment geometry so nothing refetches.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    const targetStyle = MAPBOX_STYLE_FOR_TYPE[mapType];
+    // Mapbox normalizes the style URL; compare by setting unconditionally
+    // only when the requested type changes (skip the initial render).
+    if (initialMapTypeRef.current === mapType) {
+      initialMapTypeRef.current = mapType; // no-op, keep ref aligned
+      return;
+    }
+    initialMapTypeRef.current = mapType;
+    try {
+      map.setStyle(targetStyle);
+    } catch (err) {
+      console.warn("[MapView] setStyle failed", err);
+    }
+  }, [mapType, ready]);
 
 
   useEffect(() => {
