@@ -890,6 +890,35 @@ export async function callSignScanAi(
     validationConfidenceCap = Math.min(validationConfidenceCap, 0.6);
   }
 
+  // STACK-DIRECTION ENFORCEMENT: the rules engine must never claim a
+  // direction that does not physically exist on the sign. Multiple plates do
+  // NOT imply multiple directions — only physical arrow heads do.
+  const stackDirs = physicalStackDirections(extraction.plates);
+  if (stackDirs.size > 0 && !stackDirs.has("both")) {
+    // No double-headed arrow was photographed → BOTH is never valid.
+    for (const r of rules) {
+      if (r.arrow === "both") {
+        r.arrow = stackDirs.size === 1 ? [...stackDirs][0] : null;
+        r.confidence = Math.min(r.confidence, 0.58);
+        validationConfidenceCap = Math.min(validationConfidenceCap, 0.58);
+      }
+    }
+  }
+  if (stackDirs.size === 1) {
+    const [only] = [...stackDirs];
+    // Only one physical direction on the entire stack → every rule with no
+    // arrow inherits it; rules pointing the opposite way were invented.
+    for (const r of rules) {
+      if (r.arrow == null) {
+        r.arrow = only;
+      } else if (r.arrow !== only) {
+        r.arrow = only;
+        r.confidence = Math.min(r.confidence, 0.55);
+        validationConfidenceCap = Math.min(validationConfidenceCap, 0.55);
+      }
+    }
+  }
+
   const finalRules = dedupeRawRules(rules);
 
   const overall_confidence = Math.min(
