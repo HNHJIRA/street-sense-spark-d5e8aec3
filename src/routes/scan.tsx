@@ -209,13 +209,23 @@ function ScanResult({
   const s = sideEval?.summary ?? result.summary;
   const decision = sideEval?.decision ?? result.decision;
 
+  // Loading-zone subtypes are RESTRICTED-USE zones, not parkable spots.
+  // The UI must never imply "you may park for N minutes" when the active
+  // rule is loading/taxi/bus zone — those time limits are LOADING limits.
+  const LOADING_CODES = new Set([
+    "loading_zone", "loading", "loading_only",
+    "passenger_loading", "commercial_loading", "taxi_zone", "bus_zone",
+  ]);
+  const activeCode = decision?.code ?? "";
+  const isLoading = LOADING_CODES.has(activeCode);
+
   const palette =
     s.status === "YES"
       ? { ring: "bg-park-green/15", dot: "bg-park-green", text: "text-park-green", icon: Check, title: "Yes, you can park!", subtitle: "Parking is allowed at this spot right now.", untilLabel: "Parking until" }
       : s.status === "NO"
       ? { ring: "bg-park-red/15", dot: "bg-park-red", text: "text-park-red", icon: X, title: "No, you can't park", subtitle: "Parking is not allowed at this spot right now.", untilLabel: "Restriction until" }
       : s.status === "LIMITED"
-      ? { ring: "bg-park-yellow/15", dot: "bg-park-yellow", text: "text-park-yellow", icon: AlertTriangle, title: "Limited parking", subtitle: s.plain, untilLabel: "Changes at" }
+      ? { ring: "bg-park-yellow/15", dot: "bg-park-yellow", text: "text-park-yellow", icon: AlertTriangle, title: "Limited parking", subtitle: s.plain, untilLabel: isLoading ? "Restriction until" : "Changes at" }
       : { ring: "bg-muted", dot: "bg-muted-foreground", text: "text-foreground", icon: HelpCircle, title: "Unclear sign", subtitle: "We couldn't fully read this sign.", untilLabel: "Next change" };
 
   const Icon = palette.icon;
@@ -255,7 +265,9 @@ function ScanResult({
   };
 
   const nextChange = s.timeline.find((t) => t.when !== "now");
-  const untilTime = nextChange?.when_label ?? null;
+  const untilTime = isLoading
+    ? (fmtClock(decision.restriction_ends_at) ?? nextChange?.when_label ?? null)
+    : (nextChange?.when_label ?? null);
 
   // Applies-To derived from arrow detection + selected side.
   // Applies-To: server is the source of truth (driven by physical arrows).
@@ -375,7 +387,9 @@ function ScanResult({
   const nextReasonLabel = result.next_rule?.label ?? result.next_restriction_reason ?? null;
 
   // moveByLabel kept for the existing "Until card" UI below.
-  const moveByLabel = allowedUntilLabel && (s.status === "LIMITED" || (s.status === "YES" && sideTimeLimit))
+  // For loading zones the user is NOT legally parked — never surface a
+  // "Park until 9:17 AM" countdown; show "Restriction until 5:00 PM" instead.
+  const moveByLabel = !isLoading && allowedUntilLabel && (s.status === "LIMITED" || (s.status === "YES" && sideTimeLimit))
     ? allowedUntilLabel : null;
 
 
@@ -475,6 +489,19 @@ function ScanResult({
     bothWindow,
     restrictionStartsLabel: nextStartLabel,
     decisionConfidence: result.decision_confidence ?? 0,
+    activeCode,
+    loadingActivity: isLoading
+      ? (activeCode === "passenger_loading"
+          ? "You may briefly stop to pick up or drop off passengers."
+          : activeCode === "commercial_loading"
+            ? "You may stop only for active commercial loading or unloading by qualifying vehicles."
+            : activeCode === "taxi_zone"
+              ? "Reserved for taxis actively picking up or dropping off passengers."
+              : activeCode === "bus_zone"
+                ? "Reserved for transit buses — do not stop or park here."
+                : "Stops are allowed only for active loading or unloading.")
+      : null,
+    restrictionEndLabel: fmtClock(decision.restriction_ends_at),
   });
   // sideClause/timeRemainingLabel intentionally unused here but kept for other UI.
   void sideClause; void timeRemainingLabel;
@@ -582,9 +609,16 @@ function ScanResult({
             <span className={cn("font-bold", palette.text)}>{s.status}</span>
           } />
           <DetailRow label="Reason" value={reasonLabel} />
-          <DetailRow label="Allowed until" value={allowedUntilLabel ?? "—"} />
+          <DetailRow
+            label={isLoading ? "Restriction until" : "Allowed until"}
+            value={
+              isLoading
+                ? (fmtClock(decision.restriction_ends_at) ?? "—")
+                : (allowedUntilLabel ?? "—")
+            }
+          />
           <DetailRow label="Time remaining" value={timeRemainingLabel ?? "—"} />
-          <DetailRow label="Maximum stay" value={maxStayLabel ?? "No limit"} />
+          <DetailRow label={isLoading ? "Loading time limit" : "Maximum stay"} value={maxStayLabel ?? "No limit"} />
           <DetailRow label="Next restriction" value={nextReasonLabel ?? "None scheduled"} />
           <DetailRow label="Restriction starts" value={nextStartLabel ?? "—"} />
           <DetailRow label="Restriction ends" value={nextEndLabel ?? "—"} />
@@ -815,6 +849,12 @@ interface OfficerArgs {
   bothWindow: string | null;
   restrictionStartsLabel: string | null;
   decisionConfidence: number;
+  /** Engine code for the currently active rule (e.g. "passenger_loading"). */
+  activeCode: string | null;
+  /** Plain-English description of who may use a loading/taxi/bus zone. */
+  loadingActivity: string | null;
+  /** Clock label for restriction_ends_at, used by loading-zone narratives. */
+  restrictionEndLabel: string | null;
 }
 
 // Narrator-only side phrase. Uses ONLY the supplied arrow value — never guesses.
@@ -846,6 +886,29 @@ function buildOfficerParagraph(a: OfficerArgs): string {
   }
 
   const side = sidePhrase(a.appliesTo, a.hasArrows);
+
+  // -------- LOADING / TAXI / BUS ZONES (restricted-use, never "parkable") --------
+  // These are NOT parking — even when the engine reports LIMITED with a
+  // time limit, that limit is a LOADING limit, not a parking allowance.
+  if (a.activeCode && a.loadingActivity) {
+    const reasonNoLimit = (a.reason || "").replace(/\s*\([^)]*\)\s*$/, "").trim() || "Loading Only";
+    const limitClause = a.timeLimitMinutes
+      ? ` with a ${a.timeLimitMinutes}-minute limit`
+      : "";
+    const sideClauseLoading = (a.hasArrows && (a.appliesTo === "LEFT" || a.appliesTo === "RIGHT"))
+      ? `This sign applies to the ${a.appliesTo} side.`
+      : "";
+    const untilClause = a.restrictionEndLabel
+      ? ` This restriction remains in effect until ${a.restrictionEndLabel}.`
+      : "";
+    return [
+      `LIMITED. ${prefix}`,
+      sideClauseLoading,
+      `This curb is reserved for ${reasonNoLimit.toLowerCase()}${limitClause}.`,
+      "General parking is not permitted during this restriction period.",
+      a.loadingActivity,
+    ].filter(Boolean).join(" ") + untilClause;
+  }
 
   // -------- NO PARKING --------
   if (a.status === "NO") {
