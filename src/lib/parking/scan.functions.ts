@@ -587,7 +587,7 @@ export const scanSign = createServerFn({ method: "POST" })
       applies_to,
       debug: {
         ocr_plates_text: ai.raw_text,
-        interpreted_rules: aiRulesAll,
+        interpreted_rules: aiRulesAll.map((r, i) => ({ ...r, id: `scan-rule-${i}` })),
         active_rule_id: decision.rule_id ?? null,
         physical_arrow_directions: [
           ...(hasPhysicalBoth ? ["BOTH"] : []),
