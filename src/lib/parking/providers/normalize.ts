@@ -51,10 +51,18 @@ export function normalizeCategory(raw: string | null | undefined): ClassifiedRul
     return { code: "no_parking", priority: 20, notes: "Posted: no parking." };
   if (c.includes("no stopping"))
     return { code: "no_stopping", priority: 15, notes: "No stopping zone." };
+  if (c.includes("passenger load"))
+    return { code: "passenger_loading", priority: 28, notes: "Passenger loading only — pick-up / drop-off." };
+  if (c.includes("commercial load"))
+    return { code: "commercial_loading", priority: 28, notes: "Commercial loading only — active loading/unloading." };
+  if (c.includes("taxi"))
+    return { code: "taxi_zone", priority: 28, notes: "Taxi zone — taxis only." };
+  if (c.includes("bus zone") || c.includes("bus stop") || c.includes("bus loading"))
+    return { code: "bus_zone", priority: 28, notes: "Bus zone — transit pick-up / drop-off." };
   if (c.includes("bus") || c.includes("transit"))
-    return { code: "bus_lane", priority: 15, notes: "Bus / transit zone." };
+    return { code: "bus_lane", priority: 15, notes: "Bus / transit lane." };
   if (c.includes("load"))
-    return { code: "loading_zone", priority: 30, notes: "Loading zone." };
+    return { code: "loading_zone", priority: 30, notes: "Loading zone — active loading only." };
   if (c.includes("street cleaning") || c.includes("sweep"))
     return { code: "street_cleaning", priority: 25, notes: "Street cleaning posted." };
   if (c.includes("paid parking") || c.includes("metered") || c.includes("meter"))
