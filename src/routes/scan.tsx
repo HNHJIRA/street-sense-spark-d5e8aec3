@@ -344,14 +344,21 @@ function ScanResult({
     : null;
 
   // Reason label — prefer the SIDE's own rule when arrows split the sign.
-  const sideReasonFromRule = sidePrimaryRule
+  // CRITICAL: when status is YES with no currently-active engine rule, we
+  // must NOT show an inactive plate's code (e.g. "no parking") as the
+  // reason — that contradicts the green YES.
+  const sideEngineCode = sideEval?.decision?.code ?? null;
+  const sideHasActiveRule = !!(sideEngineCode && sideEngineCode !== "free" && sideEngineCode !== "unknown" && sideEngineCode !== "allowed");
+  const sideReasonFromRule = sidePrimaryRule && sideHasActiveRule
     ? (sidePrimaryRule.time_limit_minutes
         ? `${sidePrimaryRule.time_limit_minutes % 60 === 0 ? `${sidePrimaryRule.time_limit_minutes/60}-hour` : `${sidePrimaryRule.time_limit_minutes}-minute`} parking`
         : (sidePrimaryRule.restriction_code ?? "").replace(/_/g, " "))
     : null;
   const reasonLabel = sideEval
-    ? (sideReasonFromRule || s.reason || "Posted restriction")
-    : (result.current_rule?.label ?? s.reason ?? "Posted restriction");
+    ? (sideReasonFromRule || (s.status === "YES" ? "Currently allowed" : s.reason) || "Posted restriction")
+    : (s.status === "YES"
+        ? (result.current_rule?.label ?? "Currently allowed")
+        : (result.current_rule?.label ?? s.reason ?? "Posted restriction"));
   const nextReasonLabel = result.next_rule?.label ?? result.next_restriction_reason ?? null;
 
   // moveByLabel kept for the existing "Until card" UI below.
