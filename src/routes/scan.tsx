@@ -768,6 +768,20 @@ function ScanResult({
             </ol>
           </div>
           <div>
+            <div className="font-bold text-foreground">Timeline rules ({result.debug.timeline_rules.length})</div>
+            <ol className="mt-1 list-decimal space-y-1 pl-5 text-muted-foreground">
+              {result.debug.timeline_rules.map((r, i) => (
+                <li key={i} className={cn(r.slot === "CURRENT" && "font-bold text-park-green")}>
+                  [{r.slot}] {r.label}
+                  {r.time_limit_minutes ? ` · ${r.time_limit_minutes} min limit` : ""}
+                  {" · "}{r.starts_at_human} → {r.ends_at_human}
+                  {r.slot !== "CURRENT" ? ` · in ${r.time_until_human}` : ""}
+                </li>
+              ))}
+              {result.debug.timeline_rules.length === 0 && <li>(none)</li>}
+            </ol>
+          </div>
+          <div>
             <div className="font-bold text-foreground">Engine decision</div>
             <div className="mt-1 text-muted-foreground">
               status=<span className="font-bold text-foreground">{result.status}</span> ·
