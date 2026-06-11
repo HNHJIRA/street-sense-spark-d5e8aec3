@@ -13,6 +13,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { LocationStatusCard } from "@/components/LocationStatusCard";
 import { getCityInfo } from "@/lib/parking/parking.functions";
 import { scanSign, type SignScanResponse } from "@/lib/parking/scan.functions";
+import { buildRuleTimeline } from "@/lib/parking/driver-narrative";
 import type { NormalizedRule } from "@/lib/parking/providers/types";
 import { useLocationStore } from "@/stores/location-store";
 import { cn } from "@/lib/utils";
@@ -280,15 +281,18 @@ function ScanResult({
     ? (fmtClock(decision.restriction_ends_at) ?? nextChange?.when_label ?? null)
     : (nextChange?.when_label ?? null);
 
-  // Applies-To derived from arrow detection + selected side.
-  // Applies-To: server is the source of truth (driven by physical arrows).
-  // Multiple plates with one arrow are multiple time windows for the SAME
-  // direction — never BOTH unless the photo shows it.
-  const appliesTo: "LEFT" | "RIGHT" | "BOTH" | "NONE" = result.applies_to;
+  // Applies-To is selected-side aware. When the user picks LEFT or RIGHT, the
+  // display and narrator must not leak rules or wording from the opposite side.
+  const physicalAppliesTo: "LEFT" | "RIGHT" | "BOTH" | "NONE" = result.applies_to;
+  const hasPhysicalBothArrow = result.debug.physical_arrow_directions.includes("BOTH");
+  const selectedAppliesTo: "LEFT" | "RIGHT" | "BOTH" | "NONE" =
+    result.sides && side === "left" ? "LEFT" :
+    result.sides && side === "right" ? "RIGHT" :
+    physicalAppliesTo;
   const sideClause =
-    appliesTo === "LEFT"  ? "on the LEFT side of this sign" :
-    appliesTo === "RIGHT" ? "on the RIGHT side of this sign" :
-    appliesTo === "BOTH"  ? (result.sides ? "on both sides of this sign" : "across this entire curb area")
+    selectedAppliesTo === "LEFT"  ? "on the LEFT side of this sign" :
+    selectedAppliesTo === "RIGHT" ? "on the RIGHT side of this sign" :
+    selectedAppliesTo === "BOTH"  ? (result.sides ? "on both sides of this sign" : "across this entire curb area")
                           : "";
 
   // Per-side rule + time-limit: when arrows split the sign, LEFT vs RIGHT
@@ -317,11 +321,22 @@ function ScanResult({
     allowedUntilIso = decision.restriction_starts_at;
   }
   const scannedRef = new Date(result.scanned_at);
+  const selectedTimeline = sideEval ? buildRuleTimeline(sideRules, scannedRef, TZ) : null;
+  const selectedCurrentRule = sideEval ? (selectedTimeline?.current_rule ?? null) : result.current_rule;
+  const selectedNextRule = sideEval ? (selectedTimeline?.next_rule ?? null) : result.next_rule;
+  const selectedFollowingRule = sideEval ? (selectedTimeline?.following_rule ?? null) : result.following_rule;
+  const selectedTimelineRules = selectedTimeline
+    ? [
+        selectedTimeline.current_rule ? { slot: "CURRENT" as const, ...selectedTimeline.current_rule } : null,
+        selectedTimeline.next_rule ? { slot: "NEXT" as const, ...selectedTimeline.next_rule } : null,
+        selectedTimeline.following_rule ? { slot: "FOLLOWING" as const, ...selectedTimeline.following_rule } : null,
+      ].filter((x): x is NonNullable<typeof x> => x !== null)
+    : result.debug.timeline_rules;
   const allowedUntilLabel = fmtClock(allowedUntilIso);
   const allowedUntilDayLabel = fmtDayClock(allowedUntilIso, scannedRef);
-  const nextStartIso = decision.restriction_starts_at ?? result.next_rule?.starts_at ?? null;
-  const nextEndIso = decision.restriction_ends_at ?? result.next_rule?.ends_at ?? null;
-  const activeRestrictionEndIso = decision.restriction_ends_at ?? result.current_rule?.ends_at ?? null;
+  const nextStartIso = decision.restriction_starts_at ?? selectedNextRule?.starts_at ?? null;
+  const nextEndIso = decision.restriction_ends_at ?? selectedNextRule?.ends_at ?? null;
+  const activeRestrictionEndIso = decision.restriction_ends_at ?? selectedCurrentRule?.ends_at ?? null;
   const nextStartLabel = fmtClock(nextStartIso);
   const nextStartDayLabel = fmtDayClock(nextStartIso, scannedRef);
   // For NO: "Parking becomes available" should land 1 minute after the
@@ -338,8 +353,8 @@ function ScanResult({
     const a = fmtClock(rs.starts_at), b = fmtClock(rs.ends_at);
     return a && b ? `between ${a} and ${b}` : null;
   };
-  const currentRuleWindow = ruleWindow(result.current_rule ?? null);
-  const nextRuleWindow = ruleWindow(result.next_rule ?? null);
+  const currentRuleWindow = ruleWindow(selectedCurrentRule ?? null);
+  const nextRuleWindow = ruleWindow(selectedNextRule ?? null);
   // Posted parsed rule window driven by the selected SIDE (so switching
   // LEFT/RIGHT updates the narrated window).
   const parsedWindow = (() => {
@@ -396,11 +411,11 @@ function ScanResult({
   const reasonLabel = sideEval
     ? (sideReasonFromRule || (s.status === "YES" ? "Currently allowed" : s.reason) || "Posted restriction")
     : (s.status === "YES"
-        ? (result.current_rule?.label ?? "Currently allowed")
-        : (result.current_rule?.label ?? s.reason ?? "Posted restriction"));
-  const nextReasonLabel = result.next_rule?.label ?? result.next_restriction_reason ?? null;
-  const nextRestrictionDetail = result.next_rule
-    ? `${result.next_rule.label}${result.next_rule.time_limit_minutes ? ` · ${result.next_rule.time_limit_minutes} Minute Limit` : ""}`
+        ? (selectedCurrentRule?.label ?? "Currently allowed")
+        : (selectedCurrentRule?.label ?? s.reason ?? "Posted restriction"));
+  const nextReasonLabel = selectedNextRule?.label ?? (sideEval ? null : result.next_restriction_reason) ?? null;
+  const nextRestrictionDetail = selectedNextRule
+    ? `${selectedNextRule.label}${selectedNextRule.time_limit_minutes ? ` · ${selectedNextRule.time_limit_minutes} Minute Limit` : ""}`
     : nextReasonLabel;
 
   // moveByLabel kept for the existing "Until card" UI below.
@@ -463,14 +478,14 @@ function ScanResult({
        (result.sides.right.summary.status === "YES" && !!rightRule?.time_limit_minutes))
     : false;
   const rulesDiffer = !!(
-    result.sides && side === "both" && leftRule && rightRule &&
+    result.sides && leftRule && rightRule &&
     (leftRule.time_limit_minutes !== rightRule.time_limit_minutes ||
       leftRule.restriction_code !== rightRule.restriction_code)
   );
-  const sidesDiffer = !!(result.sides && leftUntil && rightUntil && leftUntil !== rightUntil && side === "both") || rulesDiffer;
-  // MIXED_RULES: user picked "both" but each side carries a distinct rule.
-  // We must NOT collapse the two into one allowed-until / max-stay.
-  const mixedMode = side === "both" && rulesDiffer;
+  const sidesDiffer = !!(result.sides && side === "both" && ((leftUntil && rightUntil && leftUntil !== rightUntil) || rulesDiffer));
+  // MIXED_RULES: user picked "both" on a split-arrow sign. Never collapse the
+  // two side evaluations into one allowed-until / max-stay decision.
+  const mixedMode = side === "both" && !!result.sides;
 
   const sideWindowFor = (r: NormalizedRule | null): string | null => {
     if (!r) return null;
@@ -486,8 +501,8 @@ function ScanResult({
   const officerParagraph = buildOfficerParagraph({
     status: s.status,
     reason: reasonLabel,
-    appliesTo,
-    hasArrows: !!result.sides,
+    appliesTo: selectedAppliesTo,
+    hasArrows: !!result.sides || hasPhysicalBothArrow,
     nowClock: arrivalClock,
     nowDay,
     allowedUntilLabel,
@@ -502,7 +517,7 @@ function ScanResult({
     currentRuleWindow,
     nextRuleWindow,
     parsedWindow,
-    currentRuleActive: !!result.current_rule,
+    currentRuleActive: !!selectedCurrentRule,
     sidesDiffer,
     leftUntil,
     rightUntil,
@@ -526,12 +541,12 @@ function ScanResult({
                 : "Stops are allowed only for active loading or unloading.")
       : null,
     restrictionEndLabel: fmtClock(decision.restriction_ends_at),
-    currentRuleStartLabel: fmtClock(result.current_rule?.starts_at ?? null),
-    currentRuleEndLabel: fmtClock(result.current_rule?.ends_at ?? null),
-    nextRuleLabel: result.next_rule?.label ?? null,
-    nextRuleTimeLimit: result.next_rule?.time_limit_minutes ?? null,
-    nextRuleStartLabel: fmtClock(result.next_rule?.starts_at ?? null),
-    nextRuleEndLabel: fmtClock(result.next_rule?.ends_at ?? null),
+    currentRuleStartLabel: fmtClock(selectedCurrentRule?.starts_at ?? null),
+    currentRuleEndLabel: fmtClock(selectedCurrentRule?.ends_at ?? null),
+    nextRuleLabel: selectedNextRule?.label ?? null,
+    nextRuleTimeLimit: selectedNextRule?.time_limit_minutes ?? null,
+    nextRuleStartLabel: fmtClock(selectedNextRule?.starts_at ?? null),
+    nextRuleEndLabel: fmtClock(selectedNextRule?.ends_at ?? null),
   });
   // sideClause/timeRemainingLabel intentionally unused here but kept for other UI.
   void sideClause; void timeRemainingLabel;
@@ -559,11 +574,11 @@ function ScanResult({
     { codes: ["street_cleaning", "street_sweeping"], label: "Street Cleaning" },
     { codes: ["permit", "permit_parking", "rpz"], label: "Permit Parking" },
   ];
-  const activeRestrictionType = result.current_rule?.restriction_type ?? null;
+  const activeRestrictionType = selectedCurrentRule?.restriction_type ?? null;
   const awarenessSentences: string[] = [];
   const seenLabels = new Set<string>();
   for (const tier of HIGH_RISK_PRIORITY) {
-    for (const r of result.debug.timeline_rules) {
+    for (const r of selectedTimelineRules) {
       if (!tier.codes.includes(r.restriction_type)) continue;
       // Skip the currently-active rule slot — already described above.
       if (r.slot === "CURRENT" && r.restriction_type === activeRestrictionType) continue;
@@ -580,7 +595,7 @@ function ScanResult({
   const awarenessBlock = awarenessSentences.length ? " " + awarenessSentences.join(" ") : "";
   const mixedNarrative = mixedMode
     ? [
-        "MIXED RULES. This post has different parking rules on each side.",
+        rulesDiffer ? "MIXED RULES. This post has different parking rules on each side." : "SIDE COMPARISON. This post has separate left and right side evaluations.",
         `RIGHT side: ${rightRuleHeading}${rightWindow ? ` (${rightWindow})` : ""}.${rightUntil ? ` You may park until ${rightUntil}.` : ""}`,
         `LEFT side: ${leftRuleHeading}${leftWindow ? ` (${leftWindow})` : ""}.${leftUntil ? ` You may park until ${leftUntil}.` : ""}`,
         "Select LEFT or RIGHT above for a definitive parking decision.",
@@ -734,17 +749,17 @@ function ScanResult({
             label={isLoading ? "Loading time limit" : "Maximum stay"}
             value={mixedMode ? "Differs by side" : (maxStayLabel ?? "No limit")}
           />
-          <DetailRow label="Next restriction" value={nextReasonLabel ?? "None scheduled"} />
+          <DetailRow label="Next restriction" value={mixedMode ? "Differs by side" : (nextReasonLabel ?? "None scheduled")} />
           <DetailRow label="Restriction starts" value={mixedMode ? "Differs by side" : (nextStartLabel ?? "—")} />
           <DetailRow label="Restriction ends" value={mixedMode ? "Differs by side" : (nextEndLabel ?? "—")} />
           <DetailRow label="Applies to" value={
             mixedMode
-              ? "Mixed (Left and Right differ)"
-              : appliesTo === "BOTH" && !result.sides
-                ? "BOTH (no arrows)"
-                : appliesTo === "LEFT" ? "LEFT side"
-                : appliesTo === "RIGHT" ? "RIGHT side"
-                : appliesTo === "BOTH" ? "BOTH sides" : "NONE"
+              ? (rulesDiffer ? "Mixed (Left and Right differ)" : "Separate Left/Right comparison")
+                : selectedAppliesTo === "BOTH" && !result.sides
+                  ? (hasPhysicalBothArrow ? "BOTH sides" : "BOTH (no arrows)")
+                : selectedAppliesTo === "LEFT" ? "LEFT side only"
+                : selectedAppliesTo === "RIGHT" ? "RIGHT side only"
+                : selectedAppliesTo === "BOTH" ? "BOTH sides" : "NONE"
           } />
           <DetailRow label="Confidence" value={`${Math.round(result.decision_confidence * 100)}%`} />
 
@@ -760,7 +775,7 @@ function ScanResult({
         <p className="whitespace-pre-line text-sm leading-relaxed text-foreground/90">
           {officerParagraphWithWarning}
         </p>
-        {(result.left_summary || result.right_summary) && appliesTo === "BOTH" && (
+        {(result.left_summary || result.right_summary) && selectedAppliesTo === "BOTH" && (
           <div className="mt-4 space-y-1 border-t border-border pt-3 text-xs text-muted-foreground">
             {result.left_summary && <p>{result.left_summary}</p>}
             {result.right_summary && <p>{result.right_summary}</p>}
@@ -775,31 +790,31 @@ function ScanResult({
 
 
       {/* Upcoming rules timeline (Edge case 1 / 10) */}
-      {(result.current_rule || result.next_rule || result.following_rule) && (
+      {!mixedMode && (selectedCurrentRule || selectedNextRule || selectedFollowingRule) && (
         <div className="rounded-3xl border border-border bg-background p-5">
           <div className="mb-3 text-sm font-bold text-foreground">Rule timeline</div>
           <div className="space-y-3 text-xs">
-            {result.current_rule && (
+            {selectedCurrentRule && (
               <div>
-                <div className="font-semibold text-foreground">Current: {result.current_rule.label}</div>
-                <div className="text-muted-foreground">Active until {result.current_rule.ends_at_human}</div>
+                <div className="font-semibold text-foreground">Current: {selectedCurrentRule.label}</div>
+                <div className="text-muted-foreground">Active until {selectedCurrentRule.ends_at_human}</div>
               </div>
             )}
-            {result.next_rule && (
+            {selectedNextRule && (
               <div>
-                <div className="font-semibold text-foreground">Next: {result.next_rule.label}</div>
+                <div className="font-semibold text-foreground">Next: {selectedNextRule.label}</div>
                 <div className="text-muted-foreground">
-                  Begins {result.next_rule.starts_at_human}
-                  {result.countdown_to_next_rule ? ` · in ${result.countdown_to_next_rule}` : ""}
+                  Begins {selectedNextRule.starts_at_human}
+                  {(selectedTimeline?.countdown_to_next_rule ?? result.countdown_to_next_rule) ? ` · in ${selectedTimeline?.countdown_to_next_rule ?? result.countdown_to_next_rule}` : ""}
                 </div>
               </div>
             )}
-            {result.following_rule && (
+            {selectedFollowingRule && (
               <div>
-                <div className="font-semibold text-foreground">Following: {result.following_rule.label}</div>
+                <div className="font-semibold text-foreground">Following: {selectedFollowingRule.label}</div>
                 <div className="text-muted-foreground">
-                  Begins {result.following_rule.starts_at_human}
-                  {result.countdown_to_following_rule ? ` · in ${result.countdown_to_following_rule}` : ""}
+                  Begins {selectedFollowingRule.starts_at_human}
+                  {(selectedTimeline?.countdown_to_following_rule ?? result.countdown_to_following_rule) ? ` · in ${selectedTimeline?.countdown_to_following_rule ?? result.countdown_to_following_rule}` : ""}
                 </div>
               </div>
             )}
@@ -1024,7 +1039,7 @@ function buildOfficerParagraph(a: OfficerArgs): string {
   const directionSentence =
     a.appliesTo === "LEFT"  ? " This sign applies to the LEFT side." :
     a.appliesTo === "RIGHT" ? " This sign applies to the RIGHT side." :
-    a.appliesTo === "BOTH"  ? " This sign applies to BOTH sides." : "";
+    a.appliesTo === "BOTH" && a.hasArrows ? " This sign applies to BOTH sides." : "";
   const prefix = `it is currently ${a.nowClock} on ${a.nowDay}.${directionSentence}`;
 
   // Confidence gate — below 0.65 we refuse to narrate the decision.
