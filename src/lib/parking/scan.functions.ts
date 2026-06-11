@@ -93,7 +93,7 @@ export interface SignScanResponse {
   /** Raw OCR + interpretation snapshot for the in-app debug panel. */
   debug: {
     ocr_plates_text: string;
-    interpreted_rules: NormalizedScanRule[];
+    interpreted_rules: Array<NormalizedScanRule & { id: string }>;
     active_rule_id: string | null;
     physical_arrow_directions: string[];
   };
