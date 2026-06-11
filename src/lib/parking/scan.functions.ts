@@ -584,7 +584,16 @@ export const scanSign = createServerFn({ method: "POST" })
       countdown_to_following_rule: timeline.countdown_to_following_rule,
       conflict_detected,
       conflict_summary,
-    };
+      applies_to,
+      debug: {
+        ocr_plates_text: ai.raw_text,
+        interpreted_rules: aiRulesAll,
+        active_rule_id: decision.rule_id ?? null,
+        physical_arrow_directions: [
+          ...(hasPhysicalBoth ? ["BOTH"] : []),
+          ...[...physicalDirs].map((d) => d.toUpperCase()),
+        ],
+      },
   });
 
 export interface RecentScan {
