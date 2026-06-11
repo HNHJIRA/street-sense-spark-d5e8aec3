@@ -353,10 +353,19 @@ function ScanResult({
   // reason — that contradicts the green YES.
   const sideEngineCode = sideEval?.decision?.code ?? null;
   const sideHasActiveRule = !!(sideEngineCode && sideEngineCode !== "free" && sideEngineCode !== "unknown" && sideEngineCode !== "allowed");
+  const LOADING_LABELS: Record<string, string> = {
+    passenger_loading: "Passenger Loading Only",
+    commercial_loading: "Commercial Loading Only",
+    taxi_zone: "Taxi Zone",
+    bus_zone: "Bus Zone",
+    loading_zone: "Loading Zone",
+  };
   const sideReasonFromRule = sidePrimaryRule && sideHasActiveRule
-    ? (sidePrimaryRule.time_limit_minutes
-        ? `${sidePrimaryRule.time_limit_minutes % 60 === 0 ? `${sidePrimaryRule.time_limit_minutes/60}-hour` : `${sidePrimaryRule.time_limit_minutes}-minute`} parking`
-        : (sidePrimaryRule.restriction_code ?? "").replace(/_/g, " "))
+    ? (LOADING_LABELS[sidePrimaryRule.restriction_code ?? ""]
+        ? `${LOADING_LABELS[sidePrimaryRule.restriction_code!]}${sidePrimaryRule.time_limit_minutes ? ` (${sidePrimaryRule.time_limit_minutes}-minute limit)` : ""}`
+        : sidePrimaryRule.time_limit_minutes
+          ? `${sidePrimaryRule.time_limit_minutes % 60 === 0 ? `${sidePrimaryRule.time_limit_minutes/60}-hour` : `${sidePrimaryRule.time_limit_minutes}-minute`} parking`
+          : (sidePrimaryRule.restriction_code ?? "").replace(/_/g, " "))
     : null;
   const reasonLabel = sideEval
     ? (sideReasonFromRule || (s.status === "YES" ? "Currently allowed" : s.reason) || "Posted restriction")
