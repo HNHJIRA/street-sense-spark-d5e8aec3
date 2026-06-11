@@ -1039,7 +1039,7 @@ function buildOfficerParagraph(a: OfficerArgs): string {
   const directionSentence =
     a.appliesTo === "LEFT"  ? " This sign applies to the LEFT side." :
     a.appliesTo === "RIGHT" ? " This sign applies to the RIGHT side." :
-    a.appliesTo === "BOTH"  ? " This sign applies to BOTH sides." : "";
+    a.appliesTo === "BOTH" && a.hasArrows ? " This sign applies to BOTH sides." : "";
   const prefix = `it is currently ${a.nowClock} on ${a.nowDay}.${directionSentence}`;
 
   // Confidence gate — below 0.65 we refuse to narrate the decision.
