@@ -360,7 +360,7 @@ export function MapView({ token, city }: MapViewProps) {
 
             // 3D buildings (best-effort — skip if style schema differs).
             try {
-              if (!map.getLayer("3d-buildings")) {
+              if (map.getSource("composite") && !map.getLayer("3d-buildings")) {
                 map.addLayer(
                   {
                     id: "3d-buildings",
