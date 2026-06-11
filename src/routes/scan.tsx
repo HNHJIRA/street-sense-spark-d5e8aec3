@@ -468,6 +468,9 @@ function ScanResult({
       leftRule.restriction_code !== rightRule.restriction_code)
   );
   const sidesDiffer = !!(result.sides && leftUntil && rightUntil && leftUntil !== rightUntil && side === "both") || rulesDiffer;
+  // MIXED_RULES: user picked "both" but each side carries a distinct rule.
+  // We must NOT collapse the two into one allowed-until / max-stay.
+  const mixedMode = side === "both" && rulesDiffer;
 
   const sideWindowFor = (r: NormalizedRule | null): string | null => {
     if (!r) return null;
@@ -475,6 +478,10 @@ function ScanResult({
     return a && b ? `from ${a} to ${b}` : null;
   };
   const bothWindow = sideWindowFor(leftRule) ?? sideWindowFor(rightRule);
+  const leftWindow = sideWindowFor(leftRule);
+  const rightWindow = sideWindowFor(rightRule);
+  const leftRuleHeading = leftRuleLabel ? capitalizeWords(leftRuleLabel) : "Posted rule";
+  const rightRuleHeading = rightRuleLabel ? capitalizeWords(rightRuleLabel) : "Posted rule";
 
   const officerParagraph = buildOfficerParagraph({
     status: s.status,
