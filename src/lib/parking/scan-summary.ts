@@ -262,7 +262,10 @@ export function buildScanSummary(args: {
   } else if (status === "YES" && (reasonCode === "unknown" || reasonCode === "free")) {
     reasonCode = "free";
   }
-  const reason = reasonFor(reasonCode);
+  const baseReason = reasonFor(reasonCode);
+  const reason = (status !== "YES" && LOADING_HINTS[reasonCode] && decision.time_limit_minutes != null)
+    ? `${baseReason} (${decision.time_limit_minutes}-minute limit)`
+    : baseReason;
   const plain = buildPlain(status, reason, decision, timezone);
   const time_guidance = buildTimeGuidance(status, decision, timezone);
   const confidence = confidenceFor(decision, aiConfidence, signCount);
