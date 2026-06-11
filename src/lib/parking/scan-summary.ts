@@ -131,6 +131,12 @@ function buildPlain(
     return `You cannot park here right now because ${why} is active.`;
   }
   // LIMITED
+  const loadingHint = LOADING_HINTS[decision.code];
+  if (loadingHint) {
+    const limit = decision.time_limit_minutes != null ? ` ${decision.time_limit_minutes}-minute limit.` : "";
+    const ends = endT ? ` This restriction is in effect until ${endT}.` : "";
+    return `${reason} is active — general parking is not permitted right now. ${loadingHint}${limit}${ends}`;
+  }
   if (decision.permit_zone)
     return `Parking is limited — a ${decision.permit_zone} permit is required.`;
   if (decision.time_limit_minutes != null)
