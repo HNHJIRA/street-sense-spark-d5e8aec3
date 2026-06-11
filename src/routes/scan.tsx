@@ -198,7 +198,13 @@ function ScanPage() {
 function ScanResult({
   result, previewUrl, onReset,
 }: { result: SignScanResponse; previewUrl: string | null; onReset: () => void }) {
-  const [side, setSide] = useState<"left" | "both" | "right">("both");
+  // Default the side selector to whichever direction the sign actually
+  // addresses — never start in "both" when only one direction was photographed.
+  const defaultSide: "left" | "both" | "right" =
+    result.applies_to === "LEFT" ? "left"
+    : result.applies_to === "RIGHT" ? "right"
+    : "both";
+  const [side, setSide] = useState<"left" | "both" | "right">(defaultSide);
   const sideEval = result.sides ? result.sides[side] : null;
   const s = sideEval?.summary ?? result.summary;
   const decision = sideEval?.decision ?? result.decision;
