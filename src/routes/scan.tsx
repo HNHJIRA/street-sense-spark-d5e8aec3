@@ -541,7 +541,37 @@ function ScanResult({
       soonWarning = ` Heads up — ${what.toLowerCase()} begins in about ${minsUntil} minute${minsUntil === 1 ? "" : "s"}.`;
     }
   }
-  const officerParagraphWithWarning = officerParagraph + soonWarning;
+  // -------- HIGH-RISK FUTURE AWARENESS --------
+  // Surface tow-away / no-parking / street-cleaning / permit windows that
+  // appear ANYWHERE in the timeline (current, next, following), so the
+  // driver is never surprised by a future high-risk restriction.
+  const HIGH_RISK_PRIORITY: Array<{ codes: string[]; label: string; isParking?: boolean }> = [
+    { codes: ["tow_away"], label: "Tow-Away No Parking" },
+    { codes: ["no_parking"], label: "No Parking" },
+    { codes: ["no_stopping", "red_curb"], label: "No Stopping" },
+    { codes: ["street_cleaning", "street_sweeping"], label: "Street Cleaning" },
+    { codes: ["permit", "permit_parking", "rpz"], label: "Permit Parking" },
+  ];
+  const activeRestrictionType = result.current_rule?.restriction_type ?? null;
+  const awarenessSentences: string[] = [];
+  const seenLabels = new Set<string>();
+  for (const tier of HIGH_RISK_PRIORITY) {
+    for (const r of result.debug.timeline_rules) {
+      if (!tier.codes.includes(r.restriction_type)) continue;
+      // Skip the currently-active rule slot — already described above.
+      if (r.slot === "CURRENT" && r.restriction_type === activeRestrictionType) continue;
+      if (seenLabels.has(tier.label)) continue;
+      seenLabels.add(tier.label);
+      const startClock = fmtClock(r.starts_at);
+      const endClock = fmtClock(r.ends_at);
+      const windowStr = startClock && endClock ? ` from ${startClock} to ${endClock}` : "";
+      awarenessSentences.push(
+        `Be aware that this curb becomes a ${tier.label} zone${windowStr} (${r.time_until_human.toLowerCase()}).`,
+      );
+    }
+  }
+  const awarenessBlock = awarenessSentences.length ? " " + awarenessSentences.join(" ") : "";
+  const officerParagraphWithWarning = officerParagraph + soonWarning + awarenessBlock;
 
 
   return (
