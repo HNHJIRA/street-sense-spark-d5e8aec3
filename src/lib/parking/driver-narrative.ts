@@ -30,8 +30,11 @@ const REASON_LABEL: Record<string, string> = {
   street_sweeping: "Street Cleaning",
   loading_zone: "Loading Zone",
   loading: "Loading Zone",
-  commercial_loading: "Loading Zone",
-  passenger_loading: "Loading Zone",
+  loading_only: "Loading Zone",
+  passenger_loading: "Passenger Loading Only",
+  commercial_loading: "Commercial Loading Only",
+  taxi_zone: "Taxi Zone",
+  bus_zone: "Bus Zone",
   permit: "Permit Parking",
   permit_parking: "Permit Parking",
   permit_only: "Permit Parking",
@@ -41,12 +44,27 @@ const REASON_LABEL: Record<string, string> = {
   meter: "Meter Parking",
   paid: "Meter Parking",
   metered: "Meter Parking",
-  bus_zone: "Bus Lane",
+  bus_lane: "Bus Lane",
   transit_zone: "Bus Lane",
   red_curb: "Red Curb (No Stopping)",
   free: "Free Parking",
   unrestricted: "Free Parking",
   unknown: "Unknown — verify posted sign",
+};
+
+const LOADING_CODES = new Set([
+  "loading_zone", "loading", "loading_only",
+  "passenger_loading", "commercial_loading", "taxi_zone", "bus_zone",
+]);
+
+const LOADING_ALLOWED_ACTIVITY: Record<string, string> = {
+  passenger_loading: "You may stop temporarily to pick up or drop off passengers.",
+  commercial_loading: "You may stop only for active commercial loading or unloading by qualifying vehicles.",
+  taxi_zone: "Reserved for taxis actively picking up or dropping off passengers.",
+  bus_zone: "Reserved for transit buses — do not stop or park here.",
+  loading_zone: "Stops are allowed only for active loading or unloading.",
+  loading: "Stops are allowed only for active loading or unloading.",
+  loading_only: "Stops are allowed only for active loading or unloading.",
 };
 
 function reasonLabel(code: string | null | undefined): string {
