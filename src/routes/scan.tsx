@@ -502,6 +502,12 @@ function ScanResult({
                 : "Stops are allowed only for active loading or unloading.")
       : null,
     restrictionEndLabel: fmtClock(decision.restriction_ends_at),
+    currentRuleStartLabel: fmtClock(result.current_rule?.starts_at ?? null),
+    currentRuleEndLabel: fmtClock(result.current_rule?.ends_at ?? null),
+    nextRuleLabel: result.next_rule?.label ?? null,
+    nextRuleTimeLimit: result.next_rule?.time_limit_minutes ?? null,
+    nextRuleStartLabel: fmtClock(result.next_rule?.starts_at ?? null),
+    nextRuleEndLabel: fmtClock(result.next_rule?.ends_at ?? null),
   });
   // sideClause/timeRemainingLabel intentionally unused here but kept for other UI.
   void sideClause; void timeRemainingLabel;
