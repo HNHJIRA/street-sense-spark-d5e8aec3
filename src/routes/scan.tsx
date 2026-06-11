@@ -754,7 +754,7 @@ function ScanResult({
           <DetailRow label="Restriction ends" value={mixedMode ? "Differs by side" : (nextEndLabel ?? "—")} />
           <DetailRow label="Applies to" value={
             mixedMode
-              ? "Mixed (Left and Right differ)"
+              ? (rulesDiffer ? "Mixed (Left and Right differ)" : "Separate Left/Right comparison")
                 : selectedAppliesTo === "BOTH" && !result.sides
                   ? (hasPhysicalBothArrow ? "BOTH sides" : "BOTH (no arrows)")
                 : selectedAppliesTo === "LEFT" ? "LEFT side only"
@@ -790,7 +790,7 @@ function ScanResult({
 
 
       {/* Upcoming rules timeline (Edge case 1 / 10) */}
-      {(selectedCurrentRule || selectedNextRule || selectedFollowingRule) && (
+      {!mixedMode && (selectedCurrentRule || selectedNextRule || selectedFollowingRule) && (
         <div className="rounded-3xl border border-border bg-background p-5">
           <div className="mb-3 text-sm font-bold text-foreground">Rule timeline</div>
           <div className="space-y-3 text-xs">
