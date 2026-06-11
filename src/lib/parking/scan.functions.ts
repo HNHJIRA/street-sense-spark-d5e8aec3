@@ -513,8 +513,12 @@ export const scanSign = createServerFn({ method: "POST" })
         : Math.min(ocr_confidence, interpretation_confidence);
 
     // ===== Edge-case sprint: rule timeline, risk, conflict, confidence gate =====
-    const timeline = buildRuleTimeline(aiRules, scannedAt, data.timezone);
-    const risk_level: RiskLevel = deriveRiskLevel(aiRules, ai.raw_text);
+    // Use the UN-resolved rule list so every physical sign plate produces its
+    // own timeline entry. The conflict-resolved `aiRules` collapses overlapping
+    // restrictions (e.g. Passenger Loading 5-min and Passenger Loading 10-min
+    // become a single rule), which would discard real sign plates.
+    const timeline = buildRuleTimeline(aiRulesAll, scannedAt, data.timezone);
+    const risk_level: RiskLevel = deriveRiskLevel(aiRulesAll, ai.raw_text);
 
     const conflicting = validations.filter((v) => v.outcome === "conflict");
     const conflict_detected = conflicting.length > 0;
