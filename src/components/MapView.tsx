@@ -287,8 +287,11 @@ export function MapView({ token, city }: MapViewProps) {
         try {
           map = new mapboxgl.Map({
             container: container.current,
-            style: "mapbox://styles/mapbox/streets-v12",
+            style: MAPBOX_STYLE_FOR_TYPE[initialMapTypeRef.current],
             center: city.center as [number, number],
+            zoom: Math.max(15.5, city.default_zoom),
+            pitch: 60,
+            bearing: -18,
             zoom: Math.max(15.5, city.default_zoom),
             pitch: 60,
             bearing: -18,
