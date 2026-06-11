@@ -466,6 +466,20 @@ function ScanResult({
   // sideClause/timeRemainingLabel intentionally unused here but kept for other UI.
   void sideClause; void timeRemainingLabel;
 
+  // Warn when an upcoming side restriction begins soon (≤ 90 min).
+  let soonWarning = "";
+  if (s.status === "YES" && decision.restriction_starts_at) {
+    const startsMs = new Date(decision.restriction_starts_at).getTime();
+    const minsUntil = Math.round((startsMs - new Date(result.scanned_at).getTime()) / 60_000);
+    if (minsUntil > 0 && minsUntil <= 90) {
+      const what = nextReasonLabel ?? (sidePrimaryRule?.time_limit_minutes
+        ? `${sidePrimaryRule.time_limit_minutes}-minute parking`
+        : "the next posted restriction");
+      soonWarning = ` Heads up — ${what.toLowerCase()} begins in about ${minsUntil} minute${minsUntil === 1 ? "" : "s"}.`;
+    }
+  }
+  const officerParagraphWithWarning = officerParagraph + soonWarning;
+
 
   return (
     <div className="mt-5 space-y-5">
