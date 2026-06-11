@@ -596,12 +596,16 @@ function ScanResult({
             <span className={cn("font-bold", palette.text)}>{s.status}</span>
           } />
           <DetailRow label="Reason" value={reasonLabel} />
-          <DetailRow label="Allowed until" value={allowedUntilLabel ?? "—"} />
+          <DetailRow
+            label={isLoading ? "Restriction until" : "Allowed until"}
+            value={
+              isLoading
+                ? (fmtClock(decision.restriction_ends_at) ?? "—")
+                : (allowedUntilLabel ?? "—")
+            }
+          />
           <DetailRow label="Time remaining" value={timeRemainingLabel ?? "—"} />
           <DetailRow label={isLoading ? "Loading time limit" : "Maximum stay"} value={maxStayLabel ?? "No limit"} />
-          <DetailRow label="Allowed until" value={isLoading ? "—" : (allowedUntilLabel ?? "—")} />
-          <DetailRow label="Restriction until" value={isLoading ? (fmtClock(decision.restriction_ends_at) ?? "—") : "—"} />
-          {/* keep grid balanced: replace the old "Allowed until" slot above */}
           <DetailRow label="Next restriction" value={nextReasonLabel ?? "None scheduled"} />
           <DetailRow label="Restriction starts" value={nextStartLabel ?? "—"} />
           <DetailRow label="Restriction ends" value={nextEndLabel ?? "—"} />
