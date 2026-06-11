@@ -321,9 +321,9 @@ function ScanResult({
   }
   const scannedRef = new Date(result.scanned_at);
   const selectedTimeline = sideEval ? buildRuleTimeline(sideRules, scannedRef, TZ) : null;
-  const selectedCurrentRule = selectedTimeline?.current_rule ?? result.current_rule;
-  const selectedNextRule = selectedTimeline?.next_rule ?? result.next_rule;
-  const selectedFollowingRule = selectedTimeline?.following_rule ?? result.following_rule;
+  const selectedCurrentRule = sideEval ? (selectedTimeline?.current_rule ?? null) : result.current_rule;
+  const selectedNextRule = sideEval ? (selectedTimeline?.next_rule ?? null) : result.next_rule;
+  const selectedFollowingRule = sideEval ? (selectedTimeline?.following_rule ?? null) : result.following_rule;
   const selectedTimelineRules = selectedTimeline
     ? [
         selectedTimeline.current_rule ? { slot: "CURRENT" as const, ...selectedTimeline.current_rule } : null,
@@ -410,9 +410,9 @@ function ScanResult({
   const reasonLabel = sideEval
     ? (sideReasonFromRule || (s.status === "YES" ? "Currently allowed" : s.reason) || "Posted restriction")
     : (s.status === "YES"
-        ? (result.current_rule?.label ?? "Currently allowed")
-        : (result.current_rule?.label ?? s.reason ?? "Posted restriction"));
-  const nextReasonLabel = selectedNextRule?.label ?? result.next_restriction_reason ?? null;
+        ? (selectedCurrentRule?.label ?? "Currently allowed")
+        : (selectedCurrentRule?.label ?? s.reason ?? "Posted restriction"));
+  const nextReasonLabel = selectedNextRule?.label ?? (sideEval ? null : result.next_restriction_reason) ?? null;
   const nextRestrictionDetail = selectedNextRule
     ? `${selectedNextRule.label}${selectedNextRule.time_limit_minutes ? ` · ${selectedNextRule.time_limit_minutes} Minute Limit` : ""}`
     : nextReasonLabel;
@@ -516,7 +516,7 @@ function ScanResult({
     currentRuleWindow,
     nextRuleWindow,
     parsedWindow,
-    currentRuleActive: !!result.current_rule,
+    currentRuleActive: !!selectedCurrentRule,
     sidesDiffer,
     leftUntil,
     rightUntil,
