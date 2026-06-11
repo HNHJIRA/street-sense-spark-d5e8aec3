@@ -715,9 +715,11 @@ function inferRestrictionTypeFromPlateText(text: string): string {
   if (/\bFIRE\s+LANE\b/.test(t)) return "fire lane";
   if (/\bNO\s+PARKING\b/.test(t)) return "no parking";
   if (/\bTOW\s*-?\s*AWAY\b/.test(t)) return "tow away";
-  if (/\b(PASSENGER\s+LOADING\s+ONLY|COMMERCIAL\s+LOADING\s+ONLY|LOADING\s+ZONE|BUS\s+LOADING|TAXI\s+ZONE)\b/.test(t)) {
-    return "loading zone";
-  }
+  if (/\bPASSENGER\s+LOADING\b/.test(t)) return "passenger loading";
+  if (/\bCOMMERCIAL\s+LOADING\b/.test(t)) return "commercial loading";
+  if (/\bTAXI\s+(ZONE|STAND|ONLY)\b/.test(t)) return "taxi zone";
+  if (/\bBUS\s+(ZONE|STOP|LOADING)\b/.test(t)) return "bus zone";
+  if (/\b(LOADING\s+ZONE|LOADING\s+ONLY|TRUCK\s+LOADING)\b/.test(t)) return "loading zone";
   if (/\b\d{1,3}\s*(MINUTE|MINUTES|MIN|MINS|HOUR|HOURS|HR|HRS)\s+PARKING\b/.test(t) || /\bTIME\s+LIMIT(?:ED)?\b/.test(t)) {
     return "time limited parking";
   }
