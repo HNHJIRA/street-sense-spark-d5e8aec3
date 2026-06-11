@@ -599,10 +599,46 @@ function samePlateColor(a: ExtractedPlate, b: ExtractedPlate): boolean {
 function derivedArrowForPlate(plate: ExtractedPlate, plates: ExtractedPlate[]): ArrowDirection {
   const direct = physicalArrowValue(plate.arrow);
   if (direct) return direct;
-  const inherited = plates
+
+  // 1) Nearest arrow-only plate BELOW with the same background color.
+  const inheritedSameColor = plates
     .filter((p) => p.plate_index > plate.plate_index && isArrowOnlyPlate(p) && samePlateColor(plate, p))
     .sort((a, b) => a.plate_index - b.plate_index)[0];
-  return physicalArrowValue(inherited?.arrow);
+  const sameColor = physicalArrowValue(inheritedSameColor?.arrow);
+  if (sameColor) return sameColor;
+
+  // 2) Nearest arrow-only plate BELOW regardless of color (single shared arrow plate).
+  const inheritedAny = plates
+    .filter((p) => p.plate_index > plate.plate_index && isArrowOnlyPlate(p))
+    .sort((a, b) => a.plate_index - b.plate_index)[0];
+  const anyBelow = physicalArrowValue(inheritedAny?.arrow);
+  if (anyBelow) return anyBelow;
+
+  // 3) Stack-wide single-direction inheritance — multiple plates ≠ multiple
+  //    directions. If every physical arrow on the sign points the same way,
+  //    that direction applies to plates that did not show their own arrow.
+  const stackDirs = new Set<ArrowDirection>();
+  for (const p of plates) {
+    const dir = physicalArrowValue(p.arrow);
+    if (dir) stackDirs.add(dir);
+  }
+  if (stackDirs.size === 1) {
+    const [only] = [...stackDirs];
+    return only;
+  }
+  return null;
+}
+
+/** Set of physical arrow directions actually present on the OCR'd sign stack.
+ *  Used to forbid the interpreter from inventing LEFT, RIGHT, or BOTH that
+ *  the photo does not contain. */
+function physicalStackDirections(plates: ExtractedPlate[]): Set<ArrowDirection> {
+  const out = new Set<ArrowDirection>();
+  for (const p of plates) {
+    const dir = physicalArrowValue(p.arrow);
+    if (dir) out.add(dir);
+  }
+  return out;
 }
 
 function averagePlateConfidence(plates: ExtractedPlate[], fallback: number): number {
