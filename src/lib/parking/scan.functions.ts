@@ -96,6 +96,7 @@ export interface SignScanResponse {
     interpreted_rules: Array<NormalizedScanRule & { id: string }>;
     active_rule_id: string | null;
     physical_arrow_directions: string[];
+    timeline_rules: Array<RuleSummary & { slot: "CURRENT" | "NEXT" | "FOLLOWING" }>;
   };
   /** SDOT rules already on file for the nearest segment, for comparison. */
   sdot_rules: ParkingRule[];
