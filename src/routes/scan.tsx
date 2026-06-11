@@ -209,13 +209,23 @@ function ScanResult({
   const s = sideEval?.summary ?? result.summary;
   const decision = sideEval?.decision ?? result.decision;
 
+  // Loading-zone subtypes are RESTRICTED-USE zones, not parkable spots.
+  // The UI must never imply "you may park for N minutes" when the active
+  // rule is loading/taxi/bus zone — those time limits are LOADING limits.
+  const LOADING_CODES = new Set([
+    "loading_zone", "loading", "loading_only",
+    "passenger_loading", "commercial_loading", "taxi_zone", "bus_zone",
+  ]);
+  const activeCode = decision?.code ?? "";
+  const isLoading = LOADING_CODES.has(activeCode);
+
   const palette =
     s.status === "YES"
       ? { ring: "bg-park-green/15", dot: "bg-park-green", text: "text-park-green", icon: Check, title: "Yes, you can park!", subtitle: "Parking is allowed at this spot right now.", untilLabel: "Parking until" }
       : s.status === "NO"
       ? { ring: "bg-park-red/15", dot: "bg-park-red", text: "text-park-red", icon: X, title: "No, you can't park", subtitle: "Parking is not allowed at this spot right now.", untilLabel: "Restriction until" }
       : s.status === "LIMITED"
-      ? { ring: "bg-park-yellow/15", dot: "bg-park-yellow", text: "text-park-yellow", icon: AlertTriangle, title: "Limited parking", subtitle: s.plain, untilLabel: "Changes at" }
+      ? { ring: "bg-park-yellow/15", dot: "bg-park-yellow", text: "text-park-yellow", icon: AlertTriangle, title: "Limited parking", subtitle: s.plain, untilLabel: isLoading ? "Restriction until" : "Changes at" }
       : { ring: "bg-muted", dot: "bg-muted-foreground", text: "text-foreground", icon: HelpCircle, title: "Unclear sign", subtitle: "We couldn't fully read this sign.", untilLabel: "Next change" };
 
   const Icon = palette.icon;
