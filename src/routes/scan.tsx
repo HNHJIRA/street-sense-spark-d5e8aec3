@@ -909,11 +909,6 @@ function buildOfficerParagraph(a: OfficerArgs): string {
   // time limit, that limit is a LOADING limit, not a parking allowance.
   if (a.activeCode && a.loadingActivity) {
     const reasonNoLimit = (a.reason || "").replace(/\s*\([^)]*\)\s*$/, "").trim() || "Loading Only";
-    const limitClause = a.timeLimitMinutes
-      ? ` with a ${a.timeLimitMinutes}-minute limit`
-      : "";
-  if (a.activeCode && a.loadingActivity) {
-    const reasonNoLimit = (a.reason || "").replace(/\s*\([^)]*\)\s*$/, "").trim() || "Loading Only";
     const sideClauseLoading =
       a.appliesTo === "LEFT"  ? "This sign applies to the LEFT side." :
       a.appliesTo === "RIGHT" ? "This sign applies to the RIGHT side." :
