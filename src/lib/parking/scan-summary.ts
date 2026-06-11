@@ -60,6 +60,14 @@ const REASON_LABEL: Record<string, string> = {
   unknown: "Unknown / Verify Sign",
 };
 
+const LOADING_HINTS: Record<string, string> = {
+  passenger_loading: "You may stop only briefly to pick up or drop off passengers.",
+  commercial_loading: "You may stop only for active commercial loading or unloading by qualifying vehicles.",
+  taxi_zone: "Reserved for taxis actively picking up or dropping off passengers.",
+  bus_zone: "Reserved for transit buses — do not stop or park here.",
+  loading_zone: "Stops are allowed only for active loading or unloading.",
+};
+
 function reasonFor(code: string | null | undefined): string {
   if (!code) return "Posted Restriction";
   return REASON_LABEL[code] ?? code.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
