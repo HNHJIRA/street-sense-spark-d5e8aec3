@@ -284,6 +284,7 @@ function ScanResult({
   // Applies-To is selected-side aware. When the user picks LEFT or RIGHT, the
   // display and narrator must not leak rules or wording from the opposite side.
   const physicalAppliesTo: "LEFT" | "RIGHT" | "BOTH" | "NONE" = result.applies_to;
+  const hasPhysicalBothArrow = result.debug.physical_arrow_directions.includes("BOTH");
   const selectedAppliesTo: "LEFT" | "RIGHT" | "BOTH" | "NONE" =
     result.sides && side === "left" ? "LEFT" :
     result.sides && side === "right" ? "RIGHT" :
@@ -501,7 +502,7 @@ function ScanResult({
     status: s.status,
     reason: reasonLabel,
     appliesTo: selectedAppliesTo,
-    hasArrows: !!result.sides,
+    hasArrows: !!result.sides || hasPhysicalBothArrow,
     nowClock: arrivalClock,
     nowDay,
     allowedUntilLabel,
@@ -755,7 +756,7 @@ function ScanResult({
             mixedMode
               ? "Mixed (Left and Right differ)"
                 : selectedAppliesTo === "BOTH" && !result.sides
-                ? "BOTH (no arrows)"
+                  ? (hasPhysicalBothArrow ? "BOTH sides" : "BOTH (no arrows)")
                 : selectedAppliesTo === "LEFT" ? "LEFT side only"
                 : selectedAppliesTo === "RIGHT" ? "RIGHT side only"
                 : selectedAppliesTo === "BOTH" ? "BOTH sides" : "NONE"
