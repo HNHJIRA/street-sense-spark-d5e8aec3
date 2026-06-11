@@ -912,19 +912,42 @@ function buildOfficerParagraph(a: OfficerArgs): string {
     const limitClause = a.timeLimitMinutes
       ? ` with a ${a.timeLimitMinutes}-minute limit`
       : "";
-    const sideClauseLoading = (a.hasArrows && (a.appliesTo === "LEFT" || a.appliesTo === "RIGHT"))
-      ? `This sign applies to the ${a.appliesTo} side.`
+  if (a.activeCode && a.loadingActivity) {
+    const reasonNoLimit = (a.reason || "").replace(/\s*\([^)]*\)\s*$/, "").trim() || "Loading Only";
+    const sideClauseLoading =
+      a.appliesTo === "LEFT"  ? "This sign applies to the LEFT side." :
+      a.appliesTo === "RIGHT" ? "This sign applies to the RIGHT side." :
+      a.appliesTo === "BOTH"  ? "This sign applies to BOTH sides." : "";
+    const start = a.currentRuleStartLabel;
+    const end = a.currentRuleEndLabel ?? a.restrictionEndLabel;
+    const activeWindow = start && end
+      ? `${reasonNoLimit} is active from ${start} until ${end}.`
+      : end
+        ? `${reasonNoLimit} is active until ${end}.`
+        : `${reasonNoLimit} is currently active.`;
+    const limitLine = a.timeLimitMinutes
+      ? (end
+          ? `A ${a.timeLimitMinutes}-minute loading limit applies until ${end}.`
+          : `A ${a.timeLimitMinutes}-minute loading limit applies.`)
       : "";
-    const untilClause = a.restrictionEndLabel
-      ? ` This restriction remains in effect until ${a.restrictionEndLabel}.`
-      : "";
+    const nextLine = (() => {
+      if (!a.nextRuleLabel) return "";
+      const nextLimit = a.nextRuleTimeLimit
+        ? `${a.nextRuleTimeLimit}-minute loading limit`
+        : null;
+      const untilNext = a.nextRuleEndLabel ? ` until ${a.nextRuleEndLabel}` : "";
+      const after = end ? `After ${end} the rule changes to: ${a.nextRuleLabel}` : `Next: ${a.nextRuleLabel}`;
+      return nextLimit ? `${after}, ${nextLimit}${untilNext}.` : `${after}${untilNext}.`;
+    })();
     return [
       `LIMITED. ${prefix}`,
       sideClauseLoading,
-      `This curb is reserved for ${reasonNoLimit.toLowerCase()}${limitClause}.`,
-      "General parking is not permitted during this restriction period.",
+      activeWindow,
+      "General parking is not permitted during this period.",
       a.loadingActivity,
-    ].filter(Boolean).join(" ") + untilClause;
+      limitLine,
+      nextLine,
+    ].filter(Boolean).join(" ");
   }
 
   // -------- NO PARKING --------
