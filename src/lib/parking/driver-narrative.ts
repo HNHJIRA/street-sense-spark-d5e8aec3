@@ -392,19 +392,34 @@ function nextOccurrence(rule: NormalizedRule, now: Date, tz: string): Occurrence
   const z = zonedNow(now, tz);
   const startM = parseHHMM(rule.time_start) ?? 0;
   const endM = parseHHMM(rule.time_end) ?? 1440;
-  if (endM <= startM) return null;
+  const overnight = endM < startM;
+  const durationM = endM === startM ? 1440 : overnight ? (1440 - startM) + endM : endM - startM;
+  const prevWd = (z.weekday + 6) % 7;
+  if (overnight && z.minutes < endM && rule.days_of_week.includes(prevWd)) {
+    const minutesSinceStart = z.minutes + (1440 - startM);
+    const startIso = new Date(now.getTime() - minutesSinceStart * 60000).toISOString();
+    const endIso = new Date(now.getTime() + (endM - z.minutes) * 60000).toISOString();
+    return { startIso, endIso, rule, active: true };
+  }
+  if (rule.days_of_week.includes(z.weekday)) {
+    const activeSameDay = endM === startM
+      ? true
+      : overnight
+        ? z.minutes >= startM
+        : z.minutes >= startM && z.minutes < endM;
+    if (activeSameDay) {
+      const startIso = new Date(now.getTime() - (z.minutes - startM) * 60000).toISOString();
+      const endIso = new Date(new Date(startIso).getTime() + durationM * 60000).toISOString();
+      return { startIso, endIso, rule, active: true };
+    }
+  }
   for (let day = 0; day < 8; day++) {
     const candWd = (z.weekday + day) % 7;
     if (!rule.days_of_week.includes(candWd)) continue;
-    if (day === 0 && z.minutes >= startM && z.minutes < endM) {
-      const startIso = new Date(now.getTime() - (z.minutes - startM) * 60000).toISOString();
-      const endIso = new Date(now.getTime() + (endM - z.minutes) * 60000).toISOString();
-      return { startIso, endIso, rule, active: true };
-    }
-    if (day === 0 && z.minutes >= endM) continue;
+    if (day === 0 && z.minutes >= startM) continue;
     const offsetMin = day * 1440 + startM - z.minutes;
     const startIso = new Date(now.getTime() + offsetMin * 60000).toISOString();
-    const endIso = new Date(new Date(startIso).getTime() + (endM - startM) * 60000).toISOString();
+    const endIso = new Date(new Date(startIso).getTime() + durationM * 60000).toISOString();
     return { startIso, endIso, rule, active: false };
   }
   return null;
