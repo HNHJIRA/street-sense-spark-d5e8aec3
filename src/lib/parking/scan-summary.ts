@@ -51,8 +51,9 @@ const REASON_LABEL: Record<string, string> = {
   bus_zone: "Bus Lane",
   transit_zone: "Bus Lane",
   red_curb: "Red Curb (No Stopping)",
-  free: "Free Parking",
-  unrestricted: "Free Parking",
+  free: "Currently Allowed",
+  unrestricted: "Currently Allowed",
+  allowed: "Currently Allowed",
   unknown: "Unknown / Verify Sign",
 };
 
