@@ -836,6 +836,12 @@ interface OfficerArgs {
   bothWindow: string | null;
   restrictionStartsLabel: string | null;
   decisionConfidence: number;
+  /** Engine code for the currently active rule (e.g. "passenger_loading"). */
+  activeCode: string | null;
+  /** Plain-English description of who may use a loading/taxi/bus zone. */
+  loadingActivity: string | null;
+  /** Clock label for restriction_ends_at, used by loading-zone narratives. */
+  restrictionEndLabel: string | null;
 }
 
 // Narrator-only side phrase. Uses ONLY the supplied arrow value — never guesses.
