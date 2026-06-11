@@ -412,9 +412,9 @@ function ScanResult({
     : (s.status === "YES"
         ? (result.current_rule?.label ?? "Currently allowed")
         : (result.current_rule?.label ?? s.reason ?? "Posted restriction"));
-  const nextReasonLabel = result.next_rule?.label ?? result.next_restriction_reason ?? null;
-  const nextRestrictionDetail = result.next_rule
-    ? `${result.next_rule.label}${result.next_rule.time_limit_minutes ? ` · ${result.next_rule.time_limit_minutes} Minute Limit` : ""}`
+  const nextReasonLabel = selectedNextRule?.label ?? result.next_restriction_reason ?? null;
+  const nextRestrictionDetail = selectedNextRule
+    ? `${selectedNextRule.label}${selectedNextRule.time_limit_minutes ? ` · ${selectedNextRule.time_limit_minutes} Minute Limit` : ""}`
     : nextReasonLabel;
 
   // moveByLabel kept for the existing "Until card" UI below.
@@ -500,7 +500,7 @@ function ScanResult({
   const officerParagraph = buildOfficerParagraph({
     status: s.status,
     reason: reasonLabel,
-    appliesTo,
+    appliesTo: selectedAppliesTo,
     hasArrows: !!result.sides,
     nowClock: arrivalClock,
     nowDay,
@@ -540,12 +540,12 @@ function ScanResult({
                 : "Stops are allowed only for active loading or unloading.")
       : null,
     restrictionEndLabel: fmtClock(decision.restriction_ends_at),
-    currentRuleStartLabel: fmtClock(result.current_rule?.starts_at ?? null),
-    currentRuleEndLabel: fmtClock(result.current_rule?.ends_at ?? null),
-    nextRuleLabel: result.next_rule?.label ?? null,
-    nextRuleTimeLimit: result.next_rule?.time_limit_minutes ?? null,
-    nextRuleStartLabel: fmtClock(result.next_rule?.starts_at ?? null),
-    nextRuleEndLabel: fmtClock(result.next_rule?.ends_at ?? null),
+    currentRuleStartLabel: fmtClock(selectedCurrentRule?.starts_at ?? null),
+    currentRuleEndLabel: fmtClock(selectedCurrentRule?.ends_at ?? null),
+    nextRuleLabel: selectedNextRule?.label ?? null,
+    nextRuleTimeLimit: selectedNextRule?.time_limit_minutes ?? null,
+    nextRuleStartLabel: fmtClock(selectedNextRule?.starts_at ?? null),
+    nextRuleEndLabel: fmtClock(selectedNextRule?.ends_at ?? null),
   });
   // sideClause/timeRemainingLabel intentionally unused here but kept for other UI.
   void sideClause; void timeRemainingLabel;
