@@ -887,6 +887,29 @@ function buildOfficerParagraph(a: OfficerArgs): string {
 
   const side = sidePhrase(a.appliesTo, a.hasArrows);
 
+  // -------- LOADING / TAXI / BUS ZONES (restricted-use, never "parkable") --------
+  // These are NOT parking — even when the engine reports LIMITED with a
+  // time limit, that limit is a LOADING limit, not a parking allowance.
+  if (a.activeCode && a.loadingActivity) {
+    const reasonNoLimit = (a.reason || "").replace(/\s*\([^)]*\)\s*$/, "").trim() || "Loading Only";
+    const limitClause = a.timeLimitMinutes
+      ? ` with a ${a.timeLimitMinutes}-minute limit`
+      : "";
+    const sideClauseLoading = (a.hasArrows && (a.appliesTo === "LEFT" || a.appliesTo === "RIGHT"))
+      ? `This sign applies to the ${a.appliesTo} side.`
+      : "";
+    const untilClause = a.restrictionEndLabel
+      ? ` This restriction remains in effect until ${a.restrictionEndLabel}.`
+      : "";
+    return [
+      `LIMITED. ${prefix}`,
+      sideClauseLoading,
+      `This curb is reserved for ${reasonNoLimit.toLowerCase()}${limitClause}.`,
+      "General parking is not permitted during this restriction period.",
+      a.loadingActivity,
+    ].filter(Boolean).join(" ") + untilClause;
+  }
+
   // -------- NO PARKING --------
   if (a.status === "NO") {
     const reasonLc = (a.reason || "no-parking").toLowerCase();
