@@ -95,6 +95,17 @@ function ScanPage() {
         },
       });
       setResult(res);
+      // eslint-disable-next-line no-console
+      console.groupCollapsed("%cDEBUG PIPELINE TRACE", "color:#16a34a;font-weight:bold");
+      console.log("1. OCR plates detected:\n", res.debug.ocr_plates_text);
+      console.log("2. Interpreted rules:", res.debug.interpreted_rules);
+      console.log("   Detected arrows → applies_to:", res.debug.physical_arrow_directions, "→", res.applies_to);
+      const activeRule = res.debug.interpreted_rules.find(r => r.id === res.debug.active_rule_id) ?? null;
+      console.log("3. Active rule selected:", activeRule);
+      console.log("4. Future rules (next, following):", res.next_rule, res.following_rule);
+      console.log("5. Timeline rules rendered:", res.debug.timeline_rules);
+      console.log("→ Engine decision:", { status: res.status, code: res.decision.code, allowed_until: res.decision.allowed_until });
+      console.groupEnd();
     } catch (e) {
       setError((e as Error).message);
     } finally {
