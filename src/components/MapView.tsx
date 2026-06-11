@@ -701,9 +701,8 @@ export function MapView({ token, city }: MapViewProps) {
 
       {ready && (
         <MapLayerButton
-          className="bottom-0 right-0 px-3"
-          // Sit above the bottom nav / legend area.
-          // eslint-disable-next-line react/forbid-dom-props
+          className="right-3"
+          style={{ bottom: "calc(var(--safe-bottom) + 14.5rem)" }}
         />
       )}
 
