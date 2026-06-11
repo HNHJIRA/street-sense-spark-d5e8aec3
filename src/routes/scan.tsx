@@ -95,6 +95,17 @@ function ScanPage() {
         },
       });
       setResult(res);
+      // eslint-disable-next-line no-console
+      console.groupCollapsed("%cDEBUG PIPELINE TRACE", "color:#16a34a;font-weight:bold");
+      console.log("1. OCR plates detected:\n", res.debug.ocr_plates_text);
+      console.log("2. Interpreted rules:", res.debug.interpreted_rules);
+      console.log("   Detected arrows → applies_to:", res.debug.physical_arrow_directions, "→", res.applies_to);
+      const activeRule = res.debug.interpreted_rules.find(r => r.id === res.debug.active_rule_id) ?? null;
+      console.log("3. Active rule selected:", activeRule);
+      console.log("4. Future rules (next, following):", res.next_rule, res.following_rule);
+      console.log("5. Timeline rules rendered:", res.debug.timeline_rules);
+      console.log("→ Engine decision:", { status: res.status, code: res.decision.code, allowed_until: res.decision.allowed_until });
+      console.groupEnd();
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -765,6 +776,20 @@ function ScanResult({
                   </li>
                 );
               })}
+            </ol>
+          </div>
+          <div>
+            <div className="font-bold text-foreground">Timeline rules ({result.debug.timeline_rules.length})</div>
+            <ol className="mt-1 list-decimal space-y-1 pl-5 text-muted-foreground">
+              {result.debug.timeline_rules.map((r, i) => (
+                <li key={i} className={cn(r.slot === "CURRENT" && "font-bold text-park-green")}>
+                  [{r.slot}] {r.label}
+                  {r.time_limit_minutes ? ` · ${r.time_limit_minutes} min limit` : ""}
+                  {" · "}{r.starts_at_human} → {r.ends_at_human}
+                  {r.slot !== "CURRENT" ? ` · in ${r.time_until_human}` : ""}
+                </li>
+              ))}
+              {result.debug.timeline_rules.length === 0 && <li>(none)</li>}
             </ol>
           </div>
           <div>

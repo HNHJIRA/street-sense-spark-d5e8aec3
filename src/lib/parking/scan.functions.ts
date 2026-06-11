@@ -96,6 +96,7 @@ export interface SignScanResponse {
     interpreted_rules: Array<NormalizedScanRule & { id: string }>;
     active_rule_id: string | null;
     physical_arrow_directions: string[];
+    timeline_rules: Array<RuleSummary & { slot: "CURRENT" | "NEXT" | "FOLLOWING" }>;
   };
   /** SDOT rules already on file for the nearest segment, for comparison. */
   sdot_rules: ParkingRule[];
@@ -597,6 +598,11 @@ export const scanSign = createServerFn({ method: "POST" })
           ...(hasPhysicalBoth ? ["BOTH"] : []),
           ...[...physicalDirs].map((d) => d.toUpperCase()),
         ],
+        timeline_rules: [
+          timeline.current_rule ? { slot: "CURRENT" as const, ...timeline.current_rule } : null,
+          timeline.next_rule ? { slot: "NEXT" as const, ...timeline.next_rule } : null,
+          timeline.following_rule ? { slot: "FOLLOWING" as const, ...timeline.following_rule } : null,
+        ].filter((x): x is NonNullable<typeof x> => x !== null),
       },
     };
   });
