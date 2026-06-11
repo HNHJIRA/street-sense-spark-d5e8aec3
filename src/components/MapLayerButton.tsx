@@ -42,6 +42,7 @@ export function MapLayerButton({ className, style }: Props) {
   return (
     <div
       ref={rootRef}
+      style={style}
       className={cn(
         "pointer-events-auto absolute z-20 flex flex-col items-end gap-2",
         className,
