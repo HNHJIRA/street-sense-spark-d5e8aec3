@@ -16,6 +16,8 @@ import { getAvailabilityBlocksInBbox, type AvailabilityBlock } from "@/lib/parki
 import type { ParkingColor } from "@/lib/parking/types";
 import { useAppStore } from "@/stores/app-store";
 import { useLocationStore } from "@/stores/location-store";
+import { useMapTypeStore, MAPBOX_STYLE_FOR_TYPE } from "@/stores/map-type-store";
+import { MapLayerButton } from "@/components/MapLayerButton";
 
 interface MapViewProps {
   token: string;
@@ -92,6 +94,11 @@ export function MapView({ token, city }: MapViewProps) {
   const [mapError, setMapError] = useState(false);
   const [ready, setReady] = useState(false);
   const [globeMode, setGlobeMode] = useState(false);
+  const [styleVersion, setStyleVersion] = useState(0);
+  const mapType = useMapTypeStore((s) => s.mapType);
+  // Latest mapType captured at init time so the effect that creates the map
+  // doesn't need to depend on it (we don't want to recreate the map on switch).
+  const initialMapTypeRef = useRef(mapType);
 
   const queryClient = useQueryClient();
   const fetchSegments = useServerFn(getSegmentsInBbox);
