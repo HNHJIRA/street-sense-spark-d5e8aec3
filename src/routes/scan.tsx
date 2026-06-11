@@ -578,7 +578,15 @@ function ScanResult({
     }
   }
   const awarenessBlock = awarenessSentences.length ? " " + awarenessSentences.join(" ") : "";
-  const officerParagraphWithWarning = officerParagraph + soonWarning + awarenessBlock;
+  const mixedNarrative = mixedMode
+    ? [
+        "MIXED RULES. This post has different parking rules on each side.",
+        `RIGHT side: ${rightRuleHeading}${rightWindow ? ` (${rightWindow})` : ""}.${rightUntil ? ` You may park until ${rightUntil}.` : ""}`,
+        `LEFT side: ${leftRuleHeading}${leftWindow ? ` (${leftWindow})` : ""}.${leftUntil ? ` You may park until ${leftUntil}.` : ""}`,
+        "Select LEFT or RIGHT above for a definitive parking decision.",
+      ].join("\n")
+    : null;
+  const officerParagraphWithWarning = mixedNarrative ?? (officerParagraph + soonWarning + awarenessBlock);
 
 
   return (
