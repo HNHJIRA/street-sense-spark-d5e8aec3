@@ -226,6 +226,31 @@ function formatLimit(min: number): string {
   return `${min} minutes`;
 }
 
+/** Format an HH:MM (24h) string as 12h clock; pure, no timezone needed. */
+function fmtHHMM12(hhmm: string | null | undefined): string | null {
+  if (!hhmm) return null;
+  const [hStr, mStr] = hhmm.split(":");
+  const h = parseInt(hStr, 10);
+  const m = parseInt(mStr, 10);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+  const period = h >= 12 ? "PM" : "AM";
+  const h12 = ((h + 11) % 12) + 1;
+  return m === 0 ? `${h12} ${period}` : `${h12}:${m.toString().padStart(2, "0")} ${period}`;
+}
+
+/** Describe a posted rule as "NO PARKING 1:30 AM – 6 AM" / "1-hour parking 8 AM – 6 PM". */
+function describePostedRule(r: NormalizedRule): string {
+  const code = r.restriction_code ?? "";
+  const lim = r.time_limit_minutes ?? null;
+  const head = lim
+    ? (lim % 60 === 0 ? `${lim / 60}-hour parking` : `${lim}-minute parking`)
+    : reasonLabel(code);
+  const a = fmtHHMM12(r.time_start);
+  const b = fmtHHMM12(r.time_end);
+  const window = a && b ? ` ${a} – ${b}` : "";
+  return `${head}${window}`;
+}
+
 /** Short per-side caption, e.g. for left_summary / right_summary. */
 export function buildSideCaption(args: {
   side: "left" | "right";
@@ -236,7 +261,7 @@ export function buildSideCaption(args: {
   const { side, decision, parsedRules, timezone } = args;
   const status = statusFrom(decision);
   let code: string = decision.code;
-  if ((code === "unknown" || code === "free") && parsedRules.length > 0) {
+  if (status !== "YES" && (code === "unknown" || code === "free") && parsedRules.length > 0) {
     code = parsedRules[0].restriction_code;
   }
   const reason = reasonLabel(code).toLowerCase();
@@ -245,9 +270,15 @@ export function buildSideCaption(args: {
   const startClock = fmtClock(decision.restriction_starts_at, timezone);
   const endClock = fmtClock(decision.restriction_ends_at, timezone);
 
+  // Suffix listing posted-but-inactive rules so the caller can see the
+  // nightly NO PARKING / upcoming 1HR plate even when YES.
+  const postedSuffix = parsedRules.length > 0
+    ? ` Posted: ${parsedRules.map(describePostedRule).join("; ")}.`
+    : "";
+
   if (status === "YES") {
-    if (allowedClock) return `The ${sideLabel} side of this sign allows parking until ${allowedClock}.`;
-    return `The ${sideLabel} side of this sign allows parking right now.`;
+    if (allowedClock) return `The ${sideLabel} side of this sign allows parking until ${allowedClock}.${postedSuffix}`;
+    return `The ${sideLabel} side of this sign allows parking right now.${postedSuffix}`;
   }
   if (status === "LIMITED") {
     if (decision.time_limit_minutes)

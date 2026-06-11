@@ -51,8 +51,9 @@ const REASON_LABEL: Record<string, string> = {
   bus_zone: "Bus Lane",
   transit_zone: "Bus Lane",
   red_curb: "Red Curb (No Stopping)",
-  free: "Free Parking",
-  unrestricted: "Free Parking",
+  free: "Currently Allowed",
+  unrestricted: "Currently Allowed",
+  allowed: "Currently Allowed",
   unknown: "Unknown / Verify Sign",
 };
 
@@ -233,11 +234,16 @@ export function buildScanSummary(args: {
   const { decision, parsedRules, timezone, aiConfidence, signCount } = args;
   const status = statusFromDecision(decision);
 
-  // Prefer the engine's active rule code; if it's missing or `unknown` but a
-  // posted rule clearly states a category, surface that instead.
+  // Prefer the engine's active rule code. When the engine reports YES (no
+  // active restriction) we must NOT fall back to the first posted rule's
+  // code — that surfaces "No Parking" while the status is "YES", which is
+  // contradictory. Only borrow a posted rule code when the engine truly
+  // matched a restriction (NO/LIMITED) but didn't name it.
   let reasonCode: string = decision.code;
-  if ((reasonCode === "unknown" || reasonCode === "free") && parsedRules.length > 0) {
+  if (status !== "YES" && (reasonCode === "unknown" || reasonCode === "free") && parsedRules.length > 0) {
     reasonCode = parsedRules[0].restriction_code;
+  } else if (status === "YES" && (reasonCode === "unknown" || reasonCode === "free")) {
+    reasonCode = "free";
   }
   const reason = reasonFor(reasonCode);
   const plain = buildPlain(status, reason, decision, timezone);

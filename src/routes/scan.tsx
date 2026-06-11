@@ -344,14 +344,21 @@ function ScanResult({
     : null;
 
   // Reason label — prefer the SIDE's own rule when arrows split the sign.
-  const sideReasonFromRule = sidePrimaryRule
+  // CRITICAL: when status is YES with no currently-active engine rule, we
+  // must NOT show an inactive plate's code (e.g. "no parking") as the
+  // reason — that contradicts the green YES.
+  const sideEngineCode = sideEval?.decision?.code ?? null;
+  const sideHasActiveRule = !!(sideEngineCode && sideEngineCode !== "free" && sideEngineCode !== "unknown" && sideEngineCode !== "allowed");
+  const sideReasonFromRule = sidePrimaryRule && sideHasActiveRule
     ? (sidePrimaryRule.time_limit_minutes
         ? `${sidePrimaryRule.time_limit_minutes % 60 === 0 ? `${sidePrimaryRule.time_limit_minutes/60}-hour` : `${sidePrimaryRule.time_limit_minutes}-minute`} parking`
         : (sidePrimaryRule.restriction_code ?? "").replace(/_/g, " "))
     : null;
   const reasonLabel = sideEval
-    ? (sideReasonFromRule || s.reason || "Posted restriction")
-    : (result.current_rule?.label ?? s.reason ?? "Posted restriction");
+    ? (sideReasonFromRule || (s.status === "YES" ? "Currently allowed" : s.reason) || "Posted restriction")
+    : (s.status === "YES"
+        ? (result.current_rule?.label ?? "Currently allowed")
+        : (result.current_rule?.label ?? s.reason ?? "Posted restriction"));
   const nextReasonLabel = result.next_rule?.label ?? result.next_restriction_reason ?? null;
 
   // moveByLabel kept for the existing "Until card" UI below.
@@ -458,6 +465,20 @@ function ScanResult({
   });
   // sideClause/timeRemainingLabel intentionally unused here but kept for other UI.
   void sideClause; void timeRemainingLabel;
+
+  // Warn when an upcoming side restriction begins soon (≤ 90 min).
+  let soonWarning = "";
+  if (s.status === "YES" && decision.restriction_starts_at) {
+    const startsMs = new Date(decision.restriction_starts_at).getTime();
+    const minsUntil = Math.round((startsMs - new Date(result.scanned_at).getTime()) / 60_000);
+    if (minsUntil > 0 && minsUntil <= 90) {
+      const what = nextReasonLabel ?? (sidePrimaryRule?.time_limit_minutes
+        ? `${sidePrimaryRule.time_limit_minutes}-minute parking`
+        : "the next posted restriction");
+      soonWarning = ` Heads up — ${what.toLowerCase()} begins in about ${minsUntil} minute${minsUntil === 1 ? "" : "s"}.`;
+    }
+  }
+  const officerParagraphWithWarning = officerParagraph + soonWarning;
 
 
   return (
@@ -572,7 +593,7 @@ function ScanResult({
           <span className="text-sm font-bold text-foreground">AI summary</span>
         </div>
         <p className="whitespace-pre-line text-sm leading-relaxed text-foreground/90">
-          {officerParagraph}
+          {officerParagraphWithWarning}
         </p>
         {(result.left_summary || result.right_summary) && (
           <div className="mt-4 space-y-1 border-t border-border pt-3 text-xs text-muted-foreground">
