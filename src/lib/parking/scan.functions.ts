@@ -92,7 +92,7 @@ export interface SignScanResponse {
   applies_to: "LEFT" | "RIGHT" | "BOTH" | "NONE";
   /** Raw OCR + interpretation snapshot for the in-app debug panel. */
   debug: {
-    plates: Array<{ index: number; text: string; arrow: string; background_color: string; text_color: string; confidence: number }>;
+    ocr_plates_text: string;
     interpreted_rules: NormalizedScanRule[];
     active_rule_id: string | null;
     physical_arrow_directions: string[];
