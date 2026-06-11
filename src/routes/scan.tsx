@@ -489,6 +489,19 @@ function ScanResult({
     bothWindow,
     restrictionStartsLabel: nextStartLabel,
     decisionConfidence: result.decision_confidence ?? 0,
+    activeCode,
+    loadingActivity: isLoading
+      ? (activeCode === "passenger_loading"
+          ? "You may briefly stop to pick up or drop off passengers."
+          : activeCode === "commercial_loading"
+            ? "You may stop only for active commercial loading or unloading by qualifying vehicles."
+            : activeCode === "taxi_zone"
+              ? "Reserved for taxis actively picking up or dropping off passengers."
+              : activeCode === "bus_zone"
+                ? "Reserved for transit buses — do not stop or park here."
+                : "Stops are allowed only for active loading or unloading.")
+      : null,
+    restrictionEndLabel: fmtClock(decision.restriction_ends_at),
   });
   // sideClause/timeRemainingLabel intentionally unused here but kept for other UI.
   void sideClause; void timeRemainingLabel;
