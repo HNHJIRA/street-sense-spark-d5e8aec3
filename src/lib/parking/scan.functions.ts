@@ -84,6 +84,19 @@ export interface SignScanResponse {
    * authoritative and represents the whole pole.
    */
   sides: { left: SideEvaluation; right: SideEvaluation; both: SideEvaluation } | null;
+  /** Direction the posted rules apply to, derived from the physical arrows
+   *  on the sign. "BOTH" means a physical double-headed arrow OR no arrows
+   *  at all; "LEFT"/"RIGHT" mean every arrow on the stack points that way.
+   *  This is the SOURCE OF TRUTH for the UI — never split into left/right
+   *  when only one physical direction was photographed. */
+  applies_to: "LEFT" | "RIGHT" | "BOTH" | "NONE";
+  /** Raw OCR + interpretation snapshot for the in-app debug panel. */
+  debug: {
+    plates: Array<{ index: number; text: string; arrow: string; background_color: string; text_color: string; confidence: number }>;
+    interpreted_rules: NormalizedScanRule[];
+    active_rule_id: string | null;
+    physical_arrow_directions: string[];
+  };
   /** SDOT rules already on file for the nearest segment, for comparison. */
   sdot_rules: ParkingRule[];
   /** Nearest segment matched (if any) — used for validation + display. */
