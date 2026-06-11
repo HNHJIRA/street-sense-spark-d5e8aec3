@@ -352,6 +352,33 @@ export const scanSign = createServerFn({ method: "POST" })
         both: buildSide("both", scanRules),
       };
     }
+
+    // Single-direction enforcement: if all physical arrows on the stack point
+    // the same way (e.g. only RIGHT), the sign HAS NO LEFT SIDE. Drop the
+    // per-side split so the UI doesn't invent a phantom "LEFT allows parking"
+    // for a side the sign doesn't address.
+    const physicalDirs = new Set<string>();
+    let hasPhysicalBoth = false;
+    for (const r of aiRulesAll) {
+      const a = r.arrow ?? null;
+      if (a === "left" || a === "right") physicalDirs.add(a);
+      if (a === "both") hasPhysicalBoth = true;
+    }
+    const applies_to: SignScanResponse["applies_to"] =
+      aiRulesAll.length === 0
+        ? "NONE"
+        : hasPhysicalBoth || (physicalDirs.has("left") && physicalDirs.has("right"))
+          ? "BOTH"
+          : physicalDirs.has("left")
+            ? "LEFT"
+            : physicalDirs.has("right")
+              ? "RIGHT"
+              : "BOTH";
+    if (applies_to === "LEFT" || applies_to === "RIGHT") {
+      // The top-level `decision` already evaluates ALL posted rules — which
+      // is correct because every rule belongs to the single physical side.
+      sides = null;
+    }
     void combinedRules;
 
     // 4) Persist image + scan + child rows.
