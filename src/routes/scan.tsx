@@ -789,31 +789,31 @@ function ScanResult({
 
 
       {/* Upcoming rules timeline (Edge case 1 / 10) */}
-      {(result.current_rule || result.next_rule || result.following_rule) && (
+      {(selectedCurrentRule || selectedNextRule || selectedFollowingRule) && (
         <div className="rounded-3xl border border-border bg-background p-5">
           <div className="mb-3 text-sm font-bold text-foreground">Rule timeline</div>
           <div className="space-y-3 text-xs">
-            {result.current_rule && (
+            {selectedCurrentRule && (
               <div>
-                <div className="font-semibold text-foreground">Current: {result.current_rule.label}</div>
-                <div className="text-muted-foreground">Active until {result.current_rule.ends_at_human}</div>
+                <div className="font-semibold text-foreground">Current: {selectedCurrentRule.label}</div>
+                <div className="text-muted-foreground">Active until {selectedCurrentRule.ends_at_human}</div>
               </div>
             )}
-            {result.next_rule && (
+            {selectedNextRule && (
               <div>
-                <div className="font-semibold text-foreground">Next: {result.next_rule.label}</div>
+                <div className="font-semibold text-foreground">Next: {selectedNextRule.label}</div>
                 <div className="text-muted-foreground">
-                  Begins {result.next_rule.starts_at_human}
-                  {result.countdown_to_next_rule ? ` · in ${result.countdown_to_next_rule}` : ""}
+                  Begins {selectedNextRule.starts_at_human}
+                  {(selectedTimeline?.countdown_to_next_rule ?? result.countdown_to_next_rule) ? ` · in ${selectedTimeline?.countdown_to_next_rule ?? result.countdown_to_next_rule}` : ""}
                 </div>
               </div>
             )}
-            {result.following_rule && (
+            {selectedFollowingRule && (
               <div>
-                <div className="font-semibold text-foreground">Following: {result.following_rule.label}</div>
+                <div className="font-semibold text-foreground">Following: {selectedFollowingRule.label}</div>
                 <div className="text-muted-foreground">
-                  Begins {result.following_rule.starts_at_human}
-                  {result.countdown_to_following_rule ? ` · in ${result.countdown_to_following_rule}` : ""}
+                  Begins {selectedFollowingRule.starts_at_human}
+                  {(selectedTimeline?.countdown_to_following_rule ?? result.countdown_to_following_rule) ? ` · in ${selectedTimeline?.countdown_to_following_rule ?? result.countdown_to_following_rule}` : ""}
                 </div>
               </div>
             )}
