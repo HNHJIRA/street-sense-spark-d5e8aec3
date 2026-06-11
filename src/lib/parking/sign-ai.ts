@@ -823,7 +823,7 @@ export async function callSignScanAi(
 
     const interpretedDays = dayWordsTo3Letter(r.days);
     const type = restrictionTextFromType(r.restriction_type);
-    const shouldPreferPlateType = type === "" || type === "unknown" || inferredType !== "unknown" && type === "allowed";
+    const shouldPreferPlateType = type === "" || type === "unknown" || (inferredType !== "unknown" && type === "allowed");
     const perRuleConfidence = averagePlateConfidence(matchedPlates, extraction.overall_confidence);
 
     rules.push({
@@ -833,7 +833,7 @@ export async function callSignScanAi(
       end: r.end_time ?? inferredWindow.end,
       permit_zone: null,
       time_limit_minutes: r.time_limit_minutes ?? inferTimeLimitMinutes(plate.text),
-      notes: r.notes ?? plate.text.trim() || null,
+      notes: r.notes ?? (plate.text.trim() || null),
       arrow: physicalArrow,
       confidence: hallucinatedArrow ? Math.min(perRuleConfidence, 0.58) : perRuleConfidence,
     });
