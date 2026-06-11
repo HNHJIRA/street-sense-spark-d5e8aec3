@@ -477,14 +477,14 @@ function ScanResult({
        (result.sides.right.summary.status === "YES" && !!rightRule?.time_limit_minutes))
     : false;
   const rulesDiffer = !!(
-    result.sides && side === "both" && leftRule && rightRule &&
+    result.sides && leftRule && rightRule &&
     (leftRule.time_limit_minutes !== rightRule.time_limit_minutes ||
       leftRule.restriction_code !== rightRule.restriction_code)
   );
-  const sidesDiffer = !!(result.sides && leftUntil && rightUntil && leftUntil !== rightUntil && side === "both") || rulesDiffer;
-  // MIXED_RULES: user picked "both" but each side carries a distinct rule.
-  // We must NOT collapse the two into one allowed-until / max-stay.
-  const mixedMode = side === "both" && rulesDiffer;
+  const sidesDiffer = !!(result.sides && side === "both" && ((leftUntil && rightUntil && leftUntil !== rightUntil) || rulesDiffer));
+  // MIXED_RULES: user picked "both" on a split-arrow sign. Never collapse the
+  // two side evaluations into one allowed-until / max-stay decision.
+  const mixedMode = side === "both" && !!result.sides;
 
   const sideWindowFor = (r: NormalizedRule | null): string | null => {
     if (!r) return null;
@@ -594,7 +594,7 @@ function ScanResult({
   const awarenessBlock = awarenessSentences.length ? " " + awarenessSentences.join(" ") : "";
   const mixedNarrative = mixedMode
     ? [
-        "MIXED RULES. This post has different parking rules on each side.",
+        rulesDiffer ? "MIXED RULES. This post has different parking rules on each side." : "SIDE COMPARISON. This post has separate left and right side evaluations.",
         `RIGHT side: ${rightRuleHeading}${rightWindow ? ` (${rightWindow})` : ""}.${rightUntil ? ` You may park until ${rightUntil}.` : ""}`,
         `LEFT side: ${leftRuleHeading}${leftWindow ? ` (${leftWindow})` : ""}.${leftUntil ? ` You may park until ${leftUntil}.` : ""}`,
         "Select LEFT or RIGHT above for a definitive parking decision.",
