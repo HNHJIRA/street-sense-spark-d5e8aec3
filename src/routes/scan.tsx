@@ -599,7 +599,7 @@ function ScanResult({
         <p className="whitespace-pre-line text-sm leading-relaxed text-foreground/90">
           {officerParagraphWithWarning}
         </p>
-        {(result.left_summary || result.right_summary) && (
+        {(result.left_summary || result.right_summary) && appliesTo === "BOTH" && (
           <div className="mt-4 space-y-1 border-t border-border pt-3 text-xs text-muted-foreground">
             {result.left_summary && <p>{result.left_summary}</p>}
             {result.right_summary && <p>{result.right_summary}</p>}
