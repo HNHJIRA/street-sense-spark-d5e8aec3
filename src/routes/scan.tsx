@@ -265,7 +265,9 @@ function ScanResult({
   };
 
   const nextChange = s.timeline.find((t) => t.when !== "now");
-  const untilTime = nextChange?.when_label ?? null;
+  const untilTime = isLoading
+    ? (fmtClock(decision.restriction_ends_at) ?? nextChange?.when_label ?? null)
+    : (nextChange?.when_label ?? null);
 
   // Applies-To derived from arrow detection + selected side.
   // Applies-To: server is the source of truth (driven by physical arrows).
