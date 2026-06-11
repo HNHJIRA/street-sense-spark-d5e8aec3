@@ -895,7 +895,11 @@ function sidePhrase(appliesTo: OfficerArgs["appliesTo"], hasArrows: boolean): st
  *   <one or two short, conversational sentences>
  */
 function buildOfficerParagraph(a: OfficerArgs): string {
-  const prefix = `it is currently ${a.nowClock} on ${a.nowDay}.`;
+  const directionSentence =
+    a.appliesTo === "LEFT"  ? " This sign applies to the LEFT side." :
+    a.appliesTo === "RIGHT" ? " This sign applies to the RIGHT side." :
+    a.appliesTo === "BOTH"  ? " This sign applies to BOTH sides." : "";
+  const prefix = `it is currently ${a.nowClock} on ${a.nowDay}.${directionSentence}`;
 
   // Confidence gate — below 0.65 we refuse to narrate the decision.
   if (a.status === "UNKNOWN" || a.decisionConfidence < 0.65) {
