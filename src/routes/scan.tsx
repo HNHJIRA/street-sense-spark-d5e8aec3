@@ -258,12 +258,10 @@ function ScanResult({
   const untilTime = nextChange?.when_label ?? null;
 
   // Applies-To derived from arrow detection + selected side.
-  const appliesTo: "LEFT" | "RIGHT" | "BOTH" | "NONE" =
-    s.status === "UNKNOWN" && result.parsed_rules.length === 0
-      ? "NONE"
-      : result.sides
-        ? (side === "left" ? "LEFT" : side === "right" ? "RIGHT" : "BOTH")
-        : "BOTH";
+  // Applies-To: server is the source of truth (driven by physical arrows).
+  // Multiple plates with one arrow are multiple time windows for the SAME
+  // direction — never BOTH unless the photo shows it.
+  const appliesTo: "LEFT" | "RIGHT" | "BOTH" | "NONE" = result.applies_to;
   const sideClause =
     appliesTo === "LEFT"  ? "on the LEFT side of this sign" :
     appliesTo === "RIGHT" ? "on the RIGHT side of this sign" :
