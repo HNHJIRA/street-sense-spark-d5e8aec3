@@ -314,12 +314,20 @@ export function buildSideCaption(args: {
     return `The ${sideLabel} side of this sign allows parking right now.${postedSuffix}`;
   }
   if (status === "LIMITED") {
+    const properReason = reasonLabel(code);
+    if (LOADING_CODES.has(code)) {
+      const limit = decision.time_limit_minutes != null
+        ? ` (${decision.time_limit_minutes}-minute limit)`
+        : "";
+      const until = endClock ? ` until ${endClock}` : "";
+      return `The ${sideLabel} side is reserved for ${properReason}${limit}${until}. General parking is not permitted right now.${postedSuffix}`;
+    }
     if (decision.time_limit_minutes)
-      return `The ${sideLabel} side has a ${formatLimit(decision.time_limit_minutes)} time limit.`;
+      return `The ${sideLabel} side has a ${formatLimit(decision.time_limit_minutes)} time limit.${postedSuffix}`;
     if (decision.permit_zone)
-      return `The ${sideLabel} side requires permit ${decision.permit_zone}.`;
-    if (startClock) return `The ${sideLabel} side has a ${reason} restriction beginning at ${startClock}.`;
-    return `The ${sideLabel} side has limited parking (${reason}).`;
+      return `The ${sideLabel} side requires permit ${decision.permit_zone}.${postedSuffix}`;
+    if (startClock) return `The ${sideLabel} side has a ${reason} restriction beginning at ${startClock}.${postedSuffix}`;
+    return `The ${sideLabel} side has limited parking (${reason}).${postedSuffix}`;
   }
   if (status === "NO") {
     if (endClock) return `The ${sideLabel} side has a ${reason} restriction until ${endClock}.`;
