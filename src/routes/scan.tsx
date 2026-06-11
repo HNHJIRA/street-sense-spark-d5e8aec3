@@ -468,6 +468,9 @@ function ScanResult({
       leftRule.restriction_code !== rightRule.restriction_code)
   );
   const sidesDiffer = !!(result.sides && leftUntil && rightUntil && leftUntil !== rightUntil && side === "both") || rulesDiffer;
+  // MIXED_RULES: user picked "both" but each side carries a distinct rule.
+  // We must NOT collapse the two into one allowed-until / max-stay.
+  const mixedMode = side === "both" && rulesDiffer;
 
   const sideWindowFor = (r: NormalizedRule | null): string | null => {
     if (!r) return null;
@@ -475,6 +478,10 @@ function ScanResult({
     return a && b ? `from ${a} to ${b}` : null;
   };
   const bothWindow = sideWindowFor(leftRule) ?? sideWindowFor(rightRule);
+  const leftWindow = sideWindowFor(leftRule);
+  const rightWindow = sideWindowFor(rightRule);
+  const leftRuleHeading = leftRuleLabel ? capitalizeWords(leftRuleLabel) : "Posted rule";
+  const rightRuleHeading = rightRuleLabel ? capitalizeWords(rightRuleLabel) : "Posted rule";
 
   const officerParagraph = buildOfficerParagraph({
     status: s.status,
@@ -571,7 +578,15 @@ function ScanResult({
     }
   }
   const awarenessBlock = awarenessSentences.length ? " " + awarenessSentences.join(" ") : "";
-  const officerParagraphWithWarning = officerParagraph + soonWarning + awarenessBlock;
+  const mixedNarrative = mixedMode
+    ? [
+        "MIXED RULES. This post has different parking rules on each side.",
+        `RIGHT side: ${rightRuleHeading}${rightWindow ? ` (${rightWindow})` : ""}.${rightUntil ? ` You may park until ${rightUntil}.` : ""}`,
+        `LEFT side: ${leftRuleHeading}${leftWindow ? ` (${leftWindow})` : ""}.${leftUntil ? ` You may park until ${leftUntil}.` : ""}`,
+        "Select LEFT or RIGHT above for a definitive parking decision.",
+      ].join("\n")
+    : null;
+  const officerParagraphWithWarning = mixedNarrative ?? (officerParagraph + soonWarning + awarenessBlock);
 
 
   return (
@@ -616,14 +631,54 @@ function ScanResult({
             <Icon className="h-10 w-10 text-white" strokeWidth={3} />
           </div>
         </div>
-        <h2 className={cn("mt-5 font-display text-3xl font-extrabold leading-tight", palette.text)}>
-          {palette.title}
+        <h2 className={cn("mt-5 font-display text-3xl font-extrabold leading-tight", mixedMode ? "text-foreground" : palette.text)}>
+          {mixedMode ? "Different rules on each side" : palette.title}
         </h2>
-        <p className="mt-2 px-4 text-sm text-muted-foreground">{palette.subtitle}</p>
+        <p className="mt-2 px-4 text-sm text-muted-foreground">
+          {mixedMode
+            ? "This post has different parking rules on each side. Select LEFT or RIGHT for a definitive decision."
+            : palette.subtitle}
+        </p>
       </div>
 
+      {/* MIXED RULES comparison — when "both" is selected and each side has a different rule */}
+      {mixedMode && (
+        <div className="rounded-3xl border border-park-yellow/40 bg-park-yellow-soft p-5">
+          <div className="mb-3 text-[11px] font-bold uppercase tracking-wider text-park-yellow">
+            Mixed rules · Left vs Right
+          </div>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="rounded-2xl bg-background p-3">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Left side</div>
+              <div className="mt-1 font-bold text-foreground">{leftRuleHeading}</div>
+              {leftWindow && <div className="mt-0.5 text-xs text-muted-foreground">{leftWindow}</div>}
+              {leftUntil && (
+                <div className="mt-2 text-xs">
+                  <span className="text-muted-foreground">Park until </span>
+                  <span className="font-bold text-foreground">{leftUntil}</span>
+                </div>
+              )}
+            </div>
+            <div className="rounded-2xl bg-background p-3">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Right side</div>
+              <div className="mt-1 font-bold text-foreground">{rightRuleHeading}</div>
+              {rightWindow && <div className="mt-0.5 text-xs text-muted-foreground">{rightWindow}</div>}
+              {rightUntil && (
+                <div className="mt-2 text-xs">
+                  <span className="text-muted-foreground">Park until </span>
+                  <span className="font-bold text-foreground">{rightUntil}</span>
+                </div>
+              )}
+            </div>
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Select LEFT or RIGHT above for a definitive parking decision.
+          </p>
+        </div>
+      )}
+
       {/* Until card */}
-      {(untilTime || moveByLabel) && (
+      {!mixedMode && (untilTime || moveByLabel) && (
         <div className="rounded-3xl bg-surface p-5">
           {moveByLabel && (
             <>
@@ -659,30 +714,40 @@ function ScanResult({
         <div className="mb-3 text-sm font-bold text-foreground">Parking details</div>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
           <DetailRow label="Current status" value={
-            <span className={cn("font-bold", palette.text)}>{s.status}</span>
+            mixedMode
+              ? <span className="font-bold text-park-yellow">MIXED RULES</span>
+              : <span className={cn("font-bold", palette.text)}>{s.status}</span>
           } />
-          <DetailRow label="Reason" value={reasonLabel} />
+          <DetailRow label="Reason" value={mixedMode ? "Different rule on each side" : reasonLabel} />
           <DetailRow
             label={isLoading ? "Restriction until" : "Allowed until"}
             value={
-              isLoading
-                ? (fmtClock(decision.restriction_ends_at) ?? "—")
-                : (allowedUntilLabel ?? "—")
+              mixedMode
+                ? "Differs by side"
+                : isLoading
+                  ? (fmtClock(decision.restriction_ends_at) ?? "—")
+                  : (allowedUntilLabel ?? "—")
             }
           />
-          <DetailRow label="Time remaining" value={timeRemainingLabel ?? "—"} />
-          <DetailRow label={isLoading ? "Loading time limit" : "Maximum stay"} value={maxStayLabel ?? "No limit"} />
+          <DetailRow label="Time remaining" value={mixedMode ? "Differs by side" : (timeRemainingLabel ?? "—")} />
+          <DetailRow
+            label={isLoading ? "Loading time limit" : "Maximum stay"}
+            value={mixedMode ? "Differs by side" : (maxStayLabel ?? "No limit")}
+          />
           <DetailRow label="Next restriction" value={nextReasonLabel ?? "None scheduled"} />
-          <DetailRow label="Restriction starts" value={nextStartLabel ?? "—"} />
-          <DetailRow label="Restriction ends" value={nextEndLabel ?? "—"} />
+          <DetailRow label="Restriction starts" value={mixedMode ? "Differs by side" : (nextStartLabel ?? "—")} />
+          <DetailRow label="Restriction ends" value={mixedMode ? "Differs by side" : (nextEndLabel ?? "—")} />
           <DetailRow label="Applies to" value={
-            appliesTo === "BOTH" && !result.sides
-              ? "BOTH (no arrows)"
-              : appliesTo === "LEFT" ? "LEFT side"
-              : appliesTo === "RIGHT" ? "RIGHT side"
-              : appliesTo === "BOTH" ? "BOTH sides" : "NONE"
+            mixedMode
+              ? "Mixed (Left and Right differ)"
+              : appliesTo === "BOTH" && !result.sides
+                ? "BOTH (no arrows)"
+                : appliesTo === "LEFT" ? "LEFT side"
+                : appliesTo === "RIGHT" ? "RIGHT side"
+                : appliesTo === "BOTH" ? "BOTH sides" : "NONE"
           } />
           <DetailRow label="Confidence" value={`${Math.round(result.decision_confidence * 100)}%`} />
+
         </dl>
       </div>
 
@@ -1082,6 +1147,10 @@ function buildOfficerParagraph(a: OfficerArgs): string {
 
 function capitalize(s: string): string {
   return s.length ? s[0].toUpperCase() + s.slice(1) : s;
+}
+
+function capitalizeWords(s: string): string {
+  return s.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 
