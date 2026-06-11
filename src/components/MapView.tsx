@@ -16,6 +16,8 @@ import { getAvailabilityBlocksInBbox, type AvailabilityBlock } from "@/lib/parki
 import type { ParkingColor } from "@/lib/parking/types";
 import { useAppStore } from "@/stores/app-store";
 import { useLocationStore } from "@/stores/location-store";
+import { useMapTypeStore, MAPBOX_STYLE_FOR_TYPE } from "@/stores/map-type-store";
+import { MapLayerButton } from "@/components/MapLayerButton";
 
 interface MapViewProps {
   token: string;
@@ -92,6 +94,11 @@ export function MapView({ token, city }: MapViewProps) {
   const [mapError, setMapError] = useState(false);
   const [ready, setReady] = useState(false);
   const [globeMode, setGlobeMode] = useState(false);
+  const [styleVersion, setStyleVersion] = useState(0);
+  const mapType = useMapTypeStore((s) => s.mapType);
+  // Latest mapType captured at init time so the effect that creates the map
+  // doesn't need to depend on it (we don't want to recreate the map on switch).
+  const initialMapTypeRef = useRef(mapType);
 
   const queryClient = useQueryClient();
   const fetchSegments = useServerFn(getSegmentsInBbox);
@@ -280,7 +287,7 @@ export function MapView({ token, city }: MapViewProps) {
         try {
           map = new mapboxgl.Map({
             container: container.current,
-            style: "mapbox://styles/mapbox/streets-v12",
+            style: MAPBOX_STYLE_FOR_TYPE[initialMapTypeRef.current],
             center: city.center as [number, number],
             zoom: Math.max(15.5, city.default_zoom),
             pitch: 60,
@@ -465,23 +472,31 @@ export function MapView({ token, city }: MapViewProps) {
 
 
 
-            map.on("click", ["seg-left", "seg-right"] as any, (e: any) => {
-              const f = e.features?.[0];
-              const id = f?.properties?.segmentId as string | undefined;
-              if (f?.properties?.sourceType === "availability") {
-                toast.message(f.properties.label ?? "Live meter availability");
-                return;
-              }
-              if (id) selectSegment(id);
-            });
+            // Register interaction handlers only ONCE per map instance —
+            // style.load fires again after each setStyle() call, but Mapbox
+            // keeps map-level event handlers across style swaps.
+            if (!mapRef.current) {
+              map.on("click", ["seg-left", "seg-right"] as any, (e: any) => {
+                const f = e.features?.[0];
+                const id = f?.properties?.segmentId as string | undefined;
+                if (f?.properties?.sourceType === "availability") {
+                  toast.message(f.properties.label ?? "Live meter availability");
+                  return;
+                }
+                if (id) selectSegment(id);
+              });
 
-            for (const id of ["seg-left", "seg-right"]) {
-              map.on("mouseenter", id, () => { map.getCanvas().style.cursor = "pointer"; });
-              map.on("mouseleave", id, () => { map.getCanvas().style.cursor = ""; });
+              for (const id of ["seg-left", "seg-right"]) {
+                map.on("mouseenter", id, () => { map.getCanvas().style.cursor = "pointer"; });
+                map.on("mouseleave", id, () => { map.getCanvas().style.cursor = ""; });
+              }
             }
 
             mapRef.current = map;
             setReady(true);
+            // Bump version so dependent effects (rec-highlight, etc.) re-run
+            // after style swaps that wipe user-added sources/data.
+            setStyleVersion((v) => v + 1);
             // Force resize in case the container measured 0px during construction
             // (e.g., suspense fallback flicker). Tiles only fetch once sized.
             window.requestAnimationFrame(() => map.resize());
@@ -590,7 +605,28 @@ export function MapView({ token, city }: MapViewProps) {
       ],
     };
     src.setData(data);
-  }, [ready, recommendedHighlight]);
+  }, [ready, recommendedHighlight, styleVersion]);
+
+  // Map-type switch: swap the underlying base style without recreating the
+  // map. The existing style.load handler re-adds custom sources/layers, and
+  // featuresRef preserves segment geometry so nothing refetches.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    const targetStyle = MAPBOX_STYLE_FOR_TYPE[mapType];
+    // Mapbox normalizes the style URL; compare by setting unconditionally
+    // only when the requested type changes (skip the initial render).
+    if (initialMapTypeRef.current === mapType) {
+      initialMapTypeRef.current = mapType; // no-op, keep ref aligned
+      return;
+    }
+    initialMapTypeRef.current = mapType;
+    try {
+      map.setStyle(targetStyle);
+    } catch (err) {
+      console.warn("[MapView] setStyle failed", err);
+    }
+  }, [mapType, ready]);
 
 
   useEffect(() => {
@@ -662,6 +698,13 @@ export function MapView({ token, city }: MapViewProps) {
   return (
     <>
       <div ref={container} className="absolute inset-0 z-0 h-full w-full" />
+
+      {ready && (
+        <MapLayerButton
+          className="right-3"
+          style={{ bottom: "calc(var(--safe-bottom) + 14.5rem)" }}
+        />
+      )}
 
 
 
