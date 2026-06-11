@@ -385,7 +385,9 @@ function ScanResult({
   const nextReasonLabel = result.next_rule?.label ?? result.next_restriction_reason ?? null;
 
   // moveByLabel kept for the existing "Until card" UI below.
-  const moveByLabel = allowedUntilLabel && (s.status === "LIMITED" || (s.status === "YES" && sideTimeLimit))
+  // For loading zones the user is NOT legally parked — never surface a
+  // "Park until 9:17 AM" countdown; show "Restriction until 5:00 PM" instead.
+  const moveByLabel = !isLoading && allowedUntilLabel && (s.status === "LIMITED" || (s.status === "YES" && sideTimeLimit))
     ? allowedUntilLabel : null;
 
 
