@@ -748,7 +748,7 @@ function ScanResult({
             label={isLoading ? "Loading time limit" : "Maximum stay"}
             value={mixedMode ? "Differs by side" : (maxStayLabel ?? "No limit")}
           />
-          <DetailRow label="Next restriction" value={nextReasonLabel ?? "None scheduled"} />
+          <DetailRow label="Next restriction" value={mixedMode ? "Differs by side" : (nextReasonLabel ?? "None scheduled")} />
           <DetailRow label="Restriction starts" value={mixedMode ? "Differs by side" : (nextStartLabel ?? "—")} />
           <DetailRow label="Restriction ends" value={mixedMode ? "Differs by side" : (nextEndLabel ?? "—")} />
           <DetailRow label="Applies to" value={
