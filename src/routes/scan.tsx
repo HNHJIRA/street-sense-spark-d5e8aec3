@@ -13,6 +13,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { LocationStatusCard } from "@/components/LocationStatusCard";
 import { getCityInfo } from "@/lib/parking/parking.functions";
 import { scanSign, type SignScanResponse } from "@/lib/parking/scan.functions";
+import { buildRuleTimeline } from "@/lib/parking/driver-narrative";
 import type { NormalizedRule } from "@/lib/parking/providers/types";
 import { useLocationStore } from "@/stores/location-store";
 import { cn } from "@/lib/utils";
