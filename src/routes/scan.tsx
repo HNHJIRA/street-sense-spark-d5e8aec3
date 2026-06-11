@@ -855,6 +855,17 @@ interface OfficerArgs {
   loadingActivity: string | null;
   /** Clock label for restriction_ends_at, used by loading-zone narratives. */
   restrictionEndLabel: string | null;
+  /** Current rule start clock label (e.g. "12:00 AM"). */
+  currentRuleStartLabel: string | null;
+  /** Current rule end clock label. */
+  currentRuleEndLabel: string | null;
+  /** Next rule reason label. */
+  nextRuleLabel: string | null;
+  /** Next rule time-limit minutes (distinct from current). */
+  nextRuleTimeLimit: number | null;
+  /** Next rule start/end clock labels. */
+  nextRuleStartLabel: string | null;
+  nextRuleEndLabel: string | null;
 }
 
 // Narrator-only side phrase. Uses ONLY the supplied arrow value — never guesses.
