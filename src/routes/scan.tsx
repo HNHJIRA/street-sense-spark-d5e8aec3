@@ -593,7 +593,7 @@ function ScanResult({
           <span className="text-sm font-bold text-foreground">AI summary</span>
         </div>
         <p className="whitespace-pre-line text-sm leading-relaxed text-foreground/90">
-          {officerParagraph}
+          {officerParagraphWithWarning}
         </p>
         {(result.left_summary || result.right_summary) && (
           <div className="mt-4 space-y-1 border-t border-border pt-3 text-xs text-muted-foreground">
