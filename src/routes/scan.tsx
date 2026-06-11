@@ -623,11 +623,14 @@ function ScanResult({
             <Icon className="h-10 w-10 text-white" strokeWidth={3} />
           </div>
         </div>
-        <h2 className={cn("mt-5 font-display text-3xl font-extrabold leading-tight", palette.text)}>
-          {palette.title}
+        <h2 className={cn("mt-5 font-display text-3xl font-extrabold leading-tight", mixedMode ? "text-foreground" : palette.text)}>
+          {mixedMode ? "Different rules on each side" : palette.title}
         </h2>
-        <p className="mt-2 px-4 text-sm text-muted-foreground">{palette.subtitle}</p>
-      </div>
+        <p className="mt-2 px-4 text-sm text-muted-foreground">
+          {mixedMode
+            ? "This post has different parking rules on each side. Select LEFT or RIGHT for a definitive decision."
+            : palette.subtitle}
+        </p>
 
       {/* Until card */}
       {(untilTime || moveByLabel) && (
