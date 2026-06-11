@@ -84,6 +84,19 @@ export interface SignScanResponse {
    * authoritative and represents the whole pole.
    */
   sides: { left: SideEvaluation; right: SideEvaluation; both: SideEvaluation } | null;
+  /** Direction the posted rules apply to, derived from the physical arrows
+   *  on the sign. "BOTH" means a physical double-headed arrow OR no arrows
+   *  at all; "LEFT"/"RIGHT" mean every arrow on the stack points that way.
+   *  This is the SOURCE OF TRUTH for the UI — never split into left/right
+   *  when only one physical direction was photographed. */
+  applies_to: "LEFT" | "RIGHT" | "BOTH" | "NONE";
+  /** Raw OCR + interpretation snapshot for the in-app debug panel. */
+  debug: {
+    ocr_plates_text: string;
+    interpreted_rules: Array<NormalizedScanRule & { id: string }>;
+    active_rule_id: string | null;
+    physical_arrow_directions: string[];
+  };
   /** SDOT rules already on file for the nearest segment, for comparison. */
   sdot_rules: ParkingRule[];
   /** Nearest segment matched (if any) — used for validation + display. */
@@ -339,6 +352,33 @@ export const scanSign = createServerFn({ method: "POST" })
         both: buildSide("both", scanRules),
       };
     }
+
+    // Single-direction enforcement: if all physical arrows on the stack point
+    // the same way (e.g. only RIGHT), the sign HAS NO LEFT SIDE. Drop the
+    // per-side split so the UI doesn't invent a phantom "LEFT allows parking"
+    // for a side the sign doesn't address.
+    const physicalDirs = new Set<string>();
+    let hasPhysicalBoth = false;
+    for (const r of aiRulesAll) {
+      const a = r.arrow ?? null;
+      if (a === "left" || a === "right") physicalDirs.add(a);
+      if (a === "both") hasPhysicalBoth = true;
+    }
+    const applies_to: SignScanResponse["applies_to"] =
+      aiRulesAll.length === 0
+        ? "NONE"
+        : hasPhysicalBoth || (physicalDirs.has("left") && physicalDirs.has("right"))
+          ? "BOTH"
+          : physicalDirs.has("left")
+            ? "LEFT"
+            : physicalDirs.has("right")
+              ? "RIGHT"
+              : "BOTH";
+    if (applies_to === "LEFT" || applies_to === "RIGHT") {
+      // The top-level `decision` already evaluates ALL posted rules — which
+      // is correct because every rule belongs to the single physical side.
+      sides = null;
+    }
     void combinedRules;
 
     // 4) Persist image + scan + child rows.
@@ -544,6 +584,16 @@ export const scanSign = createServerFn({ method: "POST" })
       countdown_to_following_rule: timeline.countdown_to_following_rule,
       conflict_detected,
       conflict_summary,
+      applies_to,
+      debug: {
+        ocr_plates_text: ai.raw_text,
+        interpreted_rules: aiRulesAll.map((r, i) => ({ ...r, id: `scan-rule-${i}` })),
+        active_rule_id: decision.rule_id ?? null,
+        physical_arrow_directions: [
+          ...(hasPhysicalBoth ? ["BOTH"] : []),
+          ...[...physicalDirs].map((d) => d.toUpperCase()),
+        ],
+      },
     };
   });
 

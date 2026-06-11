@@ -198,7 +198,13 @@ function ScanPage() {
 function ScanResult({
   result, previewUrl, onReset,
 }: { result: SignScanResponse; previewUrl: string | null; onReset: () => void }) {
-  const [side, setSide] = useState<"left" | "both" | "right">("both");
+  // Default the side selector to whichever direction the sign actually
+  // addresses — never start in "both" when only one direction was photographed.
+  const defaultSide: "left" | "both" | "right" =
+    result.applies_to === "LEFT" ? "left"
+    : result.applies_to === "RIGHT" ? "right"
+    : "both";
+  const [side, setSide] = useState<"left" | "both" | "right">(defaultSide);
   const sideEval = result.sides ? result.sides[side] : null;
   const s = sideEval?.summary ?? result.summary;
   const decision = sideEval?.decision ?? result.decision;
@@ -252,12 +258,10 @@ function ScanResult({
   const untilTime = nextChange?.when_label ?? null;
 
   // Applies-To derived from arrow detection + selected side.
-  const appliesTo: "LEFT" | "RIGHT" | "BOTH" | "NONE" =
-    s.status === "UNKNOWN" && result.parsed_rules.length === 0
-      ? "NONE"
-      : result.sides
-        ? (side === "left" ? "LEFT" : side === "right" ? "RIGHT" : "BOTH")
-        : "BOTH";
+  // Applies-To: server is the source of truth (driven by physical arrows).
+  // Multiple plates with one arrow are multiple time windows for the SAME
+  // direction — never BOTH unless the photo shows it.
+  const appliesTo: "LEFT" | "RIGHT" | "BOTH" | "NONE" = result.applies_to;
   const sideClause =
     appliesTo === "LEFT"  ? "on the LEFT side of this sign" :
     appliesTo === "RIGHT" ? "on the RIGHT side of this sign" :
@@ -595,7 +599,7 @@ function ScanResult({
         <p className="whitespace-pre-line text-sm leading-relaxed text-foreground/90">
           {officerParagraphWithWarning}
         </p>
-        {(result.left_summary || result.right_summary) && (
+        {(result.left_summary || result.right_summary) && appliesTo === "BOTH" && (
           <div className="mt-4 space-y-1 border-t border-border pt-3 text-xs text-muted-foreground">
             {result.left_summary && <p>{result.left_summary}</p>}
             {result.right_summary && <p>{result.right_summary}</p>}
@@ -677,6 +681,55 @@ function ScanResult({
       {previewUrl && (
         <img src={previewUrl} alt="Captured sign" className="w-full rounded-3xl border border-border opacity-80" />
       )}
+
+      {/* Debug panel — OCR → Arrows → Interpreted Rules → Active Rule → Decision */}
+      <details className="rounded-3xl border border-dashed border-border bg-surface/40 p-4 text-xs">
+        <summary className="cursor-pointer text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+          Debug: pipeline trace
+        </summary>
+        <div className="mt-3 space-y-3">
+          <div>
+            <div className="font-bold text-foreground">OCR plates</div>
+            <pre className="mt-1 whitespace-pre-wrap break-words rounded bg-background p-2 text-[11px] text-muted-foreground">
+{result.debug.ocr_plates_text || "(none)"}
+            </pre>
+          </div>
+          <div>
+            <div className="font-bold text-foreground">Detected arrows</div>
+            <div className="mt-1 text-muted-foreground">
+              {result.debug.physical_arrow_directions.length
+                ? result.debug.physical_arrow_directions.join(", ")
+                : "(none)"} → applies_to = <span className="font-bold text-foreground">{result.applies_to}</span>
+            </div>
+          </div>
+          <div>
+            <div className="font-bold text-foreground">Interpreted rules ({result.debug.interpreted_rules.length})</div>
+            <ol className="mt-1 list-decimal space-y-1 pl-5 text-muted-foreground">
+              {result.debug.interpreted_rules.map((r, i) => {
+                const active = result.debug.active_rule_id === r.id;
+                return (
+                  <li key={i} className={cn(active && "font-bold text-park-green")}>
+                    [{(r.arrow ?? "NONE").toString().toUpperCase()}] {r.restriction_code}
+                    {r.time_start && r.time_end ? ` · ${r.time_start}–${r.time_end}` : " · all day"}
+                    {r.time_limit_minutes ? ` · ${r.time_limit_minutes} min limit` : ""}
+                    {active ? "  ← ACTIVE NOW" : ""}
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+          <div>
+            <div className="font-bold text-foreground">Engine decision</div>
+            <div className="mt-1 text-muted-foreground">
+              status=<span className="font-bold text-foreground">{result.status}</span> ·
+              code={result.decision.code} ·
+              rule_id={result.debug.active_rule_id ?? "(none)"} ·
+              allowed_until={result.decision.allowed_until ?? "—"}
+            </div>
+          </div>
+        </div>
+      </details>
+
 
       <button
         onClick={onReset}
