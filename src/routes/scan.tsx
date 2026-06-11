@@ -573,11 +573,11 @@ function ScanResult({
     { codes: ["street_cleaning", "street_sweeping"], label: "Street Cleaning" },
     { codes: ["permit", "permit_parking", "rpz"], label: "Permit Parking" },
   ];
-  const activeRestrictionType = result.current_rule?.restriction_type ?? null;
+  const activeRestrictionType = selectedCurrentRule?.restriction_type ?? null;
   const awarenessSentences: string[] = [];
   const seenLabels = new Set<string>();
   for (const tier of HIGH_RISK_PRIORITY) {
-    for (const r of result.debug.timeline_rules) {
+    for (const r of selectedTimelineRules) {
       if (!tier.codes.includes(r.restriction_type)) continue;
       // Skip the currently-active rule slot — already described above.
       if (r.slot === "CURRENT" && r.restriction_type === activeRestrictionType) continue;
@@ -754,11 +754,11 @@ function ScanResult({
           <DetailRow label="Applies to" value={
             mixedMode
               ? "Mixed (Left and Right differ)"
-              : appliesTo === "BOTH" && !result.sides
+                : selectedAppliesTo === "BOTH" && !result.sides
                 ? "BOTH (no arrows)"
-                : appliesTo === "LEFT" ? "LEFT side"
-                : appliesTo === "RIGHT" ? "RIGHT side"
-                : appliesTo === "BOTH" ? "BOTH sides" : "NONE"
+                : selectedAppliesTo === "LEFT" ? "LEFT side only"
+                : selectedAppliesTo === "RIGHT" ? "RIGHT side only"
+                : selectedAppliesTo === "BOTH" ? "BOTH sides" : "NONE"
           } />
           <DetailRow label="Confidence" value={`${Math.round(result.decision_confidence * 100)}%`} />
 
@@ -774,7 +774,7 @@ function ScanResult({
         <p className="whitespace-pre-line text-sm leading-relaxed text-foreground/90">
           {officerParagraphWithWarning}
         </p>
-        {(result.left_summary || result.right_summary) && appliesTo === "BOTH" && (
+        {(result.left_summary || result.right_summary) && selectedAppliesTo === "BOTH" && (
           <div className="mt-4 space-y-1 border-t border-border pt-3 text-xs text-muted-foreground">
             {result.left_summary && <p>{result.left_summary}</p>}
             {result.right_summary && <p>{result.right_summary}</p>}
