@@ -706,7 +706,7 @@ function ScanResult({
             <div className="font-bold text-foreground">Interpreted rules ({result.debug.interpreted_rules.length})</div>
             <ol className="mt-1 list-decimal space-y-1 pl-5 text-muted-foreground">
               {result.debug.interpreted_rules.map((r, i) => {
-                const active = result.debug.active_rule_id != null && (r as { id?: string }).id === result.debug.active_rule_id;
+                const active = result.debug.active_rule_id === r.id;
                 return (
                   <li key={i} className={cn(active && "font-bold text-park-green")}>
                     [{(r.arrow ?? "NONE").toString().toUpperCase()}] {r.restriction_code}
