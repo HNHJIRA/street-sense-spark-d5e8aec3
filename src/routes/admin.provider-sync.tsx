@@ -24,11 +24,15 @@ function SyncPage() {
 
   const run = useMutation({
     mutationFn: (slug: string) => runFn({ data: { citySlug: slug } }),
-    onSuccess: (r) => {
+    onSuccess: (r, slug) => {
       setMsg(r.error ? `Error: ${r.error}` : `Imported ${r.imported}, skipped ${r.skipped}`);
       qc.invalidateQueries({ queryKey: ["sync-logs"] });
       qc.invalidateQueries({ queryKey: ["sync-health"] });
       qc.invalidateQueries({ queryKey: ["admin-dq", "seattle"] });
+      // Auto-refresh map data so newly-synced segments (e.g. Pasadena green lines) appear immediately.
+      qc.invalidateQueries({ queryKey: ["segments"] });
+      qc.invalidateQueries({ queryKey: ["parking", "city", slug] });
+      qc.invalidateQueries({ queryKey: ["la-availability-blocks"] });
     },
     onError: (e: Error) => setMsg(`Failed: ${e.message}`),
   });
@@ -51,9 +55,16 @@ function SyncPage() {
             disabled={run.isPending}
             style={{ background: "#0f172a", color: "white", border: "none", padding: "10px 16px", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 14 }}
           >
-            {run.isPending ? "Syncing Seattle…" : "Run Seattle SDOT Sync"}
+            {run.isPending && run.variables === "seattle" ? "Syncing Seattle…" : "Run Seattle SDOT Sync"}
           </button>
-          <div style={{ fontSize: 12, color: "#64748b" }}>Pulls full Seattle bbox from SDOT FeatureServer (up to 20,000 blockfaces).</div>
+          <button
+            onClick={() => { setMsg(null); run.mutate("pasadena"); }}
+            disabled={run.isPending}
+            style={{ background: "#0f172a", color: "white", border: "none", padding: "10px 16px", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 14 }}
+          >
+            {run.isPending && run.variables === "pasadena" ? "Syncing Pasadena…" : "Run Pasadena Sync"}
+          </button>
+          <div style={{ fontSize: 12, color: "#64748b" }}>Map refreshes automatically after sync completes.</div>
         </div>
         {msg && <div style={{ marginTop: 10, fontSize: 13, color: msg.startsWith("Error") || msg.startsWith("Failed") ? "#b91c1c" : "#166534" }}>{msg}</div>}
       </section>
