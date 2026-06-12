@@ -46,10 +46,12 @@ export const SantaMonicaProvider: ParkingProvider = {
       const coords = arcgisPolyline(f.geometry);
       if (coords.length < 2 || !a.objectid) continue;
       const { start, end } = parseTimeRange(a.time);
+      const sweepDays = parseDays(a.day);
+      const nonSweepDays = [0, 1, 2, 3, 4, 5, 6].filter((d) => !sweepDays.includes(d));
       const sweep: NormalizedRule = {
         priority: 25,
         restriction_code: "street_cleaning",
-        days_of_week: parseDays(a.day),
+        days_of_week: sweepDays,
         time_start: start,
         time_end: end,
         permit_zone: null,
@@ -58,6 +60,22 @@ export const SantaMonicaProvider: ParkingProvider = {
         effective_to: null,
         notes: `Santa Monica street sweeping (open data): ${a.day ?? ""} ${a.time ?? ""}`.trim(),
       };
+      // On non-sweep days, emit an explicit allowed rule so the map shows
+      // green instead of falling through to the catch-all unknown rule.
+      const allowedOffSweep: NormalizedRule | null = nonSweepDays.length
+        ? {
+            priority: 800,
+            restriction_code: "allowed",
+            days_of_week: nonSweepDays,
+            time_start: null,
+            time_end: null,
+            permit_zone: null,
+            time_limit_minutes: null,
+            effective_from: null,
+            effective_to: null,
+            notes: "No posted Santa Monica street-sweeping restriction on this day. Verify any local sign before parking.",
+          }
+        : null;
       out.push({
         external_id: `smgov:sweep/${a.objectid}`,
         name: `Sweep route ${a.objectid}`,
@@ -70,9 +88,13 @@ export const SantaMonicaProvider: ParkingProvider = {
           sweep_time: a.time ?? null,
           posted_restrictions: "unknown",
         },
-        rules: resolveRuleConflicts([sweep, unknownRule(
-          "Santa Monica publishes sweeping for this block, but posted permit/meter/time-limit signs are not in open data. Verify local signage.",
-        )]),
+        rules: resolveRuleConflicts([
+          sweep,
+          ...(allowedOffSweep ? [allowedOffSweep] : []),
+          unknownRule(
+            "Santa Monica publishes sweeping for this block, but posted permit/meter/time-limit signs are not in open data. Verify local signage.",
+          ),
+        ]),
       });
     }
     return out;

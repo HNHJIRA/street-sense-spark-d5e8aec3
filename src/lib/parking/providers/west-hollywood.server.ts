@@ -55,6 +55,7 @@ export const WestHollywoodProvider: ParkingProvider = {
           if (coords.length < 2 || a.OBJECTID == null) continue;
           const { start, end } = parseSchedule(a.Schedule);
           const days = a.Day && a.Day.toLowerCase() !== "daily" ? parseDays(a.Day) : layer.defaultDays;
+          const nonSweepDays = [0, 1, 2, 3, 4, 5, 6].filter((d) => !days.includes(d));
           const sweep: NormalizedRule = {
             priority: 25,
             restriction_code: "street_cleaning",
@@ -67,6 +68,22 @@ export const WestHollywoodProvider: ParkingProvider = {
             effective_to: null,
             notes: `WeHo street sweeping (zone ${a.Zone ?? "?"}, ${layer.name}): ${a.Day ?? ""} ${a.Schedule ?? ""}`.trim(),
           };
+          // On non-sweep days, emit an explicit allowed rule so the map shows
+          // green instead of falling through to the catch-all unknown rule.
+          const allowedOffSweep: NormalizedRule | null = nonSweepDays.length
+            ? {
+                priority: 800,
+                restriction_code: "allowed",
+                days_of_week: nonSweepDays,
+                time_start: null,
+                time_end: null,
+                permit_zone: null,
+                time_limit_minutes: null,
+                effective_from: null,
+                effective_to: null,
+                notes: "No posted WeHo street-sweeping restriction on this day. Verify any local sign before parking.",
+              }
+            : null;
           out.push({
             external_id: `weho:sweep/${layer.id}/${a.OBJECTID}`,
             name: `Sweep zone ${a.Zone ?? a.OBJECTID}`,
@@ -80,9 +97,13 @@ export const WestHollywoodProvider: ParkingProvider = {
               sweep_schedule: a.Schedule ?? null,
               posted_restrictions: "unknown",
             },
-            rules: resolveRuleConflicts([sweep, unknownRule(
-              "WeHo publishes sweeping data, but posted permit/meter/time-limit signs are not in open data. Verify local signage.",
-            )]),
+            rules: resolveRuleConflicts([
+              sweep,
+              ...(allowedOffSweep ? [allowedOffSweep] : []),
+              unknownRule(
+                "WeHo publishes sweeping data, but posted permit/meter/time-limit signs are not in open data. Verify local signage.",
+              ),
+            ]),
           });
         }
       } catch (e) {
