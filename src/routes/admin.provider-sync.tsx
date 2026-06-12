@@ -24,11 +24,15 @@ function SyncPage() {
 
   const run = useMutation({
     mutationFn: (slug: string) => runFn({ data: { citySlug: slug } }),
-    onSuccess: (r) => {
+    onSuccess: (r, slug) => {
       setMsg(r.error ? `Error: ${r.error}` : `Imported ${r.imported}, skipped ${r.skipped}`);
       qc.invalidateQueries({ queryKey: ["sync-logs"] });
       qc.invalidateQueries({ queryKey: ["sync-health"] });
       qc.invalidateQueries({ queryKey: ["admin-dq", "seattle"] });
+      // Auto-refresh map data so newly-synced segments (e.g. Pasadena green lines) appear immediately.
+      qc.invalidateQueries({ queryKey: ["segments"] });
+      qc.invalidateQueries({ queryKey: ["parking", "city", slug] });
+      qc.invalidateQueries({ queryKey: ["la-availability-blocks"] });
     },
     onError: (e: Error) => setMsg(`Failed: ${e.message}`),
   });
