@@ -55,9 +55,16 @@ function SyncPage() {
             disabled={run.isPending}
             style={{ background: "#0f172a", color: "white", border: "none", padding: "10px 16px", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 14 }}
           >
-            {run.isPending ? "Syncing Seattle…" : "Run Seattle SDOT Sync"}
+            {run.isPending && run.variables === "seattle" ? "Syncing Seattle…" : "Run Seattle SDOT Sync"}
           </button>
-          <div style={{ fontSize: 12, color: "#64748b" }}>Pulls full Seattle bbox from SDOT FeatureServer (up to 20,000 blockfaces).</div>
+          <button
+            onClick={() => { setMsg(null); run.mutate("pasadena"); }}
+            disabled={run.isPending}
+            style={{ background: "#0f172a", color: "white", border: "none", padding: "10px 16px", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 14 }}
+          >
+            {run.isPending && run.variables === "pasadena" ? "Syncing Pasadena…" : "Run Pasadena Sync"}
+          </button>
+          <div style={{ fontSize: 12, color: "#64748b" }}>Map refreshes automatically after sync completes.</div>
         </div>
         {msg && <div style={{ marginTop: 10, fontSize: 13, color: msg.startsWith("Error") || msg.startsWith("Failed") ? "#b91c1c" : "#166534" }}>{msg}</div>}
       </section>
