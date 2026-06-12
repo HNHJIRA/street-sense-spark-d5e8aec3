@@ -42,10 +42,12 @@ export const PasadenaProvider: ParkingProvider = {
         const a = f.attributes;
         const coords = arcgisPolyline(f.geometry);
         if (coords.length < 2 || a.OBJECTID == null) continue;
+        const sweepDays = parseDays(a.SWEEPING_DAY);
+        const nonSweepDays = [0, 1, 2, 3, 4, 5, 6].filter((d) => !sweepDays.includes(d));
         const sweep: NormalizedRule = {
           priority: 25,
           restriction_code: "street_cleaning",
-          days_of_week: parseDays(a.SWEEPING_DAY),
+          days_of_week: sweepDays,
           time_start: null,
           time_end: null,
           permit_zone: null,
@@ -54,6 +56,23 @@ export const PasadenaProvider: ParkingProvider = {
           effective_to: null,
           notes: `Pasadena street sweeping (open data): ${a.SWEEPING_DAY ?? "unknown day"}. Posted time-of-day not in open data — verify sign.`,
         };
+        // On non-sweep days, Pasadena residential streets are generally
+        // unrestricted. Emit an explicit allowed rule so the map shows green
+        // instead of falling through to the catch-all unknown rule.
+        const allowedOffSweep: NormalizedRule | null = nonSweepDays.length
+          ? {
+              priority: 800,
+              restriction_code: "allowed",
+              days_of_week: nonSweepDays,
+              time_start: null,
+              time_end: null,
+              permit_zone: null,
+              time_limit_minutes: null,
+              effective_from: null,
+              effective_to: null,
+              notes: "No posted Pasadena street-sweeping restriction on this day. Verify any local sign before parking.",
+            }
+          : null;
         out.push({
           external_id: `pasadena:sweep/${a.OBJECTID}`,
           name: `Sweep area ${a.OBJECTID}`,
@@ -65,9 +84,13 @@ export const PasadenaProvider: ParkingProvider = {
             sweep_day: a.SWEEPING_DAY ?? null,
             posted_restrictions: "unknown",
           },
-          rules: resolveRuleConflicts([sweep, unknownRule(
-            "Pasadena publishes sweeping day but not posted time-of-day, permit, or meter signs. Verify local signage.",
-          )]),
+          rules: resolveRuleConflicts([
+            sweep,
+            ...(allowedOffSweep ? [allowedOffSweep] : []),
+            unknownRule(
+              "Pasadena publishes sweeping day but not posted time-of-day, permit, or meter signs. Verify local signage.",
+            ),
+          ]),
         });
       }
       more = Boolean(json.exceededTransferLimit) && feats.length === PAGE;
