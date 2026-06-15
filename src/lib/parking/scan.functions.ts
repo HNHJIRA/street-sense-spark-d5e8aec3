@@ -228,13 +228,12 @@ export const scanSign = createServerFn({ method: "POST" })
     //   - main OCR/extraction + interpretation (single AI roundtrip)
     //   - restriction types lookup (DB)
     //   - nearest segment lookup (DB, if GPS present)
-    //   - image upload to storage
+    //   - no storage / history writes on the critical path
     // Previously these stacked multiple AI/DB/storage roundtrips. Running the
     // independent work concurrently keeps wall-clock time close to the AI call.
     const scanId = crypto.randomUUID();
     const ext = data.mimeType.split("/")[1]?.toLowerCase().replace("jpeg", "jpg") ?? "jpg";
     const storagePath = `${new Date().toISOString().slice(0, 10)}/${scanId}.${ext}`;
-    const bytes = Uint8Array.from(atob(data.imageBase64), (c) => c.charCodeAt(0));
 
     const aiP = callSignScanAi(data.imageBase64, data.mimeType, apiKey);
     const restrictionTypesP = loadRestrictionTypes(admin);
@@ -245,9 +244,6 @@ export const scanSign = createServerFn({ method: "POST" })
           p_max_meters: 80,
         })
       : Promise.resolve({ data: null } as { data: unknown });
-    const uploadP = admin.storage.from("sign-scans").upload(storagePath, bytes, {
-      contentType: data.mimeType, upsert: false,
-    });
     const [ai, restrictionTypes, nearestRes] = await Promise.all([aiP, restrictionTypesP, nearestP]);
     if (ai.sign_count === 0 || ai.rules.length === 0) {
       throw new Error(
@@ -389,16 +385,6 @@ export const scanSign = createServerFn({ method: "POST" })
     }
     void combinedRules;
 
-    // 4) Persist image + scan + child rows. The upload was started in
-    // parallel up top; await it now, then fan out all inserts concurrently.
-    const upload = await uploadP;
-    const uploadOk = !upload.error;
-    const signedUrlP = uploadOk
-      ? admin.storage.from("sign-scans")
-          .createSignedUrl(storagePath, 60 * 60 * 24 * 7)
-          .then((s: { data: { signedUrl?: string } | null }) => s.data?.signedUrl ?? null)
-      : Promise.resolve(null as string | null);
-
     const matchStatus: "matched" | "out_of_range" | "no_gps" | "no_segment_data" =
       data.lng == null || data.lat == null
         ? "no_gps"
@@ -418,65 +404,85 @@ export const scanSign = createServerFn({ method: "POST" })
       signCount: ai.sign_count,
     });
 
-    // PERF: run all writes in parallel — they target different tables and
-    // don't depend on each other. Previously this was ~6 awaits in series.
-    const writes: Promise<unknown>[] = [
-      admin.from("parking_sign_scans").insert({
-        id: scanId,
-        city_id: data.cityId,
-        segment_id: segmentDbId,
-        lng: data.lng, lat: data.lat,
-        decision,
-        overall_confidence: ai.overall_confidence,
-        verdict: verdictFromColor(decision.color),
-        nearest_distance_m: segmentInfo?.distance_m ?? null,
-        match_status: matchStatus,
-        summary,
-      }),
-      admin.from("ocr_results").insert({
-        scan_id: scanId,
-        model: ai.model,
-        raw_text: ai.raw_text,
-        sign_count: ai.sign_count,
-      }),
-    ];
-    const signedUrl = await signedUrlP;
-    if (uploadOk) {
-      writes.push(admin.from("parking_sign_images").insert({
-        scan_id: scanId,
-        storage_path: storagePath,
-        public_url: signedUrl,
-      }));
-    }
-    if (aiRules.length > 0) {
-      writes.push(admin.from("parsed_sign_rules").insert(
-        aiRules.map((r, i) => ({
-          scan_id: scanId,
-          sequence: i,
-          restriction_code: r.restriction_code,
-          days_of_week: r.days_of_week,
-          time_start: r.time_start,
-          time_end: r.time_end,
-          permit_zone: r.permit_zone,
-          time_limit_minutes: r.time_limit_minutes,
-          priority: r.priority,
-          confidence: ai.rules[i]?.confidence ?? ai.overall_confidence,
-          notes: r.notes,
-        })),
-      ));
-    }
-    if (validations.length > 0) {
-      writes.push(admin.from("scan_validation_results").insert(
-        validations.map((v) => ({
-          scan_id: scanId,
-          outcome: v.outcome,
-          matched_rule_id: v.matched_rule_id,
-          confidence: v.confidence,
-          detail: v.detail,
-        })),
-      ));
-    }
-    await Promise.all(writes);
+    // PERF: return the driver verdict immediately after AI + engine evaluation.
+    // Storage/history rows are non-critical for the on-screen result, so they
+    // run in the background instead of adding seconds to the scan response.
+    const signedUrl: string | null = null;
+    void (async () => {
+      try {
+        await Promise.resolve();
+        const bytes = Uint8Array.from(atob(data.imageBase64), (c) => c.charCodeAt(0));
+        const upload = await admin.storage.from("sign-scans").upload(storagePath, bytes, {
+          contentType: data.mimeType, upsert: false,
+        });
+        const uploadOk = !upload.error;
+        const backgroundSignedUrl = uploadOk
+          ? await admin.storage.from("sign-scans")
+              .createSignedUrl(storagePath, 60 * 60 * 24 * 7)
+              .then((s: { data: { signedUrl?: string } | null }) => s.data?.signedUrl ?? null)
+          : null;
+
+        await admin.from("parking_sign_scans").insert({
+          id: scanId,
+          city_id: data.cityId,
+          segment_id: segmentDbId,
+          lng: data.lng, lat: data.lat,
+          decision,
+          overall_confidence: ai.overall_confidence,
+          verdict: verdictFromColor(decision.color),
+          nearest_distance_m: segmentInfo?.distance_m ?? null,
+          match_status: matchStatus,
+          summary,
+        });
+
+        const writes: Promise<unknown>[] = [
+          admin.from("ocr_results").insert({
+            scan_id: scanId,
+            model: ai.model,
+            raw_text: ai.raw_text,
+            sign_count: ai.sign_count,
+          }),
+        ];
+        if (uploadOk) {
+          writes.push(admin.from("parking_sign_images").insert({
+            scan_id: scanId,
+            storage_path: storagePath,
+            public_url: backgroundSignedUrl,
+          }));
+        }
+        if (aiRules.length > 0) {
+          writes.push(admin.from("parsed_sign_rules").insert(
+            aiRules.map((r, i) => ({
+              scan_id: scanId,
+              sequence: i,
+              restriction_code: r.restriction_code,
+              days_of_week: r.days_of_week,
+              time_start: r.time_start,
+              time_end: r.time_end,
+              permit_zone: r.permit_zone,
+              time_limit_minutes: r.time_limit_minutes,
+              priority: r.priority,
+              confidence: ai.rules[i]?.confidence ?? ai.overall_confidence,
+              notes: r.notes,
+            })),
+          ));
+        }
+        if (validations.length > 0) {
+          writes.push(admin.from("scan_validation_results").insert(
+            validations.map((v) => ({
+              scan_id: scanId,
+              outcome: v.outcome,
+              matched_rule_id: v.matched_rule_id,
+              confidence: v.confidence,
+              detail: v.detail,
+            })),
+          ));
+        }
+        await Promise.all(writes);
+      } catch (e) {
+        console.warn("[scanSign] background persistence failed:", (e as Error).message);
+      }
+    })();
 
 
 

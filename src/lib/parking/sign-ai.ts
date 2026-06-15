@@ -13,7 +13,8 @@ import { normalizeCategory } from "@/lib/parking/providers/normalize";
 import type { NormalizedRule } from "@/lib/parking/providers/types";
 
 const AI_GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const AI_MODEL = "google/gemini-3-flash-preview";
+const AI_MODEL = "google/gemini-2.5-flash-lite";
+const AI_TIMEOUT_MS = 4_200;
 
 export type ArrowDirection = "left" | "right" | "both" | null;
 
@@ -247,8 +248,11 @@ async function runExtraction(
   mime: string,
   apiKey: string,
 ): Promise<ExtractionResult> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
   const res = await fetch(AI_GATEWAY_URL, {
     method: "POST",
+    signal: controller.signal,
     headers: {
       "Content-Type": "application/json",
       "Lovable-API-Key": apiKey,
@@ -270,8 +274,10 @@ async function runExtraction(
         type: "json_schema",
         json_schema: { name: "sign_extraction", strict: true, schema: EXTRACTION_SCHEMA },
       },
+      temperature: 0,
+      max_tokens: 1400,
     }),
-  });
+  }).finally(() => clearTimeout(timeout));
 
   if (!res.ok) {
     const body = await res.text();
@@ -466,13 +472,21 @@ const COMBINED_SCAN_SCHEMA = {
   },
 } as const;
 
+const FAST_SCAN_PROMPT = `Read this parking/stopping sign photo quickly and return JSON only.
+Detect each visible sign plate top-to-bottom. For each plate include exact text, arrow LEFT/RIGHT/BOTH/UNCLEAR/NONE, colors, symbols, confidence.
+Then create one parking rule per text plate. Use restriction_type values like no_parking, no_stopping, passenger_loading, commercial_loading, loading_zone, taxi_zone, bus_zone, street_cleaning, permit, time_limited, metered, unknown.
+Copy days, start/end time as HH:MM when visible, time limit minutes when visible, and arrow only if physically visible or inherited from an arrow-only plate. Never invent opposite arrows.`;
+
 async function runCombinedScan(
   imageBase64: string,
   mime: string,
   apiKey: string,
 ): Promise<CombinedScanResult> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
   const res = await fetch(AI_GATEWAY_URL, {
     method: "POST",
+    signal: controller.signal,
     headers: {
       "Content-Type": "application/json",
       "Lovable-API-Key": apiKey,
@@ -481,10 +495,7 @@ async function runCombinedScan(
     body: JSON.stringify({
       model: AI_MODEL,
       messages: [
-        {
-          role: "system",
-          content: `${EXTRACTION_PROMPT}\n\n${INTERPRETATION_SYSTEM}`,
-        },
+        { role: "system", content: FAST_SCAN_PROMPT },
         {
           role: "user",
           content: [
@@ -501,8 +512,10 @@ async function runCombinedScan(
         type: "json_schema",
         json_schema: { name: "combined_sign_scan", strict: true, schema: COMBINED_SCAN_SCHEMA },
       },
+      temperature: 0,
+      max_tokens: 1600,
     }),
-  });
+  }).finally(() => clearTimeout(timeout));
 
   if (!res.ok) {
     const body = await res.text();
@@ -888,8 +901,23 @@ export async function callSignScanAi(
   try {
     combined = await runCombinedScan(imageBase64, mime, apiKey);
   } catch {
-    const extraction = await runExtraction(imageBase64, mime, apiKey);
-    combined = { extraction, interpretation: { rules: [], confidence: 0 } };
+    return {
+      raw_text: "Fast scan timed out before the sign could be read confidently.",
+      sign_count: 1,
+      overall_confidence: 0.4,
+      rules: [{
+        type: "unknown",
+        days: [],
+        start: null,
+        end: null,
+        permit_zone: null,
+        time_limit_minutes: null,
+        notes: "Scan timed out — verify the posted sign manually.",
+        arrow: null,
+        confidence: 0.4,
+      }],
+      model: `${AI_MODEL}:timeout-fallback`,
+    };
   }
   const { extraction, interpretation } = combined;
 
