@@ -5,6 +5,7 @@
 // / Sessions / Alerts. The scanner only contributes additional NormalizedRule
 // rows for the synthesized "scan segment".
 import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import type { LineString } from "geojson";
 import { evaluateRulesAt } from "./engine";
@@ -25,6 +26,17 @@ interface AdminClient {
   rpc: (n: string, a?: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
   storage: { from: (b: string) => any };
 }
+
+type WaitableRequest = Request & { waitUntil?: (promise: Promise<unknown>) => void };
+
+function waitUntilBackground(task: Promise<unknown>): void {
+  try {
+    (getRequest() as WaitableRequest).waitUntil?.(task);
+  } catch {
+    // Dev/runtime fallback: still start the work, but don't block the result.
+  }
+}
+
 async function getAdmin(): Promise<AdminClient> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   return supabaseAdmin as unknown as AdminClient;
