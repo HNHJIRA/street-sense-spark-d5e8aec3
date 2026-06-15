@@ -944,6 +944,40 @@ function ScanResult({
   );
 }
 
+async function prepareImageForScan(file: File): Promise<File> {
+  if (typeof window === "undefined" || !("createImageBitmap" in window)) return file;
+  if (file.size <= 1_200_000) return file;
+
+  try {
+    const bitmap = await createImageBitmap(file);
+    const maxEdge = Math.max(bitmap.width, bitmap.height);
+    if (maxEdge <= 1400) {
+      bitmap.close?.();
+      return file;
+    }
+
+    const scale = 1400 / maxEdge;
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      bitmap.close?.();
+      return file;
+    }
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close?.();
+
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, "image/jpeg", 0.78);
+    });
+    if (!blob || blob.size >= file.size) return file;
+    const name = file.name.replace(/\.[^.]+$/, "") || "parking-sign";
+    return new File([blob], `${name}.jpg`, { type: "image/jpeg" });
+  } catch {
+    return file;
+  }
+}
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
