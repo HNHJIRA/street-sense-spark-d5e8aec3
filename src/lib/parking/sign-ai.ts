@@ -13,7 +13,8 @@ import { normalizeCategory } from "@/lib/parking/providers/normalize";
 import type { NormalizedRule } from "@/lib/parking/providers/types";
 
 const AI_GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const AI_MODEL = "google/gemini-3-flash-preview";
+const AI_MODEL = "google/gemini-2.5-flash-lite";
+const AI_TIMEOUT_MS = 4_200;
 
 export type ArrowDirection = "left" | "right" | "both" | null;
 
@@ -247,8 +248,11 @@ async function runExtraction(
   mime: string,
   apiKey: string,
 ): Promise<ExtractionResult> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
   const res = await fetch(AI_GATEWAY_URL, {
     method: "POST",
+    signal: controller.signal,
     headers: {
       "Content-Type": "application/json",
       "Lovable-API-Key": apiKey,
@@ -270,8 +274,10 @@ async function runExtraction(
         type: "json_schema",
         json_schema: { name: "sign_extraction", strict: true, schema: EXTRACTION_SCHEMA },
       },
+      temperature: 0,
+      max_tokens: 1400,
     }),
-  });
+  }).finally(() => clearTimeout(timeout));
 
   if (!res.ok) {
     const body = await res.text();
