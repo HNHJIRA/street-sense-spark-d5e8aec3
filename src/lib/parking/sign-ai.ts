@@ -411,6 +411,11 @@ interface InterpretationResult {
   confidence: number;
 }
 
+interface CombinedScanResult {
+  extraction: ExtractionResult;
+  interpretation: InterpretationResult;
+}
+
 const INTERPRETATION_SCHEMA = {
   type: "object",
   additionalProperties: false,
@@ -450,6 +455,69 @@ const INTERPRETATION_SCHEMA = {
     confidence: { type: "number", minimum: 0, maximum: 1 },
   },
 } as const;
+
+const COMBINED_SCAN_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["extraction", "interpretation"],
+  properties: {
+    extraction: EXTRACTION_SCHEMA,
+    interpretation: INTERPRETATION_SCHEMA,
+  },
+} as const;
+
+async function runCombinedScan(
+  imageBase64: string,
+  mime: string,
+  apiKey: string,
+): Promise<CombinedScanResult> {
+  const res = await fetch(AI_GATEWAY_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Lovable-API-Key": apiKey,
+      "X-Lovable-AIG-SDK": "raw-fetch",
+    },
+    body: JSON.stringify({
+      model: AI_MODEL,
+      messages: [
+        {
+          role: "system",
+          content: `${EXTRACTION_PROMPT}\n\n${INTERPRETATION_SYSTEM}`,
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text:
+                "First extract every visible sign plate, then interpret those extracted plates into normalized parking rules. Return ONLY the JSON object.",
+            },
+            { type: "image_url", image_url: { url: `data:${mime};base64,${imageBase64}` } },
+          ],
+        },
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: { name: "combined_sign_scan", strict: true, schema: COMBINED_SCAN_SCHEMA },
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    if (res.status === 429) throw new Error("Sign scanner is rate-limited. Try again in a moment.");
+    if (res.status === 402) throw new Error("AI credits exhausted. Add credits in workspace settings.");
+    throw new Error(`Sign scan failed (${res.status}): ${body.slice(0, 200)}`);
+  }
+  const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+  const content = data.choices?.[0]?.message?.content ?? "{}";
+  try {
+    return JSON.parse(content) as CombinedScanResult;
+  } catch {
+    throw new Error("Sign scanner returned non-JSON output.");
+  }
+}
 
 async function runInterpretation(
   extraction: ExtractionResult,
@@ -813,16 +881,17 @@ export async function callSignScanAi(
   mime: string,
   apiKey: string,
 ): Promise<AiScanResult> {
-  // Stage A — verbatim plate extraction with strict arrow detection.
-  const extraction = await runExtraction(imageBase64, mime, apiKey);
-
-  // Stage B — color/theme-aware interpretation into logical rules.
-  let interpretation: InterpretationResult;
+  // PERF: one multimodal AI call now returns both OCR plates and interpreted
+  // rules. The older extraction → interpretation waterfall cost a second AI
+  // roundtrip, which was the main reason scans still hovered around 10s.
+  let combined: CombinedScanResult;
   try {
-    interpretation = await runInterpretation(extraction, apiKey);
+    combined = await runCombinedScan(imageBase64, mime, apiKey);
   } catch {
-    interpretation = { rules: [], confidence: 0 };
+    const extraction = await runExtraction(imageBase64, mime, apiKey);
+    combined = { extraction, interpretation: { rules: [], confidence: 0 } };
   }
+  const { extraction, interpretation } = combined;
 
   // Build raw_text from the verbatim plates (preserves what the OCR actually saw).
   const raw_text = extraction.plates

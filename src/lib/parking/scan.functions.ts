@@ -8,7 +8,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { LineString } from "geojson";
 import { evaluateRulesAt } from "./engine";
-import { aiRulesToNormalized, callSignScanAi, validateSignImage, type AiScanResult, type ArrowDirection, type NormalizedScanRule } from "./sign-ai";
+import { aiRulesToNormalized, callSignScanAi, type AiScanResult, type ArrowDirection, type NormalizedScanRule } from "./sign-ai";
 import { resolveRuleConflicts } from "./providers/normalize";
 import { buildScanSummary, type ScanSummary } from "./scan-summary";
 import { buildDriverNarrative, buildSideCaption, buildRuleTimeline, deriveRiskLevel, type DriverNarrative, type RuleSummary, type RiskLevel } from "./driver-narrative";
@@ -225,20 +225,17 @@ export const scanSign = createServerFn({ method: "POST" })
     const admin = await getAdmin();
 
     // PERF: kick off everything that doesn't depend on AI output in parallel:
-    //   - validation gate (AI roundtrip)
-    //   - main OCR/extraction (AI roundtrip)
+    //   - main OCR/extraction + interpretation (single AI roundtrip)
     //   - restriction types lookup (DB)
     //   - nearest segment lookup (DB, if GPS present)
     //   - image upload to storage
-    // Previously these ran serially (validate → extract → DB → upload),
-    // which stacked two AI roundtrips back-to-back. Running them concurrently
-    // roughly halves end-to-end scan latency.
+    // Previously these stacked multiple AI/DB/storage roundtrips. Running the
+    // independent work concurrently keeps wall-clock time close to the AI call.
     const scanId = crypto.randomUUID();
     const ext = data.mimeType.split("/")[1]?.toLowerCase().replace("jpeg", "jpg") ?? "jpg";
     const storagePath = `${new Date().toISOString().slice(0, 10)}/${scanId}.${ext}`;
     const bytes = Uint8Array.from(atob(data.imageBase64), (c) => c.charCodeAt(0));
 
-    const validationP = validateSignImage(data.imageBase64, data.mimeType, apiKey);
     const aiP = callSignScanAi(data.imageBase64, data.mimeType, apiKey);
     const restrictionTypesP = loadRestrictionTypes(admin);
     const nearestP = (data.lng != null && data.lat != null)
@@ -251,18 +248,12 @@ export const scanSign = createServerFn({ method: "POST" })
     const uploadP = admin.storage.from("sign-scans").upload(storagePath, bytes, {
       contentType: data.mimeType, upsert: false,
     });
-
-    // Short-circuit if validation rejects the image. The other in-flight
-    // promises become wasted work, but on every successful scan we save
-    // a full AI roundtrip of wall-clock latency.
-    const validation = await validationP;
-    if (!validation.is_valid) {
+    const [ai, restrictionTypes, nearestRes] = await Promise.all([aiP, restrictionTypesP, nearestP]);
+    if (ai.sign_count === 0 || ai.rules.length === 0) {
       throw new Error(
-        "This image does not appear to contain a parking, stopping, loading, tow-away, or street restriction sign.",
+        "This image does not appear to contain a readable parking, stopping, loading, tow-away, or street restriction sign.",
       );
     }
-
-    const [ai, restrictionTypes, nearestRes] = await Promise.all([aiP, restrictionTypesP, nearestP]);
     const aiRulesAll = aiRulesToNormalized(ai.rules) as NormalizedScanRule[];
     // Conflict-resolved flat list for SDOT comparison + persistence.
     const aiRules = resolveRuleConflicts(aiRulesAll);
