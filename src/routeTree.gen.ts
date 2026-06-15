@@ -14,6 +14,7 @@ import { Route as ScanRouteImport } from './routes/scan'
 import { Route as SavedRouteImport } from './routes/saved'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as HistoryRouteImport } from './routes/history'
+import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
@@ -55,6 +56,11 @@ const ProfileRoute = ProfileRouteImport.update({
 const HistoryRoute = HistoryRouteImport.update({
   id: '/history',
   path: '/history',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -149,6 +155,7 @@ const ApiPublicAdminRunScannerSelfTestRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
+  '/dashboard': typeof DashboardRoute
   '/history': typeof HistoryRoute
   '/profile': typeof ProfileRoute
   '/saved': typeof SavedRoute
@@ -172,6 +179,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/dashboard': typeof DashboardRoute
   '/history': typeof HistoryRoute
   '/profile': typeof ProfileRoute
   '/saved': typeof SavedRoute
@@ -197,6 +205,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
+  '/dashboard': typeof DashboardRoute
   '/history': typeof HistoryRoute
   '/profile': typeof ProfileRoute
   '/saved': typeof SavedRoute
@@ -223,6 +232,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/dashboard'
     | '/history'
     | '/profile'
     | '/saved'
@@ -246,6 +256,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/dashboard'
     | '/history'
     | '/profile'
     | '/saved'
@@ -270,6 +281,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
+    | '/dashboard'
     | '/history'
     | '/profile'
     | '/saved'
@@ -295,6 +307,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
+  DashboardRoute: typeof DashboardRoute
   HistoryRoute: typeof HistoryRoute
   ProfileRoute: typeof ProfileRoute
   SavedRoute: typeof SavedRoute
@@ -342,6 +355,13 @@ declare module '@tanstack/react-router' {
       path: '/history'
       fullPath: '/history'
       preLoaderRoute: typeof HistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -497,6 +517,7 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
+  DashboardRoute: DashboardRoute,
   HistoryRoute: HistoryRoute,
   ProfileRoute: ProfileRoute,
   SavedRoute: SavedRoute,
