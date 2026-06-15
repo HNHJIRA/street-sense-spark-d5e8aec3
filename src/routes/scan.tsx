@@ -75,6 +75,7 @@ function ScanPage() {
           return;
         }
       }
+      file = await prepareImageForScan(file);
       if (file.size > 8 * 1024 * 1024) {
         setError("Image must be under 8 MB after conversion. Try a smaller photo.");
         setLoading(false);
