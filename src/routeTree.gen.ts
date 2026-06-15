@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SessionRouteImport } from './routes/session'
 import { Route as ScanRouteImport } from './routes/scan'
 import { Route as SavedRouteImport } from './routes/saved'
@@ -34,6 +35,11 @@ import { Route as ApiPublicCronHealthCheckRouteImport } from './routes/api/publi
 import { Route as ApiPublicAdminSyncLaRouteImport } from './routes/api/public/admin.sync-la'
 import { Route as ApiPublicAdminRunScannerSelfTestRouteImport } from './routes/api/public/admin.run-scanner-self-test'
 
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SessionRoute = SessionRouteImport.update({
   id: '/session',
   path: '/session',
@@ -168,6 +174,7 @@ export interface FileRoutesByFullPath {
   '/saved': typeof SavedRoute
   '/scan': typeof ScanRoute
   '/session': typeof SessionRoute
+  '/settings': typeof SettingsRoute
   '/admin/accuracy': typeof AdminAccuracyRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/beta-readiness': typeof AdminBetaReadinessRoute
@@ -193,6 +200,7 @@ export interface FileRoutesByTo {
   '/saved': typeof SavedRoute
   '/scan': typeof ScanRoute
   '/session': typeof SessionRoute
+  '/settings': typeof SettingsRoute
   '/admin/accuracy': typeof AdminAccuracyRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/beta-readiness': typeof AdminBetaReadinessRoute
@@ -220,6 +228,7 @@ export interface FileRoutesById {
   '/saved': typeof SavedRoute
   '/scan': typeof ScanRoute
   '/session': typeof SessionRoute
+  '/settings': typeof SettingsRoute
   '/admin/accuracy': typeof AdminAccuracyRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/beta-readiness': typeof AdminBetaReadinessRoute
@@ -248,6 +257,7 @@ export interface FileRouteTypes {
     | '/saved'
     | '/scan'
     | '/session'
+    | '/settings'
     | '/admin/accuracy'
     | '/admin/analytics'
     | '/admin/beta-readiness'
@@ -273,6 +283,7 @@ export interface FileRouteTypes {
     | '/saved'
     | '/scan'
     | '/session'
+    | '/settings'
     | '/admin/accuracy'
     | '/admin/analytics'
     | '/admin/beta-readiness'
@@ -299,6 +310,7 @@ export interface FileRouteTypes {
     | '/saved'
     | '/scan'
     | '/session'
+    | '/settings'
     | '/admin/accuracy'
     | '/admin/analytics'
     | '/admin/beta-readiness'
@@ -326,6 +338,7 @@ export interface RootRouteChildren {
   SavedRoute: typeof SavedRoute
   ScanRoute: typeof ScanRoute
   SessionRoute: typeof SessionRoute
+  SettingsRoute: typeof SettingsRoute
   DebugParkingRoute: typeof DebugParkingRoute
   ApiPublicAdminRunScannerSelfTestRoute: typeof ApiPublicAdminRunScannerSelfTestRoute
   ApiPublicAdminSyncLaRoute: typeof ApiPublicAdminSyncLaRoute
@@ -335,6 +348,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/session': {
       id: '/session'
       path: '/session'
@@ -544,6 +564,7 @@ const rootRouteChildren: RootRouteChildren = {
   SavedRoute: SavedRoute,
   ScanRoute: ScanRoute,
   SessionRoute: SessionRoute,
+  SettingsRoute: SettingsRoute,
   DebugParkingRoute: DebugParkingRoute,
   ApiPublicAdminRunScannerSelfTestRoute: ApiPublicAdminRunScannerSelfTestRoute,
   ApiPublicAdminSyncLaRoute: ApiPublicAdminSyncLaRoute,
