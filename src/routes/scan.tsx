@@ -946,7 +946,7 @@ function ScanResult({
 
 async function prepareImageForScan(file: File): Promise<File> {
   if (typeof window === "undefined" || !("createImageBitmap" in window)) return file;
-  // PERF: always downscale. Sign text stays legible at ~1024px max edge,
+  // PERF: always downscale. Sign text stays legible at ~900px max edge,
   // and the smaller payload cuts both upload time and Gemini vision-token
   // processing time — the two biggest contributors to scan latency.
   if (file.size <= 250_000) return file;
@@ -954,7 +954,7 @@ async function prepareImageForScan(file: File): Promise<File> {
   try {
     const bitmap = await createImageBitmap(file);
     const maxEdge = Math.max(bitmap.width, bitmap.height);
-    const TARGET_EDGE = 1024;
+    const TARGET_EDGE = 896;
     const scale = maxEdge > TARGET_EDGE ? TARGET_EDGE / maxEdge : 1;
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.round(bitmap.width * scale));
@@ -968,7 +968,7 @@ async function prepareImageForScan(file: File): Promise<File> {
     bitmap.close?.();
 
     const blob = await new Promise<Blob | null>((resolve) => {
-      canvas.toBlob(resolve, "image/jpeg", 0.7);
+      canvas.toBlob(resolve, "image/jpeg", 0.64);
     });
     if (!blob || blob.size >= file.size) return file;
     const name = file.name.replace(/\.[^.]+$/, "") || "parking-sign";
