@@ -257,8 +257,13 @@ export const scanSign = createServerFn({ method: "POST" })
           p_max_meters: 80,
         })
       : Promise.resolve({ data: null } as { data: unknown });
-    const uploadP = admin.storage.from("sign-scans").upload(storagePath, bytes, {
+    const uploadAndUrlP = admin.storage.from("sign-scans").upload(storagePath, bytes, {
       contentType: data.mimeType, upsert: false,
+    }).then((upload: { error?: unknown }) => {
+      if (upload.error) return null;
+      return admin.storage.from("sign-scans")
+        .createSignedUrl(storagePath, 60 * 60 * 24 * 7)
+        .then((s: { data: { signedUrl?: string } | null }) => s.data?.signedUrl ?? null);
     });
     const [ai, restrictionTypes, nearestRes] = await Promise.all([aiP, restrictionTypesP, nearestP]);
     if (ai.sign_count === 0 || ai.rules.length === 0) {
