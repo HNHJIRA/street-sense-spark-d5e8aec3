@@ -223,28 +223,51 @@ export const scanSign = createServerFn({ method: "POST" })
     if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured");
 
     const admin = await getAdmin();
-    const restrictionTypes = await loadRestrictionTypes(admin);
 
-    // 0) PHASE 1 — strict validation gate. Stop early if the photo isn't a
-    //    parking-regulation sign so we don't burn OCR tokens on garbage.
-    const validation = await validateSignImage(data.imageBase64, data.mimeType, apiKey);
+    // PERF: kick off everything that doesn't depend on AI output in parallel:
+    //   - validation gate (AI roundtrip)
+    //   - main OCR/extraction (AI roundtrip)
+    //   - restriction types lookup (DB)
+    //   - nearest segment lookup (DB, if GPS present)
+    //   - image upload to storage
+    // Previously these ran serially (validate → extract → DB → upload),
+    // which stacked two AI roundtrips back-to-back. Running them concurrently
+    // roughly halves end-to-end scan latency.
+    const scanId = crypto.randomUUID();
+    const ext = data.mimeType.split("/")[1]?.toLowerCase().replace("jpeg", "jpg") ?? "jpg";
+    const storagePath = `${new Date().toISOString().slice(0, 10)}/${scanId}.${ext}`;
+    const bytes = Uint8Array.from(atob(data.imageBase64), (c) => c.charCodeAt(0));
+
+    const validationP = validateSignImage(data.imageBase64, data.mimeType, apiKey);
+    const aiP = callSignScanAi(data.imageBase64, data.mimeType, apiKey);
+    const restrictionTypesP = loadRestrictionTypes(admin);
+    const nearestP = (data.lng != null && data.lat != null)
+      ? admin.rpc("nearest_segment_full", {
+          p_city_id: data.cityId,
+          p_lng: data.lng, p_lat: data.lat,
+          p_max_meters: 80,
+        })
+      : Promise.resolve({ data: null } as { data: unknown });
+    const uploadP = admin.storage.from("sign-scans").upload(storagePath, bytes, {
+      contentType: data.mimeType, upsert: false,
+    });
+
+    // Short-circuit if validation rejects the image. The other in-flight
+    // promises become wasted work, but on every successful scan we save
+    // a full AI roundtrip of wall-clock latency.
+    const validation = await validationP;
     if (!validation.is_valid) {
       throw new Error(
         "This image does not appear to contain a parking, stopping, loading, tow-away, or street restriction sign.",
       );
     }
 
-    // 1) Run the AI vision pipeline. aiRulesToNormalized preserves the
-    //    per-sign `arrow` direction so we can evaluate left/right separately.
-    const ai: AiScanResult = await callSignScanAi(data.imageBase64, data.mimeType, apiKey);
+    const [ai, restrictionTypes, nearestRes] = await Promise.all([aiP, restrictionTypesP, nearestP]);
     const aiRulesAll = aiRulesToNormalized(ai.rules) as NormalizedScanRule[];
-
-    // For SDOT comparison + persistence we still need a resolved, flat list.
-    // The conflict resolver strips arrow context, which is fine: side-aware
-    // evaluation runs on the un-resolved per-arrow buckets below.
+    // Conflict-resolved flat list for SDOT comparison + persistence.
     const aiRules = resolveRuleConflicts(aiRulesAll);
 
-    // 2) Find nearest SDOT segment so we can compare + still get accurate name.
+    // Nearest SDOT segment results
     let segmentInfo: SignScanResponse["segment"] = null;
     let sdotRules: ParkingRule[] = [];
     let segmentCoords: [number, number][] = [];
@@ -252,27 +275,20 @@ export const scanSign = createServerFn({ method: "POST" })
     let segmentDbId: string | null = null;
     let segmentName = "Posted sign location";
 
-    if (data.lng != null && data.lat != null) {
-      const { data: rows } = await admin.rpc("nearest_segment_full", {
-        p_city_id: data.cityId,
-        p_lng: data.lng, p_lat: data.lat,
-        p_max_meters: 80,
-      });
-      const row = (rows as Array<{
-        id: string; name: string; geojson: string;
-        data_source: string; rules: ParkingRule[] | null; distance_m: number;
-      }> | null)?.[0];
-      if (row) {
-        segmentDbId = row.id;
-        segmentName = row.name;
-        segmentSource = row.data_source;
-        sdotRules = (row.rules ?? []) as ParkingRule[];
-        try {
-          const g = JSON.parse(row.geojson) as LineString;
-          if (Array.isArray(g.coordinates)) segmentCoords = g.coordinates as [number, number][];
-        } catch { /* ignore */ }
-        segmentInfo = { id: row.id, name: row.name, distance_m: row.distance_m };
-      }
+    const row = (nearestRes.data as Array<{
+      id: string; name: string; geojson: string;
+      data_source: string; rules: ParkingRule[] | null; distance_m: number;
+    }> | null)?.[0];
+    if (row) {
+      segmentDbId = row.id;
+      segmentName = row.name;
+      segmentSource = row.data_source;
+      sdotRules = (row.rules ?? []) as ParkingRule[];
+      try {
+        const g = JSON.parse(row.geojson) as LineString;
+        if (Array.isArray(g.coordinates)) segmentCoords = g.coordinates as [number, number][];
+      } catch { /* ignore */ }
+      segmentInfo = { id: row.id, name: row.name, distance_m: row.distance_m };
     }
 
     // 3) Split posted rules by arrow direction so each side of the post can
