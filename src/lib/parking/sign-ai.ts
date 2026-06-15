@@ -901,8 +901,23 @@ export async function callSignScanAi(
   try {
     combined = await runCombinedScan(imageBase64, mime, apiKey);
   } catch {
-    const extraction = await runExtraction(imageBase64, mime, apiKey);
-    combined = { extraction, interpretation: { rules: [], confidence: 0 } };
+    return {
+      raw_text: "Fast scan timed out before the sign could be read confidently.",
+      sign_count: 1,
+      overall_confidence: 0.4,
+      rules: [{
+        type: "unknown",
+        days: [],
+        start: null,
+        end: null,
+        permit_zone: null,
+        time_limit_minutes: null,
+        notes: "Scan timed out — verify the posted sign manually.",
+        arrow: null,
+        confidence: 0.4,
+      }],
+      model: `${AI_MODEL}:timeout-fallback`,
+    };
   }
   const { extraction, interpretation } = combined;
 
