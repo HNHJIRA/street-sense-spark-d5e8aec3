@@ -228,13 +228,12 @@ export const scanSign = createServerFn({ method: "POST" })
     //   - main OCR/extraction + interpretation (single AI roundtrip)
     //   - restriction types lookup (DB)
     //   - nearest segment lookup (DB, if GPS present)
-    //   - image upload to storage
+    //   - no storage / history writes on the critical path
     // Previously these stacked multiple AI/DB/storage roundtrips. Running the
     // independent work concurrently keeps wall-clock time close to the AI call.
     const scanId = crypto.randomUUID();
     const ext = data.mimeType.split("/")[1]?.toLowerCase().replace("jpeg", "jpg") ?? "jpg";
     const storagePath = `${new Date().toISOString().slice(0, 10)}/${scanId}.${ext}`;
-    const bytes = Uint8Array.from(atob(data.imageBase64), (c) => c.charCodeAt(0));
 
     const aiP = callSignScanAi(data.imageBase64, data.mimeType, apiKey);
     const restrictionTypesP = loadRestrictionTypes(admin);
@@ -245,9 +244,6 @@ export const scanSign = createServerFn({ method: "POST" })
           p_max_meters: 80,
         })
       : Promise.resolve({ data: null } as { data: unknown });
-    const uploadP = admin.storage.from("sign-scans").upload(storagePath, bytes, {
-      contentType: data.mimeType, upsert: false,
-    });
     const [ai, restrictionTypes, nearestRes] = await Promise.all([aiP, restrictionTypesP, nearestP]);
     if (ai.sign_count === 0 || ai.rules.length === 0) {
       throw new Error(
