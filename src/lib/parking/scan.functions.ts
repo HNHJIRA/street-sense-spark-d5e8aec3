@@ -476,7 +476,12 @@ export const scanSign = createServerFn({ method: "POST" })
         })),
       ));
     }
-    await Promise.all(writes);
+    // PERF: fire-and-forget persistence. The response payload is fully
+    // computed in memory; awaiting these inserts only delays the user.
+    // Errors are logged but never block the scan result.
+    Promise.all(writes).catch((err) => {
+      console.error("[scan] background persistence failed:", err);
+    });
 
 
 
