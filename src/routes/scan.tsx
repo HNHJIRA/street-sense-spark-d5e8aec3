@@ -53,8 +53,8 @@ function ScanPage() {
 
   const onFile = async (inputFile: File) => {
     setError(null); setResult(null);
-    if (inputFile.size > 12 * 1024 * 1024) {
-      setError("Image must be under 12 MB. Try a different photo.");
+    if (inputFile.size > 25 * 1024 * 1024) {
+      setError("Image must be under 25 MB. Try a different photo.");
       return;
     }
 
