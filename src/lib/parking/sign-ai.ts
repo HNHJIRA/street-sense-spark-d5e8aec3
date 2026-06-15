@@ -466,6 +466,23 @@ const COMBINED_SCAN_SCHEMA = {
   },
 } as const;
 
+const FAST_COMBINED_SCAN_PROMPT = `
+You are a precise parking-sign OCR and rule interpreter. Return JSON only.
+
+OCR rules:
+- Scan the full image top-to-bottom and return EVERY distinct physical sign plate, including arrow-only or partial plates.
+- Never merge two text plates. Preserve visible text exactly, line order, background/text colors, symbols, and confidence.
+- For arrows, use only the triangular tip/head: tip right=RIGHT, tip left=LEFT, tips both ends=BOTH. If no arrow is visible use NONE; if genuinely unclear use UNCLEAR. Never infer arrows from layout.
+
+Interpretation rules:
+- Output at least one logical rule for every text plate; never drop a plate.
+- Only merge arrow-only plates into matching-color text plates above them; if multiple same-color text plates share that arrow plate, each stays a separate rule with that arrow.
+- Physical arrows are the only direction source. If only RIGHT is visible, no rule may be LEFT/BOTH; same for LEFT. BOTH only when a double-headed arrow is physically visible.
+- Keep different durations, restriction types, days, and time windows as separate rules.
+- Treat these as parking/stopping restrictions when visible: passenger/commercial/loading/bus/taxi zones, no parking/stopping/standing, tow away, fire lane, time-limited parking, metered/paid parking, permit parking, street cleaning.
+- Parse days, start/end times, time_limit_minutes, parking_allowed, and notes from the exact plate text. If uncertain, make the best conservative rule with lower confidence.
+`.trim();
+
 async function runCombinedScan(
   imageBase64: string,
   mime: string,
@@ -483,7 +500,7 @@ async function runCombinedScan(
       messages: [
         {
           role: "system",
-          content: `${EXTRACTION_PROMPT}\n\n${INTERPRETATION_SYSTEM}`,
+          content: FAST_COMBINED_SCAN_PROMPT,
         },
         {
           role: "user",
@@ -501,6 +518,8 @@ async function runCombinedScan(
         type: "json_schema",
         json_schema: { name: "combined_sign_scan", strict: true, schema: COMBINED_SCAN_SCHEMA },
       },
+      temperature: 0,
+      max_tokens: 3000,
     }),
   });
 
