@@ -529,7 +529,7 @@ async function runCombinedScan(
         json_schema: { name: "combined_sign_scan", strict: true, schema: COMBINED_SCAN_SCHEMA },
       },
       temperature: 0,
-      max_tokens: 3000,
+      max_tokens: 4500,
     }),
   });
 
