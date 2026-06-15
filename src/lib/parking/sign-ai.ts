@@ -881,16 +881,17 @@ export async function callSignScanAi(
   mime: string,
   apiKey: string,
 ): Promise<AiScanResult> {
-  // Stage A — verbatim plate extraction with strict arrow detection.
-  const extraction = await runExtraction(imageBase64, mime, apiKey);
-
-  // Stage B — color/theme-aware interpretation into logical rules.
-  let interpretation: InterpretationResult;
+  // PERF: one multimodal AI call now returns both OCR plates and interpreted
+  // rules. The older extraction → interpretation waterfall cost a second AI
+  // roundtrip, which was the main reason scans still hovered around 10s.
+  let combined: CombinedScanResult;
   try {
-    interpretation = await runInterpretation(extraction, apiKey);
+    combined = await runCombinedScan(imageBase64, mime, apiKey);
   } catch {
-    interpretation = { rules: [], confidence: 0 };
+    const extraction = await runExtraction(imageBase64, mime, apiKey);
+    combined = { extraction, interpretation: { rules: [], confidence: 0 } };
   }
+  const { extraction, interpretation } = combined;
 
   // Build raw_text from the verbatim plates (preserves what the OCR actually saw).
   const raw_text = extraction.plates
