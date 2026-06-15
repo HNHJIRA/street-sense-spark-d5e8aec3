@@ -5,6 +5,7 @@
 // / Sessions / Alerts. The scanner only contributes additional NormalizedRule
 // rows for the synthesized "scan segment".
 import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import type { LineString } from "geojson";
 import { evaluateRulesAt } from "./engine";
@@ -25,6 +26,17 @@ interface AdminClient {
   rpc: (n: string, a?: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
   storage: { from: (b: string) => any };
 }
+
+type WaitableRequest = Request & { waitUntil?: (promise: Promise<unknown>) => void };
+
+function waitUntilBackground(task: Promise<unknown>): void {
+  try {
+    (getRequest() as WaitableRequest).waitUntil?.(task);
+  } catch {
+    // Dev/runtime fallback: still start the work, but don't block the result.
+  }
+}
+
 async function getAdmin(): Promise<AdminClient> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   return supabaseAdmin as unknown as AdminClient;
@@ -245,8 +257,13 @@ export const scanSign = createServerFn({ method: "POST" })
           p_max_meters: 80,
         })
       : Promise.resolve({ data: null } as { data: unknown });
-    const uploadP = admin.storage.from("sign-scans").upload(storagePath, bytes, {
+    const uploadAndUrlP: Promise<string | null> = admin.storage.from("sign-scans").upload(storagePath, bytes, {
       contentType: data.mimeType, upsert: false,
+    }).then((upload: { error?: unknown }) => {
+      if (upload.error) return null;
+      return admin.storage.from("sign-scans")
+        .createSignedUrl(storagePath, 60 * 60 * 24 * 7)
+        .then((s: { data: { signedUrl?: string } | null }) => s.data?.signedUrl ?? null);
     });
     const [ai, restrictionTypes, nearestRes] = await Promise.all([aiP, restrictionTypesP, nearestP]);
     if (ai.sign_count === 0 || ai.rules.length === 0) {
@@ -389,16 +406,9 @@ export const scanSign = createServerFn({ method: "POST" })
     }
     void combinedRules;
 
-    // 4) Persist image + scan + child rows. The upload was started in
-    // parallel up top; await it now, then fan out all inserts concurrently.
-    const upload = await uploadP;
-    const uploadOk = !upload.error;
-    const signedUrlP = uploadOk
-      ? admin.storage.from("sign-scans")
-          .createSignedUrl(storagePath, 60 * 60 * 24 * 7)
-          .then((s: { data: { signedUrl?: string } | null }) => s.data?.signedUrl ?? null)
-      : Promise.resolve(null as string | null);
-
+    // 4) Persist image + scan + child rows. Storage upload/signing continues
+    // in the background; the current result page already uses its local image
+    // preview, so waiting here only adds latency.
     const matchStatus: "matched" | "out_of_range" | "no_gps" | "no_segment_data" =
       data.lng == null || data.lat == null
         ? "no_gps"
@@ -418,70 +428,69 @@ export const scanSign = createServerFn({ method: "POST" })
       signCount: ai.sign_count,
     });
 
-    // PERF: run all writes in parallel — they target different tables and
-    // don't depend on each other. Previously this was ~6 awaits in series.
-    const writes: Promise<unknown>[] = [
-      admin.from("parking_sign_scans").insert({
-        id: scanId,
-        city_id: data.cityId,
-        segment_id: segmentDbId,
-        lng: data.lng, lat: data.lat,
-        decision,
-        overall_confidence: ai.overall_confidence,
-        verdict: verdictFromColor(decision.color),
-        nearest_distance_m: segmentInfo?.distance_m ?? null,
-        match_status: matchStatus,
-        summary,
-      }),
-      admin.from("ocr_results").insert({
-        scan_id: scanId,
-        model: ai.model,
-        raw_text: ai.raw_text,
-        sign_count: ai.sign_count,
-      }),
-    ];
-    const signedUrl = await signedUrlP;
-    if (uploadOk) {
-      writes.push(admin.from("parking_sign_images").insert({
-        scan_id: scanId,
-        storage_path: storagePath,
-        public_url: signedUrl,
-      }));
-    }
-    if (aiRules.length > 0) {
-      writes.push(admin.from("parsed_sign_rules").insert(
-        aiRules.map((r, i) => ({
+    // PERF: run all writes in parallel in the request's background lifetime.
+    // They target different tables and don't affect the returned verdict.
+    const persistence = uploadAndUrlP.then((signedUrl: string | null) => {
+      const writes: Promise<unknown>[] = [
+        admin.from("parking_sign_scans").insert({
+          id: scanId,
+          city_id: data.cityId,
+          segment_id: segmentDbId,
+          lng: data.lng, lat: data.lat,
+          decision,
+          overall_confidence: ai.overall_confidence,
+          verdict: verdictFromColor(decision.color),
+          nearest_distance_m: segmentInfo?.distance_m ?? null,
+          match_status: matchStatus,
+          summary,
+        }),
+        admin.from("ocr_results").insert({
           scan_id: scanId,
-          sequence: i,
-          restriction_code: r.restriction_code,
-          days_of_week: r.days_of_week,
-          time_start: r.time_start,
-          time_end: r.time_end,
-          permit_zone: r.permit_zone,
-          time_limit_minutes: r.time_limit_minutes,
-          priority: r.priority,
-          confidence: ai.rules[i]?.confidence ?? ai.overall_confidence,
-          notes: r.notes,
-        })),
-      ));
-    }
-    if (validations.length > 0) {
-      writes.push(admin.from("scan_validation_results").insert(
-        validations.map((v) => ({
+          model: ai.model,
+          raw_text: ai.raw_text,
+          sign_count: ai.sign_count,
+        }),
+      ];
+      if (signedUrl) {
+        writes.push(admin.from("parking_sign_images").insert({
           scan_id: scanId,
-          outcome: v.outcome,
-          matched_rule_id: v.matched_rule_id,
-          confidence: v.confidence,
-          detail: v.detail,
-        })),
-      ));
-    }
-    // PERF: fire-and-forget persistence. The response payload is fully
-    // computed in memory; awaiting these inserts only delays the user.
-    // Errors are logged but never block the scan result.
-    Promise.all(writes).catch((err) => {
+          storage_path: storagePath,
+          public_url: signedUrl,
+        }));
+      }
+      if (aiRules.length > 0) {
+        writes.push(admin.from("parsed_sign_rules").insert(
+          aiRules.map((r, i) => ({
+            scan_id: scanId,
+            sequence: i,
+            restriction_code: r.restriction_code,
+            days_of_week: r.days_of_week,
+            time_start: r.time_start,
+            time_end: r.time_end,
+            permit_zone: r.permit_zone,
+            time_limit_minutes: r.time_limit_minutes,
+            priority: r.priority,
+            confidence: ai.rules[i]?.confidence ?? ai.overall_confidence,
+            notes: r.notes,
+          })),
+        ));
+      }
+      if (validations.length > 0) {
+        writes.push(admin.from("scan_validation_results").insert(
+          validations.map((v) => ({
+            scan_id: scanId,
+            outcome: v.outcome,
+            matched_rule_id: v.matched_rule_id,
+            confidence: v.confidence,
+            detail: v.detail,
+          })),
+        ));
+      }
+      return Promise.all(writes);
+    }).catch((err: unknown) => {
       console.error("[scan] background persistence failed:", err);
     });
+    waitUntilBackground(persistence);
 
 
 
@@ -554,7 +563,7 @@ export const scanSign = createServerFn({ method: "POST" })
 
     return {
       scan_id: scanId,
-      image_url: signedUrl,
+      image_url: null,
       raw_text: ai.raw_text,
       model: ai.model,
       overall_confidence: ai.overall_confidence,
