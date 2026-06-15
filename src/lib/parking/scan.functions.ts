@@ -398,21 +398,15 @@ export const scanSign = createServerFn({ method: "POST" })
     }
     void combinedRules;
 
-    // 4) Persist image + scan + child rows.
-    const scanId = crypto.randomUUID();
-    const ext = data.mimeType.split("/")[1]?.toLowerCase().replace("jpeg", "jpg") ?? "jpg";
-    const storagePath = `${new Date().toISOString().slice(0, 10)}/${scanId}.${ext}`;
-    const bytes = Uint8Array.from(atob(data.imageBase64), (c) => c.charCodeAt(0));
-    const upload = await admin.storage.from("sign-scans").upload(storagePath, bytes, {
-      contentType: data.mimeType, upsert: false,
-    });
+    // 4) Persist image + scan + child rows. The upload was started in
+    // parallel up top; await it now, then fan out all inserts concurrently.
+    const upload = await uploadP;
     const uploadOk = !upload.error;
-    let signedUrl: string | null = null;
-    if (uploadOk) {
-      const signed = await admin.storage.from("sign-scans")
-        .createSignedUrl(storagePath, 60 * 60 * 24 * 7);
-      signedUrl = signed.data?.signedUrl ?? null;
-    }
+    const signedUrlP = uploadOk
+      ? admin.storage.from("sign-scans")
+          .createSignedUrl(storagePath, 60 * 60 * 24 * 7)
+          .then((s: { data: { signedUrl?: string } | null }) => s.data?.signedUrl ?? null)
+      : Promise.resolve(null as string | null);
 
     const matchStatus: "matched" | "out_of_range" | "no_gps" | "no_segment_data" =
       data.lng == null || data.lat == null
@@ -423,36 +417,48 @@ export const scanSign = createServerFn({ method: "POST" })
             ? "no_segment_data"
             : "matched";
 
-    await admin.from("parking_sign_scans").insert({
-      id: scanId,
-      city_id: data.cityId,
-      segment_id: segmentDbId,
-      lng: data.lng, lat: data.lat,
+    const validations = validateAgainstSdot(aiRules, sdotRules, ai.overall_confidence, matchStatus);
+    const summary = buildScanSummary({
       decision,
-      overall_confidence: ai.overall_confidence,
-      verdict: verdictFromColor(decision.color),
-      nearest_distance_m: segmentInfo?.distance_m ?? null,
-      match_status: matchStatus,
+      parsedRules: aiRules,
+      sdotRules,
+      timezone: data.timezone,
+      aiConfidence: ai.overall_confidence,
+      signCount: ai.sign_count,
     });
 
-
+    // PERF: run all writes in parallel — they target different tables and
+    // don't depend on each other. Previously this was ~6 awaits in series.
+    const writes: Promise<unknown>[] = [
+      admin.from("parking_sign_scans").insert({
+        id: scanId,
+        city_id: data.cityId,
+        segment_id: segmentDbId,
+        lng: data.lng, lat: data.lat,
+        decision,
+        overall_confidence: ai.overall_confidence,
+        verdict: verdictFromColor(decision.color),
+        nearest_distance_m: segmentInfo?.distance_m ?? null,
+        match_status: matchStatus,
+        summary,
+      }),
+      admin.from("ocr_results").insert({
+        scan_id: scanId,
+        model: ai.model,
+        raw_text: ai.raw_text,
+        sign_count: ai.sign_count,
+      }),
+    ];
+    const signedUrl = await signedUrlP;
     if (uploadOk) {
-      await admin.from("parking_sign_images").insert({
+      writes.push(admin.from("parking_sign_images").insert({
         scan_id: scanId,
         storage_path: storagePath,
         public_url: signedUrl,
-      });
+      }));
     }
-
-    await admin.from("ocr_results").insert({
-      scan_id: scanId,
-      model: ai.model,
-      raw_text: ai.raw_text,
-      sign_count: ai.sign_count,
-    });
-
     if (aiRules.length > 0) {
-      await admin.from("parsed_sign_rules").insert(
+      writes.push(admin.from("parsed_sign_rules").insert(
         aiRules.map((r, i) => ({
           scan_id: scanId,
           sequence: i,
@@ -466,12 +472,10 @@ export const scanSign = createServerFn({ method: "POST" })
           confidence: ai.rules[i]?.confidence ?? ai.overall_confidence,
           notes: r.notes,
         })),
-      );
+      ));
     }
-
-    const validations = validateAgainstSdot(aiRules, sdotRules, ai.overall_confidence, matchStatus);
     if (validations.length > 0) {
-      await admin.from("scan_validation_results").insert(
+      writes.push(admin.from("scan_validation_results").insert(
         validations.map((v) => ({
           scan_id: scanId,
           outcome: v.outcome,
@@ -479,20 +483,11 @@ export const scanSign = createServerFn({ method: "POST" })
           confidence: v.confidence,
           detail: v.detail,
         })),
-      );
+      ));
     }
+    await Promise.all(writes);
 
-    const summary = buildScanSummary({
-      decision,
-      parsedRules: aiRules,
-      sdotRules,
-      timezone: data.timezone,
-      aiConfidence: ai.overall_confidence,
-      signCount: ai.sign_count,
-    });
 
-    // Persist the summary on the scan row for the accuracy dashboard.
-    await admin.from("parking_sign_scans").update({ summary }).eq("id", scanId);
 
     // ===== Driver Summary Generator (Phase 5/6/7/8) =====
     const narrative = buildDriverNarrative({
