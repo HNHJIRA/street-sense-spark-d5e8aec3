@@ -124,8 +124,13 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       {/* Global GPS service — must mount before any route reads location. */}
       <LocationService />
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
+      {/* Phone-frame wrapper: centers the app in a mobile-sized column on larger screens. */}
+      <div className="min-h-[100dvh] w-full bg-slate-100 flex justify-center">
+        <div className="relative w-full max-w-[430px] min-h-[100dvh] bg-white overflow-hidden shadow-xl">
+          {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+          <Outlet />
+        </div>
+      </div>
     </QueryClientProvider>
   );
 }
