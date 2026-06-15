@@ -480,7 +480,17 @@ Interpretation rules:
 - Physical arrows are the only direction source. If only RIGHT is visible, no rule may be LEFT/BOTH; same for LEFT. BOTH only when a double-headed arrow is physically visible.
 - Keep different durations, restriction types, days, and time windows as separate rules.
 - Treat these as parking/stopping restrictions when visible: passenger/commercial/loading/bus/taxi zones, no parking/stopping/standing, tow away, fire lane, time-limited parking, metered/paid parking, permit parking, street cleaning.
-- Parse days, start/end times, time_limit_minutes, parking_allowed, and notes from the exact plate text. If uncertain, make the best conservative rule with lower confidence.
+
+TIME WINDOW & LIMIT PARSING (MANDATORY — DO NOT SKIP, the UI depends on these):
+- For EVERY rule, fill start_time and end_time in 24-hour "HH:MM" whenever the plate shows a time range.
+  Examples: "8 AM TO 6 PM" -> "08:00"/"18:00"; "7-9 AM" -> "07:00"/"09:00"; "4 PM - 6 PM" -> "16:00"/"18:00"; "MIDNIGHT TO 6 AM" -> "00:00"/"06:00".
+- For EVERY rule, fill days as full weekday names ("Monday".."Sunday"). Expand ranges: "MON-FRI" -> Mon,Tue,Wed,Thu,Fri. "SCHOOL DAYS" -> Mon-Fri. If no days are posted, use all 7 days.
+- For EVERY duration-limited rule, fill time_limit_minutes as an integer in minutes.
+  Examples: "15 MINUTE PARKING" -> 15; "2 HOUR PARKING" -> 120; "30 MIN" -> 30; "1 HR" -> 60.
+  Loading/passenger/commercial/taxi/bus zones with a posted limit ("20 MIN LOADING") MUST carry that limit too.
+- parking_allowed=true ONLY for time-limited / metered / permit / passenger-loading / commercial-loading style rules where the activity is allowed during the window. For no_parking/no_stopping/tow_away/fire_lane/street_cleaning, parking_allowed=false.
+- notes: include the verbatim plate text so the UI can show "until when can I park" and the posted limit. Never leave notes empty when text exists.
+- Use null only when a value is genuinely not posted; never use null to save time. Extract every value you can see.
 `.trim();
 
 async function runCombinedScan(
