@@ -10,13 +10,16 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SubscriptionRouteImport } from './routes/subscription'
+import { Route as SplashRouteImport } from './routes/splash'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SessionRouteImport } from './routes/session'
 import { Route as ScanRouteImport } from './routes/scan'
 import { Route as SavedRouteImport } from './routes/saved'
 import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as OnboardRouteImport } from './routes/onboard'
 import { Route as HistoryRouteImport } from './routes/history'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
@@ -39,6 +42,11 @@ import { Route as ApiPublicAdminRunScannerSelfTestRouteImport } from './routes/a
 const SubscriptionRoute = SubscriptionRouteImport.update({
   id: '/subscription',
   path: '/subscription',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SplashRoute = SplashRouteImport.update({
+  id: '/splash',
+  path: '/splash',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -66,6 +74,11 @@ const ProfileRoute = ProfileRouteImport.update({
   path: '/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OnboardRoute = OnboardRouteImport.update({
+  id: '/onboard',
+  path: '/onboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const HistoryRoute = HistoryRouteImport.update({
   id: '/history',
   path: '/history',
@@ -74,6 +87,11 @@ const HistoryRoute = HistoryRouteImport.update({
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AlertsRoute = AlertsRouteImport.update({
@@ -174,13 +192,16 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/alerts': typeof AlertsRoute
+  '/auth': typeof AuthRoute
   '/dashboard': typeof DashboardRoute
   '/history': typeof HistoryRoute
+  '/onboard': typeof OnboardRoute
   '/profile': typeof ProfileRoute
   '/saved': typeof SavedRoute
   '/scan': typeof ScanRoute
   '/session': typeof SessionRoute
   '/settings': typeof SettingsRoute
+  '/splash': typeof SplashRoute
   '/subscription': typeof SubscriptionRoute
   '/admin/accuracy': typeof AdminAccuracyRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
@@ -201,13 +222,16 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRoute
+  '/auth': typeof AuthRoute
   '/dashboard': typeof DashboardRoute
   '/history': typeof HistoryRoute
+  '/onboard': typeof OnboardRoute
   '/profile': typeof ProfileRoute
   '/saved': typeof SavedRoute
   '/scan': typeof ScanRoute
   '/session': typeof SessionRoute
   '/settings': typeof SettingsRoute
+  '/splash': typeof SplashRoute
   '/subscription': typeof SubscriptionRoute
   '/admin/accuracy': typeof AdminAccuracyRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
@@ -230,13 +254,16 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/alerts': typeof AlertsRoute
+  '/auth': typeof AuthRoute
   '/dashboard': typeof DashboardRoute
   '/history': typeof HistoryRoute
+  '/onboard': typeof OnboardRoute
   '/profile': typeof ProfileRoute
   '/saved': typeof SavedRoute
   '/scan': typeof ScanRoute
   '/session': typeof SessionRoute
   '/settings': typeof SettingsRoute
+  '/splash': typeof SplashRoute
   '/subscription': typeof SubscriptionRoute
   '/admin/accuracy': typeof AdminAccuracyRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
@@ -260,13 +287,16 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/alerts'
+    | '/auth'
     | '/dashboard'
     | '/history'
+    | '/onboard'
     | '/profile'
     | '/saved'
     | '/scan'
     | '/session'
     | '/settings'
+    | '/splash'
     | '/subscription'
     | '/admin/accuracy'
     | '/admin/analytics'
@@ -287,13 +317,16 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/alerts'
+    | '/auth'
     | '/dashboard'
     | '/history'
+    | '/onboard'
     | '/profile'
     | '/saved'
     | '/scan'
     | '/session'
     | '/settings'
+    | '/splash'
     | '/subscription'
     | '/admin/accuracy'
     | '/admin/analytics'
@@ -315,13 +348,16 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/alerts'
+    | '/auth'
     | '/dashboard'
     | '/history'
+    | '/onboard'
     | '/profile'
     | '/saved'
     | '/scan'
     | '/session'
     | '/settings'
+    | '/splash'
     | '/subscription'
     | '/admin/accuracy'
     | '/admin/analytics'
@@ -344,13 +380,16 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
   AlertsRoute: typeof AlertsRoute
+  AuthRoute: typeof AuthRoute
   DashboardRoute: typeof DashboardRoute
   HistoryRoute: typeof HistoryRoute
+  OnboardRoute: typeof OnboardRoute
   ProfileRoute: typeof ProfileRoute
   SavedRoute: typeof SavedRoute
   ScanRoute: typeof ScanRoute
   SessionRoute: typeof SessionRoute
   SettingsRoute: typeof SettingsRoute
+  SplashRoute: typeof SplashRoute
   SubscriptionRoute: typeof SubscriptionRoute
   DebugParkingRoute: typeof DebugParkingRoute
   ApiPublicAdminRunScannerSelfTestRoute: typeof ApiPublicAdminRunScannerSelfTestRoute
@@ -366,6 +405,13 @@ declare module '@tanstack/react-router' {
       path: '/subscription'
       fullPath: '/subscription'
       preLoaderRoute: typeof SubscriptionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/splash': {
+      id: '/splash'
+      path: '/splash'
+      fullPath: '/splash'
+      preLoaderRoute: typeof SplashRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -403,6 +449,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/onboard': {
+      id: '/onboard'
+      path: '/onboard'
+      fullPath: '/onboard'
+      preLoaderRoute: typeof OnboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/history': {
       id: '/history'
       path: '/history'
@@ -415,6 +468,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/alerts': {
@@ -578,13 +638,16 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
   AlertsRoute: AlertsRoute,
+  AuthRoute: AuthRoute,
   DashboardRoute: DashboardRoute,
   HistoryRoute: HistoryRoute,
+  OnboardRoute: OnboardRoute,
   ProfileRoute: ProfileRoute,
   SavedRoute: SavedRoute,
   ScanRoute: ScanRoute,
   SessionRoute: SessionRoute,
   SettingsRoute: SettingsRoute,
+  SplashRoute: SplashRoute,
   SubscriptionRoute: SubscriptionRoute,
   DebugParkingRoute: DebugParkingRoute,
   ApiPublicAdminRunScannerSelfTestRoute: ApiPublicAdminRunScannerSelfTestRoute,
