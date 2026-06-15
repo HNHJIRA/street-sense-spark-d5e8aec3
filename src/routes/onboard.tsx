@@ -2,7 +2,6 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import welcome from "@/assets/welcome.png";
 import { GradientButton } from "@/components/parkclear/ui";
-import { SwipeButton } from "@/components/parkclear/SwipeButton";
 
 export const Route = createFileRoute("/onboard")({
   head: () => ({
@@ -45,7 +44,7 @@ function Onboard() {
             Helping you save time and money on confusing street parking.
           </p>
           <div className="mt-10 w-full">
-            <SwipeButton label="Swipe To Continue" onComplete={() => setStep(1)} />
+            <GradientButton onClick={() => setStep(1)}>Get Started</GradientButton>
           </div>
         </div>
       ) : (
