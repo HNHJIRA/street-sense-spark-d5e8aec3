@@ -15,7 +15,7 @@ import { LocationService } from "@/components/LocationService";
 
 function NotFoundComponent() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <div className="flex min-h-full items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
         <h1 className="text-7xl font-bold text-foreground">404</h1>
         <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
@@ -43,7 +43,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   }, [error]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <div className="flex min-h-full items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
           This page didn't load
@@ -124,8 +124,15 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       {/* Global GPS service — must mount before any route reads location. */}
       <LocationService />
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
+      {/* Phone shell: every route is constrained to mobile width so the app
+          always looks like a real mobile app, even on desktop. */}
+      <div
+        className="mx-auto h-[100dvh] w-full max-w-md overflow-hidden shadow-2xl"
+        style={{ transform: "translateX(0)" }}
+      >
+        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+        <Outlet />
+      </div>
     </QueryClientProvider>
   );
 }

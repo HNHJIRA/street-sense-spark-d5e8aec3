@@ -86,7 +86,7 @@ function SessionPage() {
 
   if (!session) {
     return (
-      <div className="relative min-h-screen bg-background pb-32">
+      <div className="relative min-h-full bg-background pb-32">
         <div className="safe-top mx-auto max-w-md px-5 pt-6">
           <h1 className="font-display text-2xl font-bold">Parking session</h1>
           <div className="mt-8 rounded-3xl border border-dashed border-border bg-surface/50 p-8 text-center">
@@ -120,7 +120,7 @@ function SessionPage() {
       : "border-park-green/40 bg-park-green-soft text-park-green";
 
   return (
-    <div className="relative min-h-screen bg-background pb-32">
+    <div className="relative min-h-full bg-background pb-32">
       <div className="safe-top mx-auto max-w-md px-5 pt-6">
         <div className="flex items-center justify-between">
           <Link to="/" className="flex items-center gap-1 text-sm text-muted-foreground">
