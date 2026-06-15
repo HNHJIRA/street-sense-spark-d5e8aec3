@@ -257,7 +257,7 @@ export const scanSign = createServerFn({ method: "POST" })
           p_max_meters: 80,
         })
       : Promise.resolve({ data: null } as { data: unknown });
-    const uploadAndUrlP = admin.storage.from("sign-scans").upload(storagePath, bytes, {
+    const uploadAndUrlP: Promise<string | null> = admin.storage.from("sign-scans").upload(storagePath, bytes, {
       contentType: data.mimeType, upsert: false,
     }).then((upload: { error?: unknown }) => {
       if (upload.error) return null;
@@ -430,7 +430,7 @@ export const scanSign = createServerFn({ method: "POST" })
 
     // PERF: run all writes in parallel in the request's background lifetime.
     // They target different tables and don't affect the returned verdict.
-    const persistence = uploadAndUrlP.then((signedUrl) => {
+    const persistence = uploadAndUrlP.then((signedUrl: string | null) => {
       const writes: Promise<unknown>[] = [
         admin.from("parking_sign_scans").insert({
           id: scanId,
@@ -487,7 +487,7 @@ export const scanSign = createServerFn({ method: "POST" })
         ));
       }
       return Promise.all(writes);
-    }).catch((err) => {
+    }).catch((err: unknown) => {
       console.error("[scan] background persistence failed:", err);
     });
     waitUntilBackground(persistence);
@@ -563,7 +563,7 @@ export const scanSign = createServerFn({ method: "POST" })
 
     return {
       scan_id: scanId,
-      image_url: signedUrl,
+      image_url: null,
       raw_text: ai.raw_text,
       model: ai.model,
       overall_confidence: ai.overall_confidence,
