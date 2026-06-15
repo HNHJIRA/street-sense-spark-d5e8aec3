@@ -223,28 +223,51 @@ export const scanSign = createServerFn({ method: "POST" })
     if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured");
 
     const admin = await getAdmin();
-    const restrictionTypes = await loadRestrictionTypes(admin);
 
-    // 0) PHASE 1 — strict validation gate. Stop early if the photo isn't a
-    //    parking-regulation sign so we don't burn OCR tokens on garbage.
-    const validation = await validateSignImage(data.imageBase64, data.mimeType, apiKey);
+    // PERF: kick off everything that doesn't depend on AI output in parallel:
+    //   - validation gate (AI roundtrip)
+    //   - main OCR/extraction (AI roundtrip)
+    //   - restriction types lookup (DB)
+    //   - nearest segment lookup (DB, if GPS present)
+    //   - image upload to storage
+    // Previously these ran serially (validate → extract → DB → upload),
+    // which stacked two AI roundtrips back-to-back. Running them concurrently
+    // roughly halves end-to-end scan latency.
+    const scanId = crypto.randomUUID();
+    const ext = data.mimeType.split("/")[1]?.toLowerCase().replace("jpeg", "jpg") ?? "jpg";
+    const storagePath = `${new Date().toISOString().slice(0, 10)}/${scanId}.${ext}`;
+    const bytes = Uint8Array.from(atob(data.imageBase64), (c) => c.charCodeAt(0));
+
+    const validationP = validateSignImage(data.imageBase64, data.mimeType, apiKey);
+    const aiP = callSignScanAi(data.imageBase64, data.mimeType, apiKey);
+    const restrictionTypesP = loadRestrictionTypes(admin);
+    const nearestP = (data.lng != null && data.lat != null)
+      ? admin.rpc("nearest_segment_full", {
+          p_city_id: data.cityId,
+          p_lng: data.lng, p_lat: data.lat,
+          p_max_meters: 80,
+        })
+      : Promise.resolve({ data: null } as { data: unknown });
+    const uploadP = admin.storage.from("sign-scans").upload(storagePath, bytes, {
+      contentType: data.mimeType, upsert: false,
+    });
+
+    // Short-circuit if validation rejects the image. The other in-flight
+    // promises become wasted work, but on every successful scan we save
+    // a full AI roundtrip of wall-clock latency.
+    const validation = await validationP;
     if (!validation.is_valid) {
       throw new Error(
         "This image does not appear to contain a parking, stopping, loading, tow-away, or street restriction sign.",
       );
     }
 
-    // 1) Run the AI vision pipeline. aiRulesToNormalized preserves the
-    //    per-sign `arrow` direction so we can evaluate left/right separately.
-    const ai: AiScanResult = await callSignScanAi(data.imageBase64, data.mimeType, apiKey);
+    const [ai, restrictionTypes, nearestRes] = await Promise.all([aiP, restrictionTypesP, nearestP]);
     const aiRulesAll = aiRulesToNormalized(ai.rules) as NormalizedScanRule[];
-
-    // For SDOT comparison + persistence we still need a resolved, flat list.
-    // The conflict resolver strips arrow context, which is fine: side-aware
-    // evaluation runs on the un-resolved per-arrow buckets below.
+    // Conflict-resolved flat list for SDOT comparison + persistence.
     const aiRules = resolveRuleConflicts(aiRulesAll);
 
-    // 2) Find nearest SDOT segment so we can compare + still get accurate name.
+    // Nearest SDOT segment results
     let segmentInfo: SignScanResponse["segment"] = null;
     let sdotRules: ParkingRule[] = [];
     let segmentCoords: [number, number][] = [];
@@ -252,27 +275,20 @@ export const scanSign = createServerFn({ method: "POST" })
     let segmentDbId: string | null = null;
     let segmentName = "Posted sign location";
 
-    if (data.lng != null && data.lat != null) {
-      const { data: rows } = await admin.rpc("nearest_segment_full", {
-        p_city_id: data.cityId,
-        p_lng: data.lng, p_lat: data.lat,
-        p_max_meters: 80,
-      });
-      const row = (rows as Array<{
-        id: string; name: string; geojson: string;
-        data_source: string; rules: ParkingRule[] | null; distance_m: number;
-      }> | null)?.[0];
-      if (row) {
-        segmentDbId = row.id;
-        segmentName = row.name;
-        segmentSource = row.data_source;
-        sdotRules = (row.rules ?? []) as ParkingRule[];
-        try {
-          const g = JSON.parse(row.geojson) as LineString;
-          if (Array.isArray(g.coordinates)) segmentCoords = g.coordinates as [number, number][];
-        } catch { /* ignore */ }
-        segmentInfo = { id: row.id, name: row.name, distance_m: row.distance_m };
-      }
+    const row = (nearestRes.data as Array<{
+      id: string; name: string; geojson: string;
+      data_source: string; rules: ParkingRule[] | null; distance_m: number;
+    }> | null)?.[0];
+    if (row) {
+      segmentDbId = row.id;
+      segmentName = row.name;
+      segmentSource = row.data_source;
+      sdotRules = (row.rules ?? []) as ParkingRule[];
+      try {
+        const g = JSON.parse(row.geojson) as LineString;
+        if (Array.isArray(g.coordinates)) segmentCoords = g.coordinates as [number, number][];
+      } catch { /* ignore */ }
+      segmentInfo = { id: row.id, name: row.name, distance_m: row.distance_m };
     }
 
     // 3) Split posted rules by arrow direction so each side of the post can
@@ -382,21 +398,15 @@ export const scanSign = createServerFn({ method: "POST" })
     }
     void combinedRules;
 
-    // 4) Persist image + scan + child rows.
-    const scanId = crypto.randomUUID();
-    const ext = data.mimeType.split("/")[1]?.toLowerCase().replace("jpeg", "jpg") ?? "jpg";
-    const storagePath = `${new Date().toISOString().slice(0, 10)}/${scanId}.${ext}`;
-    const bytes = Uint8Array.from(atob(data.imageBase64), (c) => c.charCodeAt(0));
-    const upload = await admin.storage.from("sign-scans").upload(storagePath, bytes, {
-      contentType: data.mimeType, upsert: false,
-    });
+    // 4) Persist image + scan + child rows. The upload was started in
+    // parallel up top; await it now, then fan out all inserts concurrently.
+    const upload = await uploadP;
     const uploadOk = !upload.error;
-    let signedUrl: string | null = null;
-    if (uploadOk) {
-      const signed = await admin.storage.from("sign-scans")
-        .createSignedUrl(storagePath, 60 * 60 * 24 * 7);
-      signedUrl = signed.data?.signedUrl ?? null;
-    }
+    const signedUrlP = uploadOk
+      ? admin.storage.from("sign-scans")
+          .createSignedUrl(storagePath, 60 * 60 * 24 * 7)
+          .then((s: { data: { signedUrl?: string } | null }) => s.data?.signedUrl ?? null)
+      : Promise.resolve(null as string | null);
 
     const matchStatus: "matched" | "out_of_range" | "no_gps" | "no_segment_data" =
       data.lng == null || data.lat == null
@@ -407,36 +417,48 @@ export const scanSign = createServerFn({ method: "POST" })
             ? "no_segment_data"
             : "matched";
 
-    await admin.from("parking_sign_scans").insert({
-      id: scanId,
-      city_id: data.cityId,
-      segment_id: segmentDbId,
-      lng: data.lng, lat: data.lat,
+    const validations = validateAgainstSdot(aiRules, sdotRules, ai.overall_confidence, matchStatus);
+    const summary = buildScanSummary({
       decision,
-      overall_confidence: ai.overall_confidence,
-      verdict: verdictFromColor(decision.color),
-      nearest_distance_m: segmentInfo?.distance_m ?? null,
-      match_status: matchStatus,
+      parsedRules: aiRules,
+      sdotRules,
+      timezone: data.timezone,
+      aiConfidence: ai.overall_confidence,
+      signCount: ai.sign_count,
     });
 
-
+    // PERF: run all writes in parallel — they target different tables and
+    // don't depend on each other. Previously this was ~6 awaits in series.
+    const writes: Promise<unknown>[] = [
+      admin.from("parking_sign_scans").insert({
+        id: scanId,
+        city_id: data.cityId,
+        segment_id: segmentDbId,
+        lng: data.lng, lat: data.lat,
+        decision,
+        overall_confidence: ai.overall_confidence,
+        verdict: verdictFromColor(decision.color),
+        nearest_distance_m: segmentInfo?.distance_m ?? null,
+        match_status: matchStatus,
+        summary,
+      }),
+      admin.from("ocr_results").insert({
+        scan_id: scanId,
+        model: ai.model,
+        raw_text: ai.raw_text,
+        sign_count: ai.sign_count,
+      }),
+    ];
+    const signedUrl = await signedUrlP;
     if (uploadOk) {
-      await admin.from("parking_sign_images").insert({
+      writes.push(admin.from("parking_sign_images").insert({
         scan_id: scanId,
         storage_path: storagePath,
         public_url: signedUrl,
-      });
+      }));
     }
-
-    await admin.from("ocr_results").insert({
-      scan_id: scanId,
-      model: ai.model,
-      raw_text: ai.raw_text,
-      sign_count: ai.sign_count,
-    });
-
     if (aiRules.length > 0) {
-      await admin.from("parsed_sign_rules").insert(
+      writes.push(admin.from("parsed_sign_rules").insert(
         aiRules.map((r, i) => ({
           scan_id: scanId,
           sequence: i,
@@ -450,12 +472,10 @@ export const scanSign = createServerFn({ method: "POST" })
           confidence: ai.rules[i]?.confidence ?? ai.overall_confidence,
           notes: r.notes,
         })),
-      );
+      ));
     }
-
-    const validations = validateAgainstSdot(aiRules, sdotRules, ai.overall_confidence, matchStatus);
     if (validations.length > 0) {
-      await admin.from("scan_validation_results").insert(
+      writes.push(admin.from("scan_validation_results").insert(
         validations.map((v) => ({
           scan_id: scanId,
           outcome: v.outcome,
@@ -463,20 +483,11 @@ export const scanSign = createServerFn({ method: "POST" })
           confidence: v.confidence,
           detail: v.detail,
         })),
-      );
+      ));
     }
+    await Promise.all(writes);
 
-    const summary = buildScanSummary({
-      decision,
-      parsedRules: aiRules,
-      sdotRules,
-      timezone: data.timezone,
-      aiConfidence: ai.overall_confidence,
-      signCount: ai.sign_count,
-    });
 
-    // Persist the summary on the scan row for the accuracy dashboard.
-    await admin.from("parking_sign_scans").update({ summary }).eq("id", scanId);
 
     // ===== Driver Summary Generator (Phase 5/6/7/8) =====
     const narrative = buildDriverNarrative({
