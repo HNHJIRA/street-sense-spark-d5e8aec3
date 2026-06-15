@@ -116,7 +116,7 @@ function ScanPage() {
   };
 
   return (
-    <div className="relative min-h-screen bg-background pb-32">
+    <div className="relative min-h-full bg-background pb-32">
       <div className="safe-top mx-auto max-w-md px-5 pt-6">
         <div className="flex items-center justify-between">
           <Link to="/" className="flex items-center gap-1 text-sm text-muted-foreground">

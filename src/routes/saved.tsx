@@ -36,7 +36,7 @@ function SavedPage() {
   useEffect(() => setMounted(true), []);
 
   return (
-    <div className="relative min-h-screen bg-background pb-32">
+    <div className="relative min-h-full bg-background pb-32">
       <div className="safe-top mx-auto max-w-md px-5 pt-6">
         <h1 className="font-display text-2xl font-bold">Saved</h1>
         <p className="mt-1 text-sm text-muted-foreground">

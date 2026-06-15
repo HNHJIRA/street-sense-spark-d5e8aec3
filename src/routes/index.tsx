@@ -54,12 +54,12 @@ export const Route = createFileRoute("/")({
   },
   component: HomePage,
   pendingComponent: () => (
-    <div className="flex min-h-screen items-center justify-center bg-background">
+    <div className="flex min-h-full items-center justify-center bg-background">
       <div className="text-sm text-muted-foreground">Loading parking data…</div>
     </div>
   ),
   errorComponent: ({ error }) => (
-    <div className="flex min-h-screen items-center justify-center bg-background p-6 text-center">
+    <div className="flex min-h-full items-center justify-center bg-background p-6 text-center">
       <div>
         <h1 className="text-lg font-bold">Couldn't load the parking map</h1>
         <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
@@ -105,28 +105,26 @@ function HomePage() {
   const city = cityQuery.data;
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-black">
-      <div className="relative mx-auto h-full w-full max-w-md overflow-hidden bg-background shadow-2xl">
-        <MapView token={tokenQuery.data.token} city={city} />
-        <TopBar
-          cityName={city.name}
-          citySlug={city.slug}
-          cities={AVAILABLE_CITIES}
-          onCityChange={setCitySlug}
-          now={displayTime}
-          timezone={city.timezone}
-          isForecast={!!forecastAt}
-        />
-        <Legend />
-        <ActiveSessionWidget restrictionTypes={city.restrictionTypes} />
-        <ParkHereButton cityId={city.id} timezone={city.timezone} />
-        <BottomNav />
-        <SearchSheet token={tokenQuery.data.token} />
-        <ForecastSheet />
-        <StreetSheet timezone={city.timezone} restrictionTypes={city.restrictionTypes} cityId={city.id} citySlug={city.slug} />
-        <DestinationParkingSheet cityId={city.id} timezone={city.timezone} />
-        <Onboarding />
-      </div>
+    <div className="relative h-full w-full overflow-hidden bg-background">
+      <MapView token={tokenQuery.data.token} city={city} />
+      <TopBar
+        cityName={city.name}
+        citySlug={city.slug}
+        cities={AVAILABLE_CITIES}
+        onCityChange={setCitySlug}
+        now={displayTime}
+        timezone={city.timezone}
+        isForecast={!!forecastAt}
+      />
+      <Legend />
+      <ActiveSessionWidget restrictionTypes={city.restrictionTypes} />
+      <ParkHereButton cityId={city.id} timezone={city.timezone} />
+      <BottomNav />
+      <SearchSheet token={tokenQuery.data.token} />
+      <ForecastSheet />
+      <StreetSheet timezone={city.timezone} restrictionTypes={city.restrictionTypes} cityId={city.id} citySlug={city.slug} />
+      <DestinationParkingSheet cityId={city.id} timezone={city.timezone} />
+      <Onboarding />
     </div>
   );
 }
