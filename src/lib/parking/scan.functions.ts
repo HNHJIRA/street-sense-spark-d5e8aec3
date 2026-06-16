@@ -543,17 +543,22 @@ export const scanSign = createServerFn({ method: "POST" })
       ? conflicting.map((v) => v.detail).join(" ")
       : null;
 
-    // EDGE CASE 8 — low-confidence OCR forces UNKNOWN.
+    // UNKNOWN ONLY when interpretation truly failed (no rules extracted at all).
+    // Low OCR/interpretation confidence MUST NOT discard readable restrictions —
+    // multi-sign stacks (No Stopping + 2 Hour + Tow-Away) commonly score below
+    // 65% per-plate while still yielding usable rules and a valid timeline.
     let finalStatus = narrative.status;
     let finalSummary = narrative.summary;
-    if (ocr_confidence < 0.65) {
+    const hasReadableRules = aiRulesAll.length > 0;
+    if (!hasReadableRules) {
       finalStatus = "UNKNOWN";
       finalSummary =
         "Parking legality cannot be verified. Please inspect the sign manually.";
-    } else if (
-      narrative.permit_required &&
-      finalStatus === "YES"
-    ) {
+    } else if (ocr_confidence < 0.5 && interpretation_confidence < 0.5) {
+      // Genuinely unreadable — both layers failed. Keep decision visible but
+      // surface uncertainty.
+      finalSummary = `${narrative.summary} Confidence is low — please verify the posted sign.`;
+    } else if (narrative.permit_required && finalStatus === "YES") {
       // EDGE CASE 6 — permit requirement without a matching user profile.
       finalStatus = "LIMITED";
       finalSummary +=
