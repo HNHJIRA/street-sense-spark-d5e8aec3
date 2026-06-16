@@ -317,9 +317,16 @@ export const scanSign = createServerFn({ method: "POST" })
       effective_to: r.effective_to,
       notes: r.notes,
     });
-    const scanRules = aiRulesAll.map(toParkingRule);
+    // Filter out placeholder "unknown" rules from engine evaluation when ANY
+    // meaningful rule (no_stopping/no_parking/tow_away/loading/permit/
+    // time_limited/etc.) was extracted. An unknown rule with all-day/all-week
+    // coverage would otherwise out-priority real restrictions and force the
+    // engine to return UNKNOWN even though the sign was clearly readable.
+    const meaningfulRulesAll = aiRulesAll.filter((r) => r.restriction_code !== "unknown");
+    const engineRules = meaningfulRulesAll.length > 0 ? meaningfulRulesAll : aiRulesAll;
+    const scanRules = engineRules.map(toParkingRule);
     const byArrow = (want: ArrowDirection[]) =>
-      scanRules.filter((_, i) => want.includes(aiRulesAll[i].arrow ?? null));
+      scanRules.filter((_, i) => want.includes(engineRules[i].arrow ?? null));
     const sharedRules = byArrow([null, "both"]);
     const leftOnly = byArrow(["left"]);
     const rightOnly = byArrow(["right"]);
