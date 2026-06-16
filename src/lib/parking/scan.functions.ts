@@ -326,7 +326,7 @@ export const scanSign = createServerFn({ method: "POST" })
     const engineRules = meaningfulRulesAll.length > 0 ? meaningfulRulesAll : aiRulesAll;
     const scanRules = engineRules.map(toParkingRule);
     const byArrow = (want: ArrowDirection[]) =>
-      scanRules.filter((_, i) => want.includes(aiRulesAll[i].arrow ?? null));
+      scanRules.filter((_, i) => want.includes(engineRules[i].arrow ?? null));
     const sharedRules = byArrow([null, "both"]);
     const leftOnly = byArrow(["left"]);
     const rightOnly = byArrow(["right"]);
