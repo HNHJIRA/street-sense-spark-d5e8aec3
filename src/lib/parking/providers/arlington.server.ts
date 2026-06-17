@@ -182,7 +182,7 @@ export const ArlingtonProvider: ParkingProvider = {
           time_limit_minutes: meterTimeLimitMinutes(matchedMeter),
           effective_from: null,
           effective_to: null,
-          notes: `Arlington parking meter${matchedMeter.ZONE ? ` (zone ${matchedMeter.ZONE})` : ""}. Verify posted hours and rate; meter hours and free days vary by block.`,
+          notes: `Arlington parking meter${(matchedMeter.PricingZone || matchedMeter.ZONE) ? ` (zone ${matchedMeter.PricingZone || matchedMeter.ZONE})` : ""}. Verify posted hours and rate; meter hours and free days vary by block.`,
         });
       }
       rules.push(
