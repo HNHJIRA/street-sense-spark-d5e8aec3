@@ -22,9 +22,9 @@ import { arcgisPolyline, fetchArcgis, unknownRule } from "./_la-shared.server";
 import type { NormalizedRule, NormalizedSegment, ParkingProvider } from "./types";
 
 const CENTERLINE_ENDPOINT =
-  "https://services1.arcgis.com/mVFRs7NF4iFitgbY/arcgis/rest/services/Street_Centerlines/FeatureServer/0/query";
+  "https://arlgis.arlingtonva.us/arcgis/rest/services/Open_Data/od_Street_Network/FeatureServer/0/query";
 const METER_ENDPOINT =
-  "https://services1.arcgis.com/mVFRs7NF4iFitgbY/arcgis/rest/services/Parking_Meters/FeatureServer/0/query";
+  "https://arlgis.arlingtonva.us/arcgis/rest/services/Open_Data/od_Parking_Meter_Points/FeatureServer/0/query";
 
 interface CenterlineAttrs {
   OBJECTID?: number;
