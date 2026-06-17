@@ -141,7 +141,7 @@ export const getAccuracyReport = createServerFn({ method: "GET" }).handler(async
 
 
   // -- Global restriction distribution
-  const { data: restr } = await admin.rpc("restriction_distribution").catch(() => ({ data: null }));
+  const { data: restr } = await admin.rpc("restriction_distribution").then((r) => r, () => ({ data: null }));
   let byRestriction: { restriction_code: string; count: number }[] = [];
   if (Array.isArray(restr)) {
     byRestriction = (restr as { restriction_code: string; count: number | string }[]).map((r) => ({
