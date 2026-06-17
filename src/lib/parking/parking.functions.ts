@@ -315,11 +315,26 @@ export const checkParkingHere = createServerFn({ method: "GET" })
 
 // ---------- Provider sync (Seattle SDOT Blockface and future providers) ----------
 
+export interface SyncRunDiagnostics {
+  lines_input?: number;
+  lines_parsed?: number;
+  candidate_pairs?: number;
+  matched_segments?: number;
+  unmatched_lines?: number;
+  rows_updated?: number;
+  ms_parse?: number;
+  ms_match?: number;
+  ms_update?: number;
+  ms_total?: number;
+  timeout_stage?: string;
+  rpc_error?: string;
+}
 export interface SyncRunResult {
   imported: number;
   skipped: number;
   provider: string;
   error?: string;
+  diagnostics?: SyncRunDiagnostics;
 }
 
 async function recordSyncStart(
@@ -406,13 +421,32 @@ export const syncProvider = createServerFn({ method: "POST" })
     if (isOverlayProvider(provider)) {
       try {
         const r = await provider.applyOverlay(data.citySlug, bbox, { cityId: city.id as string, admin });
-        const res = { imported: r.rules_inserted, skipped: 0 };
+        const res: { imported: number; skipped: number; error?: string } = {
+          imported: r.rules_inserted,
+          skipped: 0,
+        };
+        if (r.error) res.error = r.error;
         await recordSyncFinish(admin, logId, provider.id, city.id, res, startedAt);
-        // Annotate health with overlay-specific note (polygons fetched + segments touched).
+        const d = r.diagnostics ?? {};
+        const noteParts = [
+          `Overlay: ${r.polygons_fetched} polygons → ${r.segments_touched} segments tagged with permit rules.`,
+          `lines_input=${d.lines_input ?? r.polygons_fetched}`,
+          `lines_parsed=${d.lines_parsed ?? "?"}`,
+          `candidate_pairs=${d.candidate_pairs ?? "?"}`,
+          `matched_segments=${d.matched_segments ?? "?"}`,
+          `unmatched_lines=${d.unmatched_lines ?? "?"}`,
+          `rows_updated=${d.rows_updated ?? r.rules_inserted}`,
+          `ms_parse=${d.ms_parse ?? "?"}`,
+          `ms_match=${d.ms_match ?? "?"}`,
+          `ms_update=${d.ms_update ?? "?"}`,
+          `ms_total=${d.ms_total ?? "?"}`,
+          `timeout_stage=${d.timeout_stage ?? "done"}`,
+        ];
+        if (d.rpc_error) noteParts.push(`rpc_error="${d.rpc_error}"`);
         await admin.from("provider_health").update({
-          notes: `Overlay: ${r.polygons_fetched} polygons → ${r.segments_touched} segments tagged with permit rules.`,
+          notes: noteParts.join(" "),
         }).eq("provider", provider.id).eq("city_id", city.id);
-        return { ...res, provider: provider.id };
+        return { ...res, provider: provider.id, diagnostics: r.diagnostics };
       } catch (e) {
         const res = { imported: 0, skipped: 0, error: (e as Error).message };
         await recordSyncFinish(admin, logId, provider.id, city.id, res, startedAt);

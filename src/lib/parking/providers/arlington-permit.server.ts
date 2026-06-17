@@ -139,6 +139,7 @@ export const ArlingtonPermitOverlay: OverlayProvider = {
       return { segments_touched: 0, rules_inserted: 0, polygons_fetched: 0 };
     }
 
+    const t0 = Date.now();
     const { data, error } = await ctx.admin.rpc("apply_permit_polyline_overlay", {
       p_city_id: ctx.cityId,
       p_provider: "arlington-permit",
@@ -147,12 +148,50 @@ export const ArlingtonPermitOverlay: OverlayProvider = {
       p_max_meters: SNAP_METERS,
       p_notes_prefix: "Arlington residential permit parking",
     });
-    if (error) throw new Error((error as { message?: string }).message ?? "polyline overlay RPC failed");
-    const row = Array.isArray(data) ? data[0] : data;
+    const wallMs = Date.now() - t0;
+
+    if (error) {
+      // Don't throw — surface the failure stage with diagnostics so the
+      // admin UI can see WHERE the timeout/RPC error occurred.
+      const msg = (error as { message?: string }).message ?? "polyline overlay RPC failed";
+      return {
+        segments_touched: 0,
+        rules_inserted: 0,
+        polygons_fetched: lines.length,
+        error: msg,
+        diagnostics: {
+          lines_input: lines.length,
+          lines_parsed: 0,
+          candidate_pairs: 0,
+          matched_segments: 0,
+          unmatched_lines: lines.length,
+          rows_updated: 0,
+          ms_total: wallMs,
+          timeout_stage: /timeout/i.test(msg) ? "rpc-timeout" : "rpc-error",
+          rpc_error: msg,
+        },
+      };
+    }
+
+    const row = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | null;
+    const num = (k: string) => Number((row?.[k] as number | string | undefined) ?? 0);
     return {
-      segments_touched: Number(row?.segments_touched ?? 0),
-      rules_inserted: Number(row?.rules_inserted ?? 0),
+      segments_touched: num("segments_touched"),
+      rules_inserted: num("rules_inserted"),
       polygons_fetched: lines.length, // reuse field for "lines fetched"
+      diagnostics: {
+        lines_input: num("lines_input"),
+        lines_parsed: num("lines_parsed"),
+        candidate_pairs: num("candidate_pairs"),
+        matched_segments: num("matched_segments"),
+        unmatched_lines: num("unmatched_lines"),
+        rows_updated: num("rows_updated"),
+        ms_parse: num("ms_parse"),
+        ms_match: num("ms_match"),
+        ms_update: num("ms_update"),
+        ms_total: num("ms_total") || wallMs,
+        timeout_stage: String(row?.timeout_stage ?? "done"),
+      },
     };
   },
 };
