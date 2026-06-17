@@ -32,6 +32,8 @@ interface CenterlineAttrs {
   FULLNAME?: string;
   FULL_NAME?: string;
   STREET_NAME?: string;
+  STNAME?: string;   // Arlington open-data: full street name (e.g. "N HARRISON ST")
+  STRTNAME?: string; // Arlington open-data: base name (e.g. "HARRISON")
   FROMLEFT?: number;
   TOLEFT?: number;
   FROMRIGHT?: number;
@@ -41,9 +43,13 @@ interface CenterlineAttrs {
 interface MeterAttrs {
   OBJECTID?: number;
   METER_ID?: string | number;
+  MeterID?: string;        // Arlington field name
   ZONE?: string;
+  PricingZone?: string;    // Arlington field name
   RATE?: number | string;
+  Rate?: number | string;  // Arlington field name
   TIME_LIMIT?: number | string;
+  Hours?: string | number; // Arlington time-limit in hours
   TIMEWINDOW?: string;
   HOURS?: string;
 }
