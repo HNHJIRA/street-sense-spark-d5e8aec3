@@ -890,6 +890,30 @@ export type Database = {
             }
             Returns: string
           }
+      apply_curb_zone_polyline_overlay: {
+        Args: {
+          p_city_id: string
+          p_lines: Json
+          p_max_meters?: number
+          p_provider: string
+          p_wipe_existing?: string
+        }
+        Returns: {
+          candidate_pairs: number
+          lines_input: number
+          lines_parsed: number
+          matched_segments: number
+          ms_match: number
+          ms_parse: number
+          ms_total: number
+          ms_update: number
+          rows_updated: number
+          rules_inserted: number
+          segments_touched: number
+          timeout_stage: string
+          unmatched_lines: number
+        }[]
+      }
       apply_permit_polygon_overlay: {
         Args: {
           p_city_id: string
