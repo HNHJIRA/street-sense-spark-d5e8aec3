@@ -28,6 +28,7 @@ const COLOR_HEX: Record<ParkingColor, string> = {
   green: "#22C55E",
   yellow: "#F0CE63",
   red: "#EF4444",
+  gray: "#6B7280",
 };
 
 const EARTH_CIRCUMFERENCE_M = 40_075_016.686;
