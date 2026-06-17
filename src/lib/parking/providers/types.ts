@@ -71,6 +71,21 @@ export interface OverlayResult {
   rules_inserted: number;
   polygons_fetched: number;
   error?: string;
+  /** Per-stage timings + counts returned by the underlying overlay RPC. */
+  diagnostics?: {
+    lines_input?: number;
+    lines_parsed?: number;
+    candidate_pairs?: number;
+    matched_segments?: number;
+    unmatched_lines?: number;
+    rows_updated?: number;
+    ms_parse?: number;
+    ms_match?: number;
+    ms_update?: number;
+    ms_total?: number;
+    timeout_stage?: string;
+    rpc_error?: string;
+  };
 }
 
 /**
