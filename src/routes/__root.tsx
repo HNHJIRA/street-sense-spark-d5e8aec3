@@ -120,20 +120,27 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  // Admin pages render as full-width web app; everything else uses the
+  // phone-only mobile shell.
+  const isAdmin = pathname.startsWith("/admin");
 
   return (
     <QueryClientProvider client={queryClient}>
       {/* Global GPS service — must mount before any route reads location. */}
       <LocationService />
-      {/* Phone shell: every route is constrained to mobile width so the app
-          always looks like a real mobile app, even on desktop. */}
-      <div
-        className="mx-auto h-[100dvh] w-full max-w-md overflow-x-hidden overflow-y-auto overscroll-contain shadow-2xl"
-        style={{ transform: "translateX(0)" }}
-      >
-        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-        <Outlet />
-      </div>
+      {isAdmin ? (
+        <div className="min-h-[100dvh] w-full">
+          <Outlet />
+        </div>
+      ) : (
+        <div
+          className="mx-auto h-[100dvh] w-full max-w-md overflow-x-hidden overflow-y-auto overscroll-contain shadow-2xl"
+          style={{ transform: "translateX(0)" }}
+        >
+          <Outlet />
+        </div>
+      )}
     </QueryClientProvider>
   );
 }
