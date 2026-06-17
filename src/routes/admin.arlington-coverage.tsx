@@ -77,9 +77,10 @@ function ArlingtonCoveragePage() {
   }
 
   const pr = debug?.body?.providerRun;
-  const providersRun: any[] = Array.isArray(pr?.providers) ? pr.providers : Array.isArray(pr) ? pr : [];
+  const providersRun: any[] = Array.isArray(pr?.results) ? pr.results : Array.isArray(pr?.providers) ? pr.providers : Array.isArray(pr) ? pr : [];
   const imported = providersRun.reduce((s, p) => s + (p?.imported ?? p?.segments_imported ?? 0), 0);
   const skipped = providersRun.reduce((s, p) => s + (p?.skipped ?? 0), 0);
+  const diagnostics: any[] = Array.isArray(debug?.body?.diagnostics) ? debug!.body.diagnostics : [];
 
   return (
     <div style={{ display: "grid", gap: 20 }}>
