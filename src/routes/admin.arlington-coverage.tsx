@@ -235,10 +235,7 @@ function ArlingtonCoveragePage() {
         )}
       </section>
 
-            </details>
-          </div>
-        )}
-      </section>
+
 
 
       <section style={{ overflow: "auto", border: "1px solid #e2e8f0", borderRadius: 8, background: "white" }}>
