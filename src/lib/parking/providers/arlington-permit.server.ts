@@ -17,7 +17,11 @@ import { fetchArcgis } from "./_la-shared.server";
 import type { OverlayContext, OverlayProvider, OverlayResult, SyncBbox } from "./types";
 
 const ENDPOINT =
-  "https://services1.arcgis.com/mVFRs7NF4iFitgbY/arcgis/rest/services/RPP_Districts/FeatureServer/0/query";
+  "https://arlgis.arlingtonva.us/arcgis/rest/services/Open_Data/od_Permit_Parking/FeatureServer/0/query";
+// NOTE: Arlington publishes Permit Parking as POLYLINES (curb-side block faces),
+// not polygons. The overlay below requires polygon `rings` to call the
+// `apply_permit_polygon_overlay` RPC, so this fetch will return 0 polygons
+// until a polyline-aware overlay path is added. The fetch + auth itself works.
 
 interface Attrs {
   OBJECTID?: number;
