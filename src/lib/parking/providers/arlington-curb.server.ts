@@ -281,6 +281,36 @@ export const ArlingtonCurbOverlay: OverlayProvider = {
     }
     const wallMs = Date.now() - t0;
 
+    // ---------- 3) Option B: conflict resolver ----------
+    // The Arlington CDS feed publishes multiple curb policies per block face
+    // (fire-hydrant no-parking + permit + metered + general parking). Our
+    // 15 m snap collapses them all onto one street_segment_id, so the
+    // broad no_parking rules (priority 30) silently steamroll permit/metered.
+    // Until we land sub-segment offsets (Option A), drop curb no_parking /
+    // no_standing rules from any segment that also carries a more-permissive
+    // curb rule on a different sub-stretch.
+    let suppressed_segments = 0;
+    let suppressed_rules = 0;
+    let retained_np_segments = 0;
+    try {
+      const { data: cleanup, error: cleanupErr } = await ctx.admin.rpc(
+        "cleanup_arlington_curb_conflicts",
+      );
+      if (cleanupErr) {
+        firstError = firstError ?? (cleanupErr as { message?: string }).message ?? "cleanup rpc failed";
+      } else {
+        const row = (Array.isArray(cleanup) ? cleanup[0] : cleanup) as
+          | Record<string, unknown>
+          | null;
+        const num = (k: string) => Number((row?.[k] as number | string | undefined) ?? 0);
+        suppressed_segments = num("suppressed_segments");
+        suppressed_rules = num("suppressed_rules");
+        retained_np_segments = num("retained_np_segments");
+      }
+    } catch (e) {
+      firstError = firstError ?? (e as Error).message;
+    }
+
     return {
       segments_touched,
       rules_inserted,
@@ -296,6 +326,9 @@ export const ArlingtonCurbOverlay: OverlayProvider = {
         ms_total: ms_total || wallMs,
         timeout_stage: firstError ? "rpc-error" : "done",
         rpc_error: firstError ?? undefined,
+        conflict_suppressed_segments: suppressed_segments,
+        conflict_suppressed_rules: suppressed_rules,
+        conflict_retained_np_segments: retained_np_segments,
       },
     };
   },

@@ -969,6 +969,14 @@ export type Database = {
         }[]
       }
       city_center_geojson: { Args: { p_slug: string }; Returns: string }
+      cleanup_arlington_curb_conflicts: {
+        Args: never
+        Returns: {
+          retained_np_segments: number
+          suppressed_rules: number
+          suppressed_segments: number
+        }[]
+      }
       disablelongtransactions: { Args: never; Returns: string }
       dropgeometrycolumn:
         | {
