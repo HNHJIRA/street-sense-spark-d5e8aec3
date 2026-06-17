@@ -32,11 +32,13 @@ import { Route as AdminLaCoverageRouteImport } from './routes/admin.la-coverage'
 import { Route as AdminHealthRouteImport } from './routes/admin.health'
 import { Route as AdminForecastRouteImport } from './routes/admin.forecast'
 import { Route as AdminBetaReadinessRouteImport } from './routes/admin.beta-readiness'
+import { Route as AdminArlingtonCoverageRouteImport } from './routes/admin.arlington-coverage'
 import { Route as AdminAnalyticsRouteImport } from './routes/admin.analytics'
 import { Route as AdminAccuracyRouteImport } from './routes/admin.accuracy'
 import { Route as ApiPublicCronSyncLaOccupancyRouteImport } from './routes/api/public/cron.sync-la-occupancy'
 import { Route as ApiPublicCronHealthCheckRouteImport } from './routes/api/public/cron.health-check'
 import { Route as ApiPublicAdminSyncLaRouteImport } from './routes/api/public/admin.sync-la'
+import { Route as ApiPublicAdminSyncArlingtonRouteImport } from './routes/api/public/admin.sync-arlington'
 import { Route as ApiPublicAdminRunScannerSelfTestRouteImport } from './routes/api/public/admin.run-scanner-self-test'
 
 const SubscriptionRoute = SubscriptionRouteImport.update({
@@ -154,6 +156,11 @@ const AdminBetaReadinessRoute = AdminBetaReadinessRouteImport.update({
   path: '/beta-readiness',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminArlingtonCoverageRoute = AdminArlingtonCoverageRouteImport.update({
+  id: '/arlington-coverage',
+  path: '/arlington-coverage',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminAnalyticsRoute = AdminAnalyticsRouteImport.update({
   id: '/analytics',
   path: '/analytics',
@@ -181,6 +188,12 @@ const ApiPublicAdminSyncLaRoute = ApiPublicAdminSyncLaRouteImport.update({
   path: '/api/public/admin/sync-la',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicAdminSyncArlingtonRoute =
+  ApiPublicAdminSyncArlingtonRouteImport.update({
+    id: '/api/public/admin/sync-arlington',
+    path: '/api/public/admin/sync-arlington',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicAdminRunScannerSelfTestRoute =
   ApiPublicAdminRunScannerSelfTestRouteImport.update({
     id: '/api/public/admin/run-scanner-self-test',
@@ -205,6 +218,7 @@ export interface FileRoutesByFullPath {
   '/subscription': typeof SubscriptionRoute
   '/admin/accuracy': typeof AdminAccuracyRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
+  '/admin/arlington-coverage': typeof AdminArlingtonCoverageRoute
   '/admin/beta-readiness': typeof AdminBetaReadinessRoute
   '/admin/forecast': typeof AdminForecastRoute
   '/admin/health': typeof AdminHealthRoute
@@ -215,6 +229,7 @@ export interface FileRoutesByFullPath {
   '/debug/parking': typeof DebugParkingRoute
   '/admin/': typeof AdminIndexRoute
   '/api/public/admin/run-scanner-self-test': typeof ApiPublicAdminRunScannerSelfTestRoute
+  '/api/public/admin/sync-arlington': typeof ApiPublicAdminSyncArlingtonRoute
   '/api/public/admin/sync-la': typeof ApiPublicAdminSyncLaRoute
   '/api/public/cron/health-check': typeof ApiPublicCronHealthCheckRoute
   '/api/public/cron/sync-la-occupancy': typeof ApiPublicCronSyncLaOccupancyRoute
@@ -235,6 +250,7 @@ export interface FileRoutesByTo {
   '/subscription': typeof SubscriptionRoute
   '/admin/accuracy': typeof AdminAccuracyRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
+  '/admin/arlington-coverage': typeof AdminArlingtonCoverageRoute
   '/admin/beta-readiness': typeof AdminBetaReadinessRoute
   '/admin/forecast': typeof AdminForecastRoute
   '/admin/health': typeof AdminHealthRoute
@@ -245,6 +261,7 @@ export interface FileRoutesByTo {
   '/debug/parking': typeof DebugParkingRoute
   '/admin': typeof AdminIndexRoute
   '/api/public/admin/run-scanner-self-test': typeof ApiPublicAdminRunScannerSelfTestRoute
+  '/api/public/admin/sync-arlington': typeof ApiPublicAdminSyncArlingtonRoute
   '/api/public/admin/sync-la': typeof ApiPublicAdminSyncLaRoute
   '/api/public/cron/health-check': typeof ApiPublicCronHealthCheckRoute
   '/api/public/cron/sync-la-occupancy': typeof ApiPublicCronSyncLaOccupancyRoute
@@ -267,6 +284,7 @@ export interface FileRoutesById {
   '/subscription': typeof SubscriptionRoute
   '/admin/accuracy': typeof AdminAccuracyRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
+  '/admin/arlington-coverage': typeof AdminArlingtonCoverageRoute
   '/admin/beta-readiness': typeof AdminBetaReadinessRoute
   '/admin/forecast': typeof AdminForecastRoute
   '/admin/health': typeof AdminHealthRoute
@@ -277,6 +295,7 @@ export interface FileRoutesById {
   '/debug/parking': typeof DebugParkingRoute
   '/admin/': typeof AdminIndexRoute
   '/api/public/admin/run-scanner-self-test': typeof ApiPublicAdminRunScannerSelfTestRoute
+  '/api/public/admin/sync-arlington': typeof ApiPublicAdminSyncArlingtonRoute
   '/api/public/admin/sync-la': typeof ApiPublicAdminSyncLaRoute
   '/api/public/cron/health-check': typeof ApiPublicCronHealthCheckRoute
   '/api/public/cron/sync-la-occupancy': typeof ApiPublicCronSyncLaOccupancyRoute
@@ -300,6 +319,7 @@ export interface FileRouteTypes {
     | '/subscription'
     | '/admin/accuracy'
     | '/admin/analytics'
+    | '/admin/arlington-coverage'
     | '/admin/beta-readiness'
     | '/admin/forecast'
     | '/admin/health'
@@ -310,6 +330,7 @@ export interface FileRouteTypes {
     | '/debug/parking'
     | '/admin/'
     | '/api/public/admin/run-scanner-self-test'
+    | '/api/public/admin/sync-arlington'
     | '/api/public/admin/sync-la'
     | '/api/public/cron/health-check'
     | '/api/public/cron/sync-la-occupancy'
@@ -330,6 +351,7 @@ export interface FileRouteTypes {
     | '/subscription'
     | '/admin/accuracy'
     | '/admin/analytics'
+    | '/admin/arlington-coverage'
     | '/admin/beta-readiness'
     | '/admin/forecast'
     | '/admin/health'
@@ -340,6 +362,7 @@ export interface FileRouteTypes {
     | '/debug/parking'
     | '/admin'
     | '/api/public/admin/run-scanner-self-test'
+    | '/api/public/admin/sync-arlington'
     | '/api/public/admin/sync-la'
     | '/api/public/cron/health-check'
     | '/api/public/cron/sync-la-occupancy'
@@ -361,6 +384,7 @@ export interface FileRouteTypes {
     | '/subscription'
     | '/admin/accuracy'
     | '/admin/analytics'
+    | '/admin/arlington-coverage'
     | '/admin/beta-readiness'
     | '/admin/forecast'
     | '/admin/health'
@@ -371,6 +395,7 @@ export interface FileRouteTypes {
     | '/debug/parking'
     | '/admin/'
     | '/api/public/admin/run-scanner-self-test'
+    | '/api/public/admin/sync-arlington'
     | '/api/public/admin/sync-la'
     | '/api/public/cron/health-check'
     | '/api/public/cron/sync-la-occupancy'
@@ -393,6 +418,7 @@ export interface RootRouteChildren {
   SubscriptionRoute: typeof SubscriptionRoute
   DebugParkingRoute: typeof DebugParkingRoute
   ApiPublicAdminRunScannerSelfTestRoute: typeof ApiPublicAdminRunScannerSelfTestRoute
+  ApiPublicAdminSyncArlingtonRoute: typeof ApiPublicAdminSyncArlingtonRoute
   ApiPublicAdminSyncLaRoute: typeof ApiPublicAdminSyncLaRoute
   ApiPublicCronHealthCheckRoute: typeof ApiPublicCronHealthCheckRoute
   ApiPublicCronSyncLaOccupancyRoute: typeof ApiPublicCronSyncLaOccupancyRoute
@@ -561,6 +587,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminBetaReadinessRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/arlington-coverage': {
+      id: '/admin/arlington-coverage'
+      path: '/arlington-coverage'
+      fullPath: '/admin/arlington-coverage'
+      preLoaderRoute: typeof AdminArlingtonCoverageRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/analytics': {
       id: '/admin/analytics'
       path: '/analytics'
@@ -596,6 +629,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicAdminSyncLaRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/admin/sync-arlington': {
+      id: '/api/public/admin/sync-arlington'
+      path: '/api/public/admin/sync-arlington'
+      fullPath: '/api/public/admin/sync-arlington'
+      preLoaderRoute: typeof ApiPublicAdminSyncArlingtonRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/admin/run-scanner-self-test': {
       id: '/api/public/admin/run-scanner-self-test'
       path: '/api/public/admin/run-scanner-self-test'
@@ -609,6 +649,7 @@ declare module '@tanstack/react-router' {
 interface AdminRouteChildren {
   AdminAccuracyRoute: typeof AdminAccuracyRoute
   AdminAnalyticsRoute: typeof AdminAnalyticsRoute
+  AdminArlingtonCoverageRoute: typeof AdminArlingtonCoverageRoute
   AdminBetaReadinessRoute: typeof AdminBetaReadinessRoute
   AdminForecastRoute: typeof AdminForecastRoute
   AdminHealthRoute: typeof AdminHealthRoute
@@ -622,6 +663,7 @@ interface AdminRouteChildren {
 const AdminRouteChildren: AdminRouteChildren = {
   AdminAccuracyRoute: AdminAccuracyRoute,
   AdminAnalyticsRoute: AdminAnalyticsRoute,
+  AdminArlingtonCoverageRoute: AdminArlingtonCoverageRoute,
   AdminBetaReadinessRoute: AdminBetaReadinessRoute,
   AdminForecastRoute: AdminForecastRoute,
   AdminHealthRoute: AdminHealthRoute,
@@ -651,6 +693,7 @@ const rootRouteChildren: RootRouteChildren = {
   SubscriptionRoute: SubscriptionRoute,
   DebugParkingRoute: DebugParkingRoute,
   ApiPublicAdminRunScannerSelfTestRoute: ApiPublicAdminRunScannerSelfTestRoute,
+  ApiPublicAdminSyncArlingtonRoute: ApiPublicAdminSyncArlingtonRoute,
   ApiPublicAdminSyncLaRoute: ApiPublicAdminSyncLaRoute,
   ApiPublicCronHealthCheckRoute: ApiPublicCronHealthCheckRoute,
   ApiPublicCronSyncLaOccupancyRoute: ApiPublicCronSyncLaOccupancyRoute,
