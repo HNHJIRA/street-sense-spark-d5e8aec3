@@ -25,7 +25,43 @@ async function run({ request }: { request: Request }) {
     const providerRun = await syncAllProvidersForCity({
       data: { citySlug: "arlington", ...ARLINGTON_BBOX, force: true },
     });
-    return new Response(JSON.stringify({ ok: true, providerRun }), {
+
+    // ---------- Diagnostics (read-only; no business logic changes) ----------
+    const { runArlingtonDiagnostics } = await import(
+      "@/lib/parking/providers/arlington-diagnostics.server"
+    );
+    let diagnostics: Awaited<ReturnType<typeof runArlingtonDiagnostics>> = [];
+    let diagnosticsError: string | null = null;
+    try {
+      diagnostics = await runArlingtonDiagnostics(ARLINGTON_BBOX);
+    } catch (e) {
+      diagnosticsError = (e as Error).message;
+    }
+
+    // Persist the per-provider notes to provider_health so the admin UI sees
+    // the same per-stage counters surfaced in the response.
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: city } = await supabaseAdmin
+        .from("cities").select("id").eq("slug", "arlington").maybeSingle();
+      if (city?.id) {
+        for (const d of diagnostics) {
+          await supabaseAdmin.from("provider_health")
+            .update({ notes: d.notes })
+            .eq("provider", d.provider)
+            .eq("city_id", city.id);
+        }
+      }
+    } catch {
+      // Notes are advisory; never fail the sync because we couldn't write them.
+    }
+
+    return new Response(JSON.stringify({
+      ok: true,
+      providerRun,
+      diagnostics,
+      diagnosticsError,
+    }), {
       status: 200, headers: { "Content-Type": "application/json" },
     });
   } catch (e) {
