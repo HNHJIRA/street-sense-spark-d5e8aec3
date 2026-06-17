@@ -297,7 +297,7 @@ export const ArlingtonCurbOverlay: OverlayProvider = {
         "cleanup_arlington_curb_conflicts",
       );
       if (cleanupErr) {
-        firstError = firstError ?? cleanupErr.message ?? "cleanup rpc failed";
+        firstError = firstError ?? (cleanupErr as { message?: string }).message ?? "cleanup rpc failed";
       } else {
         const row = (Array.isArray(cleanup) ? cleanup[0] : cleanup) as
           | Record<string, unknown>
