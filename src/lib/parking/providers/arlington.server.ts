@@ -22,9 +22,9 @@ import { arcgisPolyline, fetchArcgis, unknownRule } from "./_la-shared.server";
 import type { NormalizedRule, NormalizedSegment, ParkingProvider } from "./types";
 
 const CENTERLINE_ENDPOINT =
-  "https://services1.arcgis.com/mVFRs7NF4iFitgbY/arcgis/rest/services/Street_Centerlines/FeatureServer/0/query";
+  "https://arlgis.arlingtonva.us/arcgis/rest/services/Open_Data/od_Street_Network/FeatureServer/0/query";
 const METER_ENDPOINT =
-  "https://services1.arcgis.com/mVFRs7NF4iFitgbY/arcgis/rest/services/Parking_Meters/FeatureServer/0/query";
+  "https://arlgis.arlingtonva.us/arcgis/rest/services/Open_Data/od_Parking_Meter_Points/FeatureServer/0/query";
 
 interface CenterlineAttrs {
   OBJECTID?: number;
@@ -32,6 +32,8 @@ interface CenterlineAttrs {
   FULLNAME?: string;
   FULL_NAME?: string;
   STREET_NAME?: string;
+  STNAME?: string;   // Arlington open-data: full street name (e.g. "N HARRISON ST")
+  STRTNAME?: string; // Arlington open-data: base name (e.g. "HARRISON")
   FROMLEFT?: number;
   TOLEFT?: number;
   FROMRIGHT?: number;
@@ -41,9 +43,13 @@ interface CenterlineAttrs {
 interface MeterAttrs {
   OBJECTID?: number;
   METER_ID?: string | number;
+  MeterID?: string;        // Arlington field name
   ZONE?: string;
+  PricingZone?: string;    // Arlington field name
   RATE?: number | string;
+  Rate?: number | string;  // Arlington field name
   TIME_LIMIT?: number | string;
+  Hours?: string | number; // Arlington time-limit in hours
   TIMEWINDOW?: string;
   HOURS?: string;
 }
@@ -65,13 +71,19 @@ function pickName(a: CenterlineAttrs): string {
   return (
     a.FULLNAME ||
     a.FULL_NAME ||
+    a.STNAME ||
     a.STREETNAME ||
     a.STREET_NAME ||
+    a.STRTNAME ||
     (a.OBJECTID != null ? `Arlington centerline ${a.OBJECTID}` : "Arlington street")
   );
 }
 
 function meterTimeLimitMinutes(a: MeterAttrs): number | null {
+  // Arlington publishes time limit as hours in the `Hours` field
+  // (e.g. "1" = 1 hour). Legacy `TIME_LIMIT` (minutes) is kept as fallback.
+  const hours = Number(a.Hours);
+  if (Number.isFinite(hours) && hours > 0) return Math.round(hours * 60);
   const n = Number(a.TIME_LIMIT);
   return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
 }
@@ -170,7 +182,7 @@ export const ArlingtonProvider: ParkingProvider = {
           time_limit_minutes: meterTimeLimitMinutes(matchedMeter),
           effective_from: null,
           effective_to: null,
-          notes: `Arlington parking meter${matchedMeter.ZONE ? ` (zone ${matchedMeter.ZONE})` : ""}. Verify posted hours and rate; meter hours and free days vary by block.`,
+          notes: `Arlington parking meter${(matchedMeter.PricingZone || matchedMeter.ZONE) ? ` (zone ${matchedMeter.PricingZone || matchedMeter.ZONE})` : ""}. Verify posted hours and rate; meter hours and free days vary by block.`,
         });
       }
       rules.push(
