@@ -903,6 +903,21 @@ export type Database = {
           segments_touched: number
         }[]
       }
+      apply_permit_polyline_overlay: {
+        Args: {
+          p_city_id: string
+          p_lines: Json
+          p_max_meters?: number
+          p_notes_prefix?: string
+          p_priority?: number
+          p_provider: string
+        }
+        Returns: {
+          lines_input: number
+          rules_inserted: number
+          segments_touched: number
+        }[]
+      }
       arlington_area_counts: {
         Args: {
           p_city_id: string
