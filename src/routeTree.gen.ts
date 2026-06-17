@@ -32,12 +32,14 @@ import { Route as AdminLaCoverageRouteImport } from './routes/admin.la-coverage'
 import { Route as AdminHealthRouteImport } from './routes/admin.health'
 import { Route as AdminForecastRouteImport } from './routes/admin.forecast'
 import { Route as AdminBetaReadinessRouteImport } from './routes/admin.beta-readiness'
+import { Route as AdminBellevueCoverageRouteImport } from './routes/admin.bellevue-coverage'
 import { Route as AdminArlingtonCoverageRouteImport } from './routes/admin.arlington-coverage'
 import { Route as AdminAnalyticsRouteImport } from './routes/admin.analytics'
 import { Route as AdminAccuracyRouteImport } from './routes/admin.accuracy'
 import { Route as ApiPublicCronSyncLaOccupancyRouteImport } from './routes/api/public/cron.sync-la-occupancy'
 import { Route as ApiPublicCronHealthCheckRouteImport } from './routes/api/public/cron.health-check'
 import { Route as ApiPublicAdminSyncLaRouteImport } from './routes/api/public/admin.sync-la'
+import { Route as ApiPublicAdminSyncBellevueRouteImport } from './routes/api/public/admin.sync-bellevue'
 import { Route as ApiPublicAdminSyncArlingtonRouteImport } from './routes/api/public/admin.sync-arlington'
 import { Route as ApiPublicAdminRunScannerSelfTestRouteImport } from './routes/api/public/admin.run-scanner-self-test'
 import { Route as ApiPublicAdminArlingtonSelfTestRouteImport } from './routes/api/public/admin.arlington-self-test'
@@ -157,6 +159,11 @@ const AdminBetaReadinessRoute = AdminBetaReadinessRouteImport.update({
   path: '/beta-readiness',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminBellevueCoverageRoute = AdminBellevueCoverageRouteImport.update({
+  id: '/bellevue-coverage',
+  path: '/bellevue-coverage',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminArlingtonCoverageRoute = AdminArlingtonCoverageRouteImport.update({
   id: '/arlington-coverage',
   path: '/arlington-coverage',
@@ -189,6 +196,12 @@ const ApiPublicAdminSyncLaRoute = ApiPublicAdminSyncLaRouteImport.update({
   path: '/api/public/admin/sync-la',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicAdminSyncBellevueRoute =
+  ApiPublicAdminSyncBellevueRouteImport.update({
+    id: '/api/public/admin/sync-bellevue',
+    path: '/api/public/admin/sync-bellevue',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicAdminSyncArlingtonRoute =
   ApiPublicAdminSyncArlingtonRouteImport.update({
     id: '/api/public/admin/sync-arlington',
@@ -226,6 +239,7 @@ export interface FileRoutesByFullPath {
   '/admin/accuracy': typeof AdminAccuracyRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/arlington-coverage': typeof AdminArlingtonCoverageRoute
+  '/admin/bellevue-coverage': typeof AdminBellevueCoverageRoute
   '/admin/beta-readiness': typeof AdminBetaReadinessRoute
   '/admin/forecast': typeof AdminForecastRoute
   '/admin/health': typeof AdminHealthRoute
@@ -238,6 +252,7 @@ export interface FileRoutesByFullPath {
   '/api/public/admin/arlington-self-test': typeof ApiPublicAdminArlingtonSelfTestRoute
   '/api/public/admin/run-scanner-self-test': typeof ApiPublicAdminRunScannerSelfTestRoute
   '/api/public/admin/sync-arlington': typeof ApiPublicAdminSyncArlingtonRoute
+  '/api/public/admin/sync-bellevue': typeof ApiPublicAdminSyncBellevueRoute
   '/api/public/admin/sync-la': typeof ApiPublicAdminSyncLaRoute
   '/api/public/cron/health-check': typeof ApiPublicCronHealthCheckRoute
   '/api/public/cron/sync-la-occupancy': typeof ApiPublicCronSyncLaOccupancyRoute
@@ -259,6 +274,7 @@ export interface FileRoutesByTo {
   '/admin/accuracy': typeof AdminAccuracyRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/arlington-coverage': typeof AdminArlingtonCoverageRoute
+  '/admin/bellevue-coverage': typeof AdminBellevueCoverageRoute
   '/admin/beta-readiness': typeof AdminBetaReadinessRoute
   '/admin/forecast': typeof AdminForecastRoute
   '/admin/health': typeof AdminHealthRoute
@@ -271,6 +287,7 @@ export interface FileRoutesByTo {
   '/api/public/admin/arlington-self-test': typeof ApiPublicAdminArlingtonSelfTestRoute
   '/api/public/admin/run-scanner-self-test': typeof ApiPublicAdminRunScannerSelfTestRoute
   '/api/public/admin/sync-arlington': typeof ApiPublicAdminSyncArlingtonRoute
+  '/api/public/admin/sync-bellevue': typeof ApiPublicAdminSyncBellevueRoute
   '/api/public/admin/sync-la': typeof ApiPublicAdminSyncLaRoute
   '/api/public/cron/health-check': typeof ApiPublicCronHealthCheckRoute
   '/api/public/cron/sync-la-occupancy': typeof ApiPublicCronSyncLaOccupancyRoute
@@ -294,6 +311,7 @@ export interface FileRoutesById {
   '/admin/accuracy': typeof AdminAccuracyRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/arlington-coverage': typeof AdminArlingtonCoverageRoute
+  '/admin/bellevue-coverage': typeof AdminBellevueCoverageRoute
   '/admin/beta-readiness': typeof AdminBetaReadinessRoute
   '/admin/forecast': typeof AdminForecastRoute
   '/admin/health': typeof AdminHealthRoute
@@ -306,6 +324,7 @@ export interface FileRoutesById {
   '/api/public/admin/arlington-self-test': typeof ApiPublicAdminArlingtonSelfTestRoute
   '/api/public/admin/run-scanner-self-test': typeof ApiPublicAdminRunScannerSelfTestRoute
   '/api/public/admin/sync-arlington': typeof ApiPublicAdminSyncArlingtonRoute
+  '/api/public/admin/sync-bellevue': typeof ApiPublicAdminSyncBellevueRoute
   '/api/public/admin/sync-la': typeof ApiPublicAdminSyncLaRoute
   '/api/public/cron/health-check': typeof ApiPublicCronHealthCheckRoute
   '/api/public/cron/sync-la-occupancy': typeof ApiPublicCronSyncLaOccupancyRoute
@@ -330,6 +349,7 @@ export interface FileRouteTypes {
     | '/admin/accuracy'
     | '/admin/analytics'
     | '/admin/arlington-coverage'
+    | '/admin/bellevue-coverage'
     | '/admin/beta-readiness'
     | '/admin/forecast'
     | '/admin/health'
@@ -342,6 +362,7 @@ export interface FileRouteTypes {
     | '/api/public/admin/arlington-self-test'
     | '/api/public/admin/run-scanner-self-test'
     | '/api/public/admin/sync-arlington'
+    | '/api/public/admin/sync-bellevue'
     | '/api/public/admin/sync-la'
     | '/api/public/cron/health-check'
     | '/api/public/cron/sync-la-occupancy'
@@ -363,6 +384,7 @@ export interface FileRouteTypes {
     | '/admin/accuracy'
     | '/admin/analytics'
     | '/admin/arlington-coverage'
+    | '/admin/bellevue-coverage'
     | '/admin/beta-readiness'
     | '/admin/forecast'
     | '/admin/health'
@@ -375,6 +397,7 @@ export interface FileRouteTypes {
     | '/api/public/admin/arlington-self-test'
     | '/api/public/admin/run-scanner-self-test'
     | '/api/public/admin/sync-arlington'
+    | '/api/public/admin/sync-bellevue'
     | '/api/public/admin/sync-la'
     | '/api/public/cron/health-check'
     | '/api/public/cron/sync-la-occupancy'
@@ -397,6 +420,7 @@ export interface FileRouteTypes {
     | '/admin/accuracy'
     | '/admin/analytics'
     | '/admin/arlington-coverage'
+    | '/admin/bellevue-coverage'
     | '/admin/beta-readiness'
     | '/admin/forecast'
     | '/admin/health'
@@ -409,6 +433,7 @@ export interface FileRouteTypes {
     | '/api/public/admin/arlington-self-test'
     | '/api/public/admin/run-scanner-self-test'
     | '/api/public/admin/sync-arlington'
+    | '/api/public/admin/sync-bellevue'
     | '/api/public/admin/sync-la'
     | '/api/public/cron/health-check'
     | '/api/public/cron/sync-la-occupancy'
@@ -433,6 +458,7 @@ export interface RootRouteChildren {
   ApiPublicAdminArlingtonSelfTestRoute: typeof ApiPublicAdminArlingtonSelfTestRoute
   ApiPublicAdminRunScannerSelfTestRoute: typeof ApiPublicAdminRunScannerSelfTestRoute
   ApiPublicAdminSyncArlingtonRoute: typeof ApiPublicAdminSyncArlingtonRoute
+  ApiPublicAdminSyncBellevueRoute: typeof ApiPublicAdminSyncBellevueRoute
   ApiPublicAdminSyncLaRoute: typeof ApiPublicAdminSyncLaRoute
   ApiPublicCronHealthCheckRoute: typeof ApiPublicCronHealthCheckRoute
   ApiPublicCronSyncLaOccupancyRoute: typeof ApiPublicCronSyncLaOccupancyRoute
@@ -601,6 +627,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminBetaReadinessRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/bellevue-coverage': {
+      id: '/admin/bellevue-coverage'
+      path: '/bellevue-coverage'
+      fullPath: '/admin/bellevue-coverage'
+      preLoaderRoute: typeof AdminBellevueCoverageRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/arlington-coverage': {
       id: '/admin/arlington-coverage'
       path: '/arlington-coverage'
@@ -643,6 +676,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicAdminSyncLaRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/admin/sync-bellevue': {
+      id: '/api/public/admin/sync-bellevue'
+      path: '/api/public/admin/sync-bellevue'
+      fullPath: '/api/public/admin/sync-bellevue'
+      preLoaderRoute: typeof ApiPublicAdminSyncBellevueRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/admin/sync-arlington': {
       id: '/api/public/admin/sync-arlington'
       path: '/api/public/admin/sync-arlington'
@@ -671,6 +711,7 @@ interface AdminRouteChildren {
   AdminAccuracyRoute: typeof AdminAccuracyRoute
   AdminAnalyticsRoute: typeof AdminAnalyticsRoute
   AdminArlingtonCoverageRoute: typeof AdminArlingtonCoverageRoute
+  AdminBellevueCoverageRoute: typeof AdminBellevueCoverageRoute
   AdminBetaReadinessRoute: typeof AdminBetaReadinessRoute
   AdminForecastRoute: typeof AdminForecastRoute
   AdminHealthRoute: typeof AdminHealthRoute
@@ -685,6 +726,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminAccuracyRoute: AdminAccuracyRoute,
   AdminAnalyticsRoute: AdminAnalyticsRoute,
   AdminArlingtonCoverageRoute: AdminArlingtonCoverageRoute,
+  AdminBellevueCoverageRoute: AdminBellevueCoverageRoute,
   AdminBetaReadinessRoute: AdminBetaReadinessRoute,
   AdminForecastRoute: AdminForecastRoute,
   AdminHealthRoute: AdminHealthRoute,
@@ -716,6 +758,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicAdminArlingtonSelfTestRoute: ApiPublicAdminArlingtonSelfTestRoute,
   ApiPublicAdminRunScannerSelfTestRoute: ApiPublicAdminRunScannerSelfTestRoute,
   ApiPublicAdminSyncArlingtonRoute: ApiPublicAdminSyncArlingtonRoute,
+  ApiPublicAdminSyncBellevueRoute: ApiPublicAdminSyncBellevueRoute,
   ApiPublicAdminSyncLaRoute: ApiPublicAdminSyncLaRoute,
   ApiPublicCronHealthCheckRoute: ApiPublicCronHealthCheckRoute,
   ApiPublicCronSyncLaOccupancyRoute: ApiPublicCronSyncLaOccupancyRoute,
