@@ -40,6 +40,7 @@ import { Route as ApiPublicCronHealthCheckRouteImport } from './routes/api/publi
 import { Route as ApiPublicAdminSyncLaRouteImport } from './routes/api/public/admin.sync-la'
 import { Route as ApiPublicAdminSyncArlingtonRouteImport } from './routes/api/public/admin.sync-arlington'
 import { Route as ApiPublicAdminRunScannerSelfTestRouteImport } from './routes/api/public/admin.run-scanner-self-test'
+import { Route as ApiPublicAdminArlingtonSelfTestRouteImport } from './routes/api/public/admin.arlington-self-test'
 
 const SubscriptionRoute = SubscriptionRouteImport.update({
   id: '/subscription',
@@ -200,6 +201,12 @@ const ApiPublicAdminRunScannerSelfTestRoute =
     path: '/api/public/admin/run-scanner-self-test',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicAdminArlingtonSelfTestRoute =
+  ApiPublicAdminArlingtonSelfTestRouteImport.update({
+    id: '/api/public/admin/arlington-self-test',
+    path: '/api/public/admin/arlington-self-test',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -228,6 +235,7 @@ export interface FileRoutesByFullPath {
   '/admin/validation': typeof AdminValidationRoute
   '/debug/parking': typeof DebugParkingRoute
   '/admin/': typeof AdminIndexRoute
+  '/api/public/admin/arlington-self-test': typeof ApiPublicAdminArlingtonSelfTestRoute
   '/api/public/admin/run-scanner-self-test': typeof ApiPublicAdminRunScannerSelfTestRoute
   '/api/public/admin/sync-arlington': typeof ApiPublicAdminSyncArlingtonRoute
   '/api/public/admin/sync-la': typeof ApiPublicAdminSyncLaRoute
@@ -260,6 +268,7 @@ export interface FileRoutesByTo {
   '/admin/validation': typeof AdminValidationRoute
   '/debug/parking': typeof DebugParkingRoute
   '/admin': typeof AdminIndexRoute
+  '/api/public/admin/arlington-self-test': typeof ApiPublicAdminArlingtonSelfTestRoute
   '/api/public/admin/run-scanner-self-test': typeof ApiPublicAdminRunScannerSelfTestRoute
   '/api/public/admin/sync-arlington': typeof ApiPublicAdminSyncArlingtonRoute
   '/api/public/admin/sync-la': typeof ApiPublicAdminSyncLaRoute
@@ -294,6 +303,7 @@ export interface FileRoutesById {
   '/admin/validation': typeof AdminValidationRoute
   '/debug/parking': typeof DebugParkingRoute
   '/admin/': typeof AdminIndexRoute
+  '/api/public/admin/arlington-self-test': typeof ApiPublicAdminArlingtonSelfTestRoute
   '/api/public/admin/run-scanner-self-test': typeof ApiPublicAdminRunScannerSelfTestRoute
   '/api/public/admin/sync-arlington': typeof ApiPublicAdminSyncArlingtonRoute
   '/api/public/admin/sync-la': typeof ApiPublicAdminSyncLaRoute
@@ -329,6 +339,7 @@ export interface FileRouteTypes {
     | '/admin/validation'
     | '/debug/parking'
     | '/admin/'
+    | '/api/public/admin/arlington-self-test'
     | '/api/public/admin/run-scanner-self-test'
     | '/api/public/admin/sync-arlington'
     | '/api/public/admin/sync-la'
@@ -361,6 +372,7 @@ export interface FileRouteTypes {
     | '/admin/validation'
     | '/debug/parking'
     | '/admin'
+    | '/api/public/admin/arlington-self-test'
     | '/api/public/admin/run-scanner-self-test'
     | '/api/public/admin/sync-arlington'
     | '/api/public/admin/sync-la'
@@ -394,6 +406,7 @@ export interface FileRouteTypes {
     | '/admin/validation'
     | '/debug/parking'
     | '/admin/'
+    | '/api/public/admin/arlington-self-test'
     | '/api/public/admin/run-scanner-self-test'
     | '/api/public/admin/sync-arlington'
     | '/api/public/admin/sync-la'
@@ -417,6 +430,7 @@ export interface RootRouteChildren {
   SplashRoute: typeof SplashRoute
   SubscriptionRoute: typeof SubscriptionRoute
   DebugParkingRoute: typeof DebugParkingRoute
+  ApiPublicAdminArlingtonSelfTestRoute: typeof ApiPublicAdminArlingtonSelfTestRoute
   ApiPublicAdminRunScannerSelfTestRoute: typeof ApiPublicAdminRunScannerSelfTestRoute
   ApiPublicAdminSyncArlingtonRoute: typeof ApiPublicAdminSyncArlingtonRoute
   ApiPublicAdminSyncLaRoute: typeof ApiPublicAdminSyncLaRoute
@@ -643,6 +657,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicAdminRunScannerSelfTestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/admin/arlington-self-test': {
+      id: '/api/public/admin/arlington-self-test'
+      path: '/api/public/admin/arlington-self-test'
+      fullPath: '/api/public/admin/arlington-self-test'
+      preLoaderRoute: typeof ApiPublicAdminArlingtonSelfTestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -692,6 +713,7 @@ const rootRouteChildren: RootRouteChildren = {
   SplashRoute: SplashRoute,
   SubscriptionRoute: SubscriptionRoute,
   DebugParkingRoute: DebugParkingRoute,
+  ApiPublicAdminArlingtonSelfTestRoute: ApiPublicAdminArlingtonSelfTestRoute,
   ApiPublicAdminRunScannerSelfTestRoute: ApiPublicAdminRunScannerSelfTestRoute,
   ApiPublicAdminSyncArlingtonRoute: ApiPublicAdminSyncArlingtonRoute,
   ApiPublicAdminSyncLaRoute: ApiPublicAdminSyncLaRoute,
