@@ -6,6 +6,7 @@
 
 import { ArlingtonProvider } from "./arlington.server";
 import { ArlingtonPermitOverlay } from "./arlington-permit.server";
+import { ArlingtonCurbOverlay } from "./arlington-curb.server";
 import { fetchArcgis } from "./_la-shared.server";
 import type { SyncBbox } from "./types";
 
@@ -15,6 +16,8 @@ const METER_ENDPOINT =
   "https://arlgis.arlingtonva.us/arcgis/rest/services/Open_Data/od_Parking_Meter_Points/FeatureServer/0/query";
 const RPP_ENDPOINT =
   "https://arlgis.arlingtonva.us/arcgis/rest/services/Open_Data/od_Permit_Parking/FeatureServer/0/query";
+const CURB_ENDPOINT =
+  "https://arlgis.arlingtonva.us/arcgis/rest/services/Project_Services/Curb_Management_Data/FeatureServer/0/query";
 
 export interface ProviderDiagnostic {
   provider: string;
@@ -172,6 +175,43 @@ export async function runArlingtonDiagnostics(bbox: SyncBbox): Promise<ProviderD
       sample_feature: null,
       error: (e as Error).message,
       notes: `rpp_fetch_error="${(e as Error).message}"`,
+    });
+  }
+
+  // ---------- arlington-curb (CDS curb-zone polylines) ----------
+  try {
+    const curbFeats = await probeArcgis(CURB_ENDPOINT, bbox);
+    const gType = geomType(curbFeats[0]);
+    const afterBbox = bboxFilterCount(curbFeats, bbox, gType);
+    void ArlingtonCurbOverlay;
+    out.push({
+      provider: "arlington-curb",
+      dataset_url: CURB_ENDPOINT,
+      geometry_type: gType,
+      features_fetched: curbFeats.length,
+      features_after_bbox: afterBbox,
+      segments_generated: 0,
+      rules_generated: curbFeats.length,
+      sample_feature: curbFeats[0] ?? null,
+      error: null,
+      notes:
+        `curb_lines_first_page=${curbFeats.length}` +
+        ` curb_lines_in_bbox=${afterBbox}` +
+        ` geometry_type=${gType}` +
+        ` mode=polyline-snap (paginated during sync, full dataset ~132,140)`,
+    });
+  } catch (e) {
+    out.push({
+      provider: "arlington-curb",
+      dataset_url: CURB_ENDPOINT,
+      geometry_type: "unknown",
+      features_fetched: 0,
+      features_after_bbox: 0,
+      segments_generated: 0,
+      rules_generated: 0,
+      sample_feature: null,
+      error: (e as Error).message,
+      notes: `curb_fetch_error="${(e as Error).message}"`,
     });
   }
 

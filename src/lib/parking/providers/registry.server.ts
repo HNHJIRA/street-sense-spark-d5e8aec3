@@ -16,6 +16,7 @@ import { WestHollywoodPermitOverlay } from "./weho-permit.server";
 import { PasadenaProvider } from "./pasadena.server";
 import { ArlingtonProvider } from "./arlington.server";
 import { ArlingtonPermitOverlay } from "./arlington-permit.server";
+import { ArlingtonCurbOverlay } from "./arlington-curb.server";
 import type { AnyProvider, OverlayProvider, ParkingProvider } from "./types";
 import { isOverlayProvider } from "./types";
 
@@ -32,6 +33,7 @@ const REGISTRY: AnyProvider[] = [
   PasadenaProvider,
   ArlingtonProvider,
   ArlingtonPermitOverlay,
+  ArlingtonCurbOverlay,
 ];
 
 export function getProvidersForCity(citySlug: string): AnyProvider[] {
