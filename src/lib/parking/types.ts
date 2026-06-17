@@ -1,4 +1,4 @@
-export type ParkingColor = "green" | "yellow" | "red";
+export type ParkingColor = "green" | "yellow" | "red" | "gray";
 
 export interface RestrictionType {
   code: string;
