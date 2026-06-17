@@ -54,7 +54,10 @@ async function run() {
     occupancyAgeMin: ageMin,
     unhealthyProviders: unhealthy.map((u) => u.provider),
   }), {
-    status: issues.length === 0 ? 200 : 503,
+    // Always 200 so the response body is the source of truth (`ok` field).
+    // Returning 5xx here makes the preview runtime error overlay blank-screen
+    // the page; alerting should key off `ok === false`, not HTTP status.
+    status: 200,
     headers: { "Content-Type": "application/json" },
   });
 }
