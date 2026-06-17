@@ -168,6 +168,51 @@ function ArlingtonCoveragePage() {
               </div>
             )}
 
+            {diagnostics.length > 0 && (
+              <div style={{ display: "grid", gap: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#0f172a", textTransform: "uppercase", letterSpacing: 0.6 }}>
+                  Per-Stage Diagnostics
+                </div>
+                <div style={{ overflow: "auto", border: "1px solid #e2e8f0", borderRadius: 8 }}>
+                  <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
+                    <thead style={{ background: "#f8fafc" }}>
+                      <tr>{["Provider", "Fetched", "In BBox", "Segments", "Rules", "Geom", "Error"].map((h) => (
+                        <th key={h} style={th}>{h}</th>
+                      ))}</tr>
+                    </thead>
+                    <tbody>
+                      {diagnostics.map((d, i) => (
+                        <tr key={i} style={{ borderTop: "1px solid #f1f5f9" }}>
+                          <td style={td}><strong>{d.provider}</strong></td>
+                          <td style={td}>{d.features_fetched}</td>
+                          <td style={td}>{d.features_after_bbox}</td>
+                          <td style={td}>{d.segments_generated}</td>
+                          <td style={td}>{d.rules_generated}</td>
+                          <td style={td}>{d.geometry_type}</td>
+                          <td style={{ ...td, color: d.error ? "#dc2626" : "#475569" }}>{d.error ?? "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {diagnostics.map((d, i) => (
+                  <details key={i} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: 8 }}>
+                    <summary style={{ cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
+                      {d.provider} — sample feature & notes
+                    </summary>
+                    <div style={{ fontSize: 11, color: "#475569", marginTop: 6 }}>
+                      <div><strong>dataset_url:</strong> <code>{d.dataset_url}</code></div>
+                      <div style={{ marginTop: 4 }}><strong>notes:</strong> {d.notes}</div>
+                    </div>
+                    <pre style={{ marginTop: 8, background: "#0f172a", color: "#e2e8f0", padding: 10, borderRadius: 6, fontSize: 10, maxHeight: 240, overflow: "auto" }}>
+                      {JSON.stringify(d.sample_feature, null, 2)}
+                    </pre>
+                  </details>
+                ))}
+              </div>
+            )}
+
+
             <details open>
               <summary style={{ cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#0f172a" }}>
                 Raw response JSON
