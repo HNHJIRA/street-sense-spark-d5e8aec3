@@ -147,15 +147,18 @@ export async function runArlingtonDiagnostics(bbox: SyncBbox): Promise<ProviderD
       geometry_type: gType,
       features_fetched: rppFeats.length,
       features_after_bbox: afterBbox,
-      // Overlay does not generate segments; rules are inserted by RPC on hit.
+      // Polyline overlay: lines snap onto existing segments via
+      // apply_permit_polyline_overlay. Touched-segment counts surface in
+      // provider_health.notes after the actual sync runs.
       segments_generated: 0,
-      rules_generated: rppFeats.length, // upper bound (1 rule per polygon, applied by RPC)
+      rules_generated: rppFeats.length,
       sample_feature: rppFeats[0] ?? null,
       error: null,
       notes:
-        `rpp_polygons_fetched=${rppFeats.length}` +
-        ` rpp_polygons_in_bbox=${afterBbox}` +
-        ` geometry_type=${gType}`,
+        `rpp_lines_fetched=${rppFeats.length}` +
+        ` rpp_lines_in_bbox=${afterBbox}` +
+        ` geometry_type=${gType}` +
+        ` mode=polyline-snap`,
     });
   } catch (e) {
     out.push({
