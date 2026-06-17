@@ -9,7 +9,7 @@ export interface WhyCardProps {
   /** "right now" or forecast time, formatted by caller. */
   whenLabel: string;
   /** Big verdict color from engine. */
-  color: "green" | "yellow" | "red";
+  color: "green" | "yellow" | "red" | "gray";
   /** Engine label, e.g. "No Parking", "2 Hour Parking". */
   decisionLabel: string;
   /** Human reason / engine notes. */
@@ -30,6 +30,7 @@ const colorClass = {
   green: "border-park-green/40 bg-park-green-soft text-park-green",
   yellow: "border-park-yellow/40 bg-park-yellow-soft text-park-yellow",
   red: "border-park-red/40 bg-park-red-soft text-park-red",
+  gray: "border-border bg-muted text-muted-foreground",
 } as const;
 
 export function WhyCard(props: WhyCardProps) {

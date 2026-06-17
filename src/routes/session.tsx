@@ -280,7 +280,7 @@ function UpcomingAlerts({
   allowedUntil, color, reason, alertSettings, timezone, nowMs,
 }: {
   allowedUntil: string | null;
-  color: "green" | "yellow" | "red";
+  color: "green" | "yellow" | "red" | "gray";
   reason: string | null;
   alertSettings: import("@/lib/parking/alerts").AlertSettings;
   timezone: string;

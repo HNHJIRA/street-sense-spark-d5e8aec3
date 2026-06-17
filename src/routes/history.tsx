@@ -85,7 +85,7 @@ function HistoryPage() {
 
 function Stat({
   icon: Icon, label, value, tone,
-}: { icon: typeof Clock; label: string; value: string; tone?: "green" | "yellow" | "red" }) {
+}: { icon: typeof Clock; label: string; value: string; tone?: "green" | "yellow" | "red" | "gray" }) {
   return (
     <div className="rounded-xl bg-background px-2 py-1.5">
       <div className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">

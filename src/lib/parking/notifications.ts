@@ -23,7 +23,7 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
 
 interface UseSessionAlertSchedulerArgs {
   allowedUntil: string | null;
-  color: "green" | "yellow" | "red";
+  color: "green" | "yellow" | "red" | "gray";
   reason: string | null;
   nowMs: number;
 }

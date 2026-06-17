@@ -28,6 +28,7 @@ const COLOR_HEX: Record<ParkingColor, string> = {
   green: "#22C55E",
   yellow: "#F0CE63",
   red: "#EF4444",
+  gray: "#6B7280",
 };
 
 const EARTH_CIRCUMFERENCE_M = 40_075_016.686;
@@ -402,7 +403,8 @@ export function MapView({ token, city }: MapViewProps) {
               "green", COLOR_HEX.green,
               "yellow", COLOR_HEX.yellow,
               "red", COLOR_HEX.red,
-              COLOR_HEX.green,
+              "gray", COLOR_HEX.gray,
+              COLOR_HEX.gray,
             ];
             const widthExpr: any = [
               "interpolate", ["linear"], ["zoom"],
