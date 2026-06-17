@@ -79,8 +79,11 @@ export const getAccuracyReport = createServerFn({ method: "GET" }).handler(async
     }));
 
   // -- Occupancy
-  const { data: occCountRow } = await admin.rpc("la_area_counts").catch(() => ({ data: null }));
-  void occCountRow;
+  const occRpc = await admin.rpc("la_area_counts").then(
+    (r) => r,
+    () => ({ data: null }),
+  );
+  void occRpc;
   const { data: occHead } = await admin.from("la_meter_occupancy")
     .select("event_time").order("event_time", { ascending: false }).limit(1);
   const occCountRes = await admin.from("la_meter_occupancy").select("space_id", { count: "exact", head: true });
