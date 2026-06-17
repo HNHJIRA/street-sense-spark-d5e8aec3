@@ -24,6 +24,8 @@ const SOURCE_LABELS: Record<string, string> = {
   "santa-monica-opendata": "Santa Monica Open Data",
   "weho-opendata": "West Hollywood Open Data",
   "pasadena-opendata": "Pasadena Open Data",
+  "arlington-opendata": "Arlington County Open Data",
+  "arlington-permit": "Arlington Residential Permit Districts",
 };
 
 // City bbox defaults for "full-city" admin syncs.
