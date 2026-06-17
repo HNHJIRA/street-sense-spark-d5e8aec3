@@ -260,3 +260,12 @@ function ArlingtonCoveragePage() {
 const th: React.CSSProperties = { textAlign: "left", padding: "8px 10px", fontSize: 11, color: "#475569", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4 };
 const td: React.CSSProperties = { padding: "8px 10px", verticalAlign: "top" };
 const muted: React.CSSProperties = { color: "#94a3b8", fontSize: 11 };
+
+function Stat({ label, value, danger }: { label: string; value: React.ReactNode; danger?: boolean }) {
+  return (
+    <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: "8px 10px", background: "#f8fafc" }}>
+      <div style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 700 }}>{label}</div>
+      <div style={{ fontSize: 16, fontWeight: 700, color: danger ? "#dc2626" : "#0f172a", fontVariantNumeric: "tabular-nums" }}>{value}</div>
+    </div>
+  );
+}
