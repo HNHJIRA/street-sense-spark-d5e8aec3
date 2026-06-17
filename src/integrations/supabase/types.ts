@@ -913,9 +913,19 @@ export type Database = {
           p_provider: string
         }
         Returns: {
+          candidate_pairs: number
           lines_input: number
+          lines_parsed: number
+          matched_segments: number
+          ms_match: number
+          ms_parse: number
+          ms_total: number
+          ms_update: number
+          rows_updated: number
           rules_inserted: number
           segments_touched: number
+          timeout_stage: string
+          unmatched_lines: number
         }[]
       }
       arlington_area_counts: {
