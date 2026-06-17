@@ -206,12 +206,21 @@ export const ArlingtonCurbOverlay: OverlayProvider = {
           if (!cls) { skipped++; continue; }
           buckets[cls.code] = (buckets[cls.code] ?? 0) + 1;
           const a = f.attributes;
+          // CDS encodes "24/7" as time_of_day_start == time_of_day_end
+          // (commonly "0"→"0" or "00:00"→"00:00"). parseTime maps both to
+          // "00:00", which the engine's window check (hhmm < end) rejects
+          // forever. Treat equal start/end as all-day so the rule fires.
+          const tsRaw = parseTime(a.time_of_day_start) ?? null;
+          const teRaw = parseTime(a.time_of_day_end) ?? null;
+          const allDay =
+            (tsRaw === null && teRaw === null) ||
+            (tsRaw !== null && teRaw !== null && tsRaw === teRaw);
           lines.push({
             restriction_code: cls.code,
             priority: cls.priority,
             stname: a.street_name ? String(a.street_name).trim() : null,
-            time_start: parseTime(a.time_of_day_start) ?? null,
-            time_end: parseTime(a.time_of_day_end) ?? null,
+            time_start: allDay ? null : tsRaw,
+            time_end: allDay ? null : teRaw,
             days_of_week: parseCdsDays(a.days_of_week),
             permit_zone: cls.permit_zone,
             time_limit_minutes: toMinutes(a.max_stay, a.max_stay_unit),
