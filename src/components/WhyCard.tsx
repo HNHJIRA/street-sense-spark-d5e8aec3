@@ -9,7 +9,7 @@ export interface WhyCardProps {
   /** "right now" or forecast time, formatted by caller. */
   whenLabel: string;
   /** Big verdict color from engine. */
-  color: "green" | "yellow" | "red";
+  color: "green" | "yellow" | "red" | "gray";
   /** Engine label, e.g. "No Parking", "2 Hour Parking". */
   decisionLabel: string;
   /** Human reason / engine notes. */

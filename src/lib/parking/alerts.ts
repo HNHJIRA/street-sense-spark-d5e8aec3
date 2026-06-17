@@ -47,7 +47,7 @@ const THRESHOLDS: Array<{ minutes: number; setting: keyof AlertSettings; label: 
   { minutes: 5,  setting: "warn5",  label: "5 minutes remaining" },
 ];
 
-function reasonToType(reason: string | null | undefined, currentColor: "green" | "yellow" | "red"): AlertType {
+function reasonToType(reason: string | null | undefined, currentColor: "green" | "yellow" | "red" | "gray"): AlertType {
   const r = (reason ?? "").toLowerCase();
   if (r.includes("clean")) return "street_cleaning_starting";
   if (r.includes("permit") || r.includes("rpz")) return "permit_restriction_starting";
@@ -66,7 +66,7 @@ function reasonToType(reason: string | null | undefined, currentColor: "green" |
  */
 export function computeAlertWindows(
   allowedUntil: string | null,
-  currentColor: "green" | "yellow" | "red",
+  currentColor: "green" | "yellow" | "red" | "gray",
   reason: string | null,
   settings: AlertSettings,
   nowMs: number,
@@ -124,7 +124,7 @@ export function nextPlannedAlert(alerts: PlannedAlert[], nowMs: number): Planned
  */
 export function computeRiskScore(
   allowedUntil: string | null,
-  currentColor: "green" | "yellow" | "red",
+  currentColor: "green" | "yellow" | "red" | "gray",
   nowMs: number,
 ): { level: RiskLevel; secondsRemaining: number | null; reason: string } {
   if (currentColor === "red") {

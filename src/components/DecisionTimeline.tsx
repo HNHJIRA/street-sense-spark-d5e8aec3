@@ -13,12 +13,14 @@ const DOT = {
   green: "bg-park-green ring-park-green/30",
   yellow: "bg-park-yellow ring-park-yellow/30",
   red: "bg-park-red ring-park-red/30",
+  gray: "bg-muted ring-muted/30",
 } as const;
 
 const TEXT = {
   green: "text-park-green",
   yellow: "text-park-yellow",
   red: "text-park-red",
+  gray: "text-muted-foreground",
 } as const;
 
 export function DecisionTimeline({ entries, timezone }: Props) {

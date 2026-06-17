@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 
 interface ParkingStatusCardProps {
   segmentName: string;
-  color: "green" | "yellow" | "red";
+  color: "green" | "yellow" | "red" | "gray";
   label: string;
   allowedUntil: string | null;
   reason: string | null;
@@ -45,7 +45,9 @@ export function ParkingStatusCard({
       ? "bg-park-red ring-park-red/30"
       : color === "yellow"
         ? "bg-park-yellow ring-park-yellow/30"
-        : "bg-park-green ring-park-green/30";
+        : color === "gray"
+          ? "bg-muted ring-muted/30"
+          : "bg-park-green ring-park-green/30";
 
   return (
     <div className="rounded-3xl border border-border bg-surface p-4">

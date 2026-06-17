@@ -39,7 +39,7 @@ export interface SegmentDebugReport {
   timezone: string;
 }
 
-const COLOR_HEX = { green: "#16a34a", yellow: "#eab308", red: "#dc2626" } as const;
+const COLOR_HEX = { green: "#16a34a", yellow: "#eab308", red: "#dc2626", gray: "#6b7280" } as const;
 
 export const listDebugSegments = createServerFn({ method: "GET" })
   .inputValidator((input: unknown) =>

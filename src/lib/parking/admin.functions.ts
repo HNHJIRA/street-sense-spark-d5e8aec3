@@ -223,7 +223,7 @@ export const runAdminSync = createServerFn({ method: "POST" })
 export interface ForecastSlot {
   label: string;
   iso: string;
-  color: "green" | "yellow" | "red";
+  color: "green" | "yellow" | "red" | "gray";
   code: string;
   status_label: string;
   matched_rule_id: string | null;

@@ -5,7 +5,7 @@ import type { ParkingRule, ParkingEvent, ParkingStatus, StreetSegment } from "./
 
 export interface Explanation {
   headline: string;          // "NO PARKING" / "LIMITED PARKING" / "PARKING ALLOWED"
-  color: "green" | "yellow" | "red";
+  color: "green" | "yellow" | "red" | "gray";
   reason: string;            // "Street Cleaning"
   active_window: string | null; // "Mon · 8:00 AM – 10:00 AM"
   permit_zone: string | null;
@@ -17,9 +17,10 @@ export interface Explanation {
 
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-function headlineForColor(color: "green" | "yellow" | "red"): string {
+function headlineForColor(color: "green" | "yellow" | "red" | "gray"): string {
   if (color === "red") return "NO PARKING";
   if (color === "yellow") return "LIMITED PARKING";
+  if (color === "gray") return "UNKNOWN";
   return "PARKING ALLOWED";
 }
 

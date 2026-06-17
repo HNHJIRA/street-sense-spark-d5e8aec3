@@ -27,6 +27,7 @@ const COLOR_CLASS = {
   green: "bg-park-green-soft text-park-green border-park-green/40",
   yellow: "bg-park-yellow-soft text-park-yellow border-park-yellow/40",
   red: "bg-park-red-soft text-park-red border-park-red/40",
+  gray: "bg-muted text-muted-foreground border-border",
 } as const;
 
 function formatTime(d: Date, tz: string) {

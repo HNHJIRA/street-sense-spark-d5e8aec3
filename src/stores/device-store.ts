@@ -43,7 +43,7 @@ export interface ParkingSession {
   startedAt: string; // ISO
   // Snapshot from rules engine at the moment of parking — kept for history;
   // the live status screen recomputes via the engine each render.
-  initialColor: "green" | "yellow" | "red";
+  initialColor: "green" | "yellow" | "red" | "gray";
   initialLabel: string;
   initialAllowedUntil: string | null;
   initialReason: string | null;

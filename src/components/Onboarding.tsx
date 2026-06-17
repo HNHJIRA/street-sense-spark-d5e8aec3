@@ -115,7 +115,7 @@ export function Onboarding() {
   );
 }
 
-function Legend({ color, label, detail }: { color: "green" | "yellow" | "red"; label: string; detail: string }) {
+function Legend({ color, label, detail }: { color: "green" | "yellow" | "red" | "gray"; label: string; detail: string }) {
   return (
     <div className="flex items-start gap-3 rounded-2xl bg-surface px-3 py-2">
       <span className={cn("mt-1 h-3 w-3 shrink-0 rounded-full", {
