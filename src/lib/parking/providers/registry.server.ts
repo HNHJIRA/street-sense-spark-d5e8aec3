@@ -14,6 +14,8 @@ import { SantaMonicaMeterProvider } from "./santa-monica-meters.server";
 import { WestHollywoodProvider } from "./west-hollywood.server";
 import { WestHollywoodPermitOverlay } from "./weho-permit.server";
 import { PasadenaProvider } from "./pasadena.server";
+import { ArlingtonProvider } from "./arlington.server";
+import { ArlingtonPermitOverlay } from "./arlington-permit.server";
 import type { AnyProvider, OverlayProvider, ParkingProvider } from "./types";
 import { isOverlayProvider } from "./types";
 
@@ -28,6 +30,8 @@ const REGISTRY: AnyProvider[] = [
   WestHollywoodProvider,
   WestHollywoodPermitOverlay,
   PasadenaProvider,
+  ArlingtonProvider,
+  ArlingtonPermitOverlay,
 ];
 
 export function getProvidersForCity(citySlug: string): AnyProvider[] {
