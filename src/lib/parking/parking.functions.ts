@@ -320,6 +320,7 @@ export interface SyncRunResult {
   skipped: number;
   provider: string;
   error?: string;
+  diagnostics?: Record<string, unknown>;
 }
 
 async function recordSyncStart(
