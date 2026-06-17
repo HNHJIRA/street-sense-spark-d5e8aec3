@@ -20,6 +20,7 @@ export const AVAILABLE_CITIES: { slug: string; name: string }[] = [
   { slug: "west-hollywood", name: "West Hollywood" },
   { slug: "pasadena", name: "Pasadena" },
   { slug: "arlington", name: "Arlington, VA" },
+  { slug: "bellevue", name: "Bellevue, WA" },
   { slug: "seattle", name: "Seattle" },
 ];
 

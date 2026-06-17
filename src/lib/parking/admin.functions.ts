@@ -26,6 +26,7 @@ const SOURCE_LABELS: Record<string, string> = {
   "pasadena-opendata": "Pasadena Open Data",
   "arlington-opendata": "Arlington County Open Data",
   "arlington-permit": "Arlington Residential Permit Districts",
+  "bellevue-opendata": "City of Bellevue Open Data",
 };
 
 // City bbox defaults for "full-city" admin syncs.
@@ -36,6 +37,7 @@ const CITY_BBOX: Record<string, { minLng: number; minLat: number; maxLng: number
   "west-hollywood":{ minLng: -118.400, minLat: 34.070, maxLng: -118.330, maxLat: 34.110 },
   pasadena:        { minLng: -118.200, minLat: 34.110, maxLng: -118.060, maxLat: 34.220 },
   arlington:       { minLng:  -77.175, minLat: 38.820, maxLng:  -77.030, maxLat: 38.940 },
+  bellevue:        { minLng: -122.235, minLat: 47.520, maxLng: -122.080, maxLat: 47.680 },
 };
 
 // ----------------- Provider registry (multi-city readiness) -----------------
