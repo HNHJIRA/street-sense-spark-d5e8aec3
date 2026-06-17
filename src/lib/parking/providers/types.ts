@@ -85,6 +85,9 @@ export interface OverlayResult {
     ms_total?: number;
     timeout_stage?: string;
     rpc_error?: string;
+    conflict_suppressed_segments?: number;
+    conflict_suppressed_rules?: number;
+    conflict_retained_np_segments?: number;
   };
 }
 
