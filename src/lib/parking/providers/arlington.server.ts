@@ -71,13 +71,19 @@ function pickName(a: CenterlineAttrs): string {
   return (
     a.FULLNAME ||
     a.FULL_NAME ||
+    a.STNAME ||
     a.STREETNAME ||
     a.STREET_NAME ||
+    a.STRTNAME ||
     (a.OBJECTID != null ? `Arlington centerline ${a.OBJECTID}` : "Arlington street")
   );
 }
 
 function meterTimeLimitMinutes(a: MeterAttrs): number | null {
+  // Arlington publishes time limit as hours in the `Hours` field
+  // (e.g. "1" = 1 hour). Legacy `TIME_LIMIT` (minutes) is kept as fallback.
+  const hours = Number(a.Hours);
+  if (Number.isFinite(hours) && hours > 0) return Math.round(hours * 60);
   const n = Number(a.TIME_LIMIT);
   return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
 }
