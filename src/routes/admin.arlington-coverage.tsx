@@ -27,10 +27,20 @@ function classify(a: ArlingtonAreaCoverage): { label: string; color: string } {
   return { label: "IMPORTED", color: "#0ea5e9" };
 }
 
+interface DebugSync {
+  status: number;
+  durationMs: number;
+  startedAt: string;
+  body: any;
+}
+
 function ArlingtonCoveragePage() {
   const fn = useServerFn(getArlingtonCoverage);
   const sync = useServerFn(runAdminSync);
   const [syncing, setSyncing] = useState(false);
+  const [debugSyncing, setDebugSyncing] = useState(false);
+  const [debug, setDebug] = useState<DebugSync | null>(null);
+  const [debugError, setDebugError] = useState<string | null>(null);
   const q = useQuery({
     queryKey: ["arlington-coverage"],
     queryFn: () => fn(),
@@ -46,6 +56,30 @@ function ArlingtonCoveragePage() {
       setSyncing(false);
     }
   }
+
+  async function runDebugSync() {
+    setDebugSyncing(true);
+    setDebugError(null);
+    const startedAt = new Date().toISOString();
+    const t0 = performance.now();
+    try {
+      const res = await fetch("/api/public/admin/sync-arlington?wait=1", { method: "GET" });
+      const text = await res.text();
+      let body: any = text;
+      try { body = JSON.parse(text); } catch { /* keep raw */ }
+      setDebug({ status: res.status, durationMs: Math.round(performance.now() - t0), startedAt, body });
+      await q.refetch();
+    } catch (e) {
+      setDebugError((e as Error).message);
+    } finally {
+      setDebugSyncing(false);
+    }
+  }
+
+  const pr = debug?.body?.providerRun;
+  const providersRun: any[] = Array.isArray(pr?.providers) ? pr.providers : Array.isArray(pr) ? pr : [];
+  const imported = providersRun.reduce((s, p) => s + (p?.imported ?? p?.segments_imported ?? 0), 0);
+  const skipped = providersRun.reduce((s, p) => s + (p?.skipped ?? 0), 0);
 
   return (
     <div style={{ display: "grid", gap: 20 }}>
@@ -73,7 +107,81 @@ function ArlingtonCoveragePage() {
         >
           {syncing ? "Syncing…" : "Sync Arlington"}
         </button>
+        <button
+          onClick={runDebugSync}
+          disabled={debugSyncing}
+          style={{
+            padding: "8px 12px", borderRadius: 8, border: "1px solid #0f172a",
+            background: debugSyncing ? "#334155" : "#0f172a", color: "white",
+            fontSize: 12, fontWeight: 600, cursor: debugSyncing ? "wait" : "pointer",
+          }}
+        >
+          {debugSyncing ? "Running…" : "Run Sync Now (debug)"}
+        </button>
       </section>
+
+      <section style={{ border: "1px solid #e2e8f0", borderRadius: 8, background: "white", padding: 14 }}>
+        <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0, marginBottom: 10, textTransform: "uppercase", letterSpacing: 0.6, color: "#0f172a" }}>
+          Sync Debug Panel
+        </h3>
+        {!debug && !debugError && (
+          <div style={{ fontSize: 12, color: "#64748b" }}>
+            Click <strong>Run Sync Now (debug)</strong> to hit{" "}
+            <code>/api/public/admin/sync-arlington?wait=1</code> and inspect the raw response.
+          </div>
+        )}
+        {debugError && <div style={{ color: "#dc2626", fontSize: 13 }}>Error: {debugError}</div>}
+        {debug && (
+          <div style={{ display: "grid", gap: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 8 }}>
+              <Stat label="HTTP Status" value={debug.status} danger={debug.status >= 400} />
+              <Stat label="Duration" value={`${debug.durationMs} ms`} />
+              <Stat label="Providers Run" value={providersRun.length} />
+              <Stat label="Imported" value={imported} />
+              <Stat label="Skipped" value={skipped} />
+              <Stat label="Started" value={new Date(debug.startedAt).toLocaleTimeString()} />
+            </div>
+
+            {providersRun.length > 0 && (
+              <div style={{ overflow: "auto", border: "1px solid #e2e8f0", borderRadius: 8 }}>
+                <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
+                  <thead style={{ background: "#f8fafc" }}>
+                    <tr>{["Provider", "Imported", "Skipped", "Last Error", "Notes"].map((h) => (
+                      <th key={h} style={th}>{h}</th>
+                    ))}</tr>
+                  </thead>
+                  <tbody>
+                    {providersRun.map((p, i) => (
+                      <tr key={i} style={{ borderTop: "1px solid #f1f5f9" }}>
+                        <td style={td}>{p?.provider ?? p?.id ?? `#${i}`}</td>
+                        <td style={td}>{p?.imported ?? p?.segments_imported ?? 0}</td>
+                        <td style={td}>{p?.skipped ?? 0}</td>
+                        <td style={{ ...td, color: p?.last_error || p?.error ? "#dc2626" : "#475569" }}>
+                          {p?.last_error ?? p?.error ?? "—"}
+                        </td>
+                        <td style={{ ...td, color: "#475569" }}>{p?.notes ?? "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <details open>
+              <summary style={{ cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#0f172a" }}>
+                Raw response JSON
+              </summary>
+              <pre style={{
+                marginTop: 8, background: "#0f172a", color: "#e2e8f0", padding: 12,
+                borderRadius: 8, fontSize: 11, maxHeight: 360, overflow: "auto",
+              }}>
+                {JSON.stringify(debug.body, null, 2)}
+              </pre>
+            </details>
+          </div>
+        )}
+      </section>
+
 
       <section style={{ overflow: "auto", border: "1px solid #e2e8f0", borderRadius: 8, background: "white" }}>
         <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
@@ -152,3 +260,12 @@ function ArlingtonCoveragePage() {
 const th: React.CSSProperties = { textAlign: "left", padding: "8px 10px", fontSize: 11, color: "#475569", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4 };
 const td: React.CSSProperties = { padding: "8px 10px", verticalAlign: "top" };
 const muted: React.CSSProperties = { color: "#94a3b8", fontSize: 11 };
+
+function Stat({ label, value, danger }: { label: string; value: React.ReactNode; danger?: boolean }) {
+  return (
+    <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: "8px 10px", background: "#f8fafc" }}>
+      <div style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 700 }}>{label}</div>
+      <div style={{ fontSize: 16, fontWeight: 700, color: danger ? "#dc2626" : "#0f172a", fontVariantNumeric: "tabular-nums" }}>{value}</div>
+    </div>
+  );
+}
