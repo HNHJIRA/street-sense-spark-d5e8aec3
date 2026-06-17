@@ -315,12 +315,26 @@ export const checkParkingHere = createServerFn({ method: "GET" })
 
 // ---------- Provider sync (Seattle SDOT Blockface and future providers) ----------
 
+export interface SyncRunDiagnostics {
+  lines_input?: number;
+  lines_parsed?: number;
+  candidate_pairs?: number;
+  matched_segments?: number;
+  unmatched_lines?: number;
+  rows_updated?: number;
+  ms_parse?: number;
+  ms_match?: number;
+  ms_update?: number;
+  ms_total?: number;
+  timeout_stage?: string;
+  rpc_error?: string;
+}
 export interface SyncRunResult {
   imported: number;
   skipped: number;
   provider: string;
   error?: string;
-  diagnostics?: Record<string, unknown>;
+  diagnostics?: SyncRunDiagnostics;
 }
 
 async function recordSyncStart(
