@@ -33,6 +33,7 @@ const CITY_BBOX: Record<string, { minLng: number; minLat: number; maxLng: number
   "santa-monica":  { minLng: -118.530, minLat: 33.990, maxLng: -118.440, maxLat: 34.060 },
   "west-hollywood":{ minLng: -118.400, minLat: 34.070, maxLng: -118.330, maxLat: 34.110 },
   pasadena:        { minLng: -118.200, minLat: 34.110, maxLng: -118.060, maxLat: 34.220 },
+  arlington:       { minLng:  -77.175, minLat: 38.820, maxLng:  -77.030, maxLat: 38.940 },
 };
 
 // ----------------- Provider registry (multi-city readiness) -----------------
