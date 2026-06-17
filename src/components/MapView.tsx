@@ -403,7 +403,8 @@ export function MapView({ token, city }: MapViewProps) {
               "green", COLOR_HEX.green,
               "yellow", COLOR_HEX.yellow,
               "red", COLOR_HEX.red,
-              COLOR_HEX.green,
+              "gray", COLOR_HEX.gray,
+              COLOR_HEX.gray,
             ];
             const widthExpr: any = [
               "interpolate", ["linear"], ["zoom"],
