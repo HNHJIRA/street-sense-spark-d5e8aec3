@@ -1,104 +1,94 @@
-# Data Completeness Sprint — Plan
+# Add Arlington, VA as a supported city
 
-No new consumer-facing features. Every change is plumbing, providers, or admin-only dashboards.
+This adds Arlington County, Virginia to the Parking Intelligence platform following the same architecture as Los Angeles, Santa Monica, West Hollywood, and Pasadena. The engine will never invent legality — anything Arlington doesn't publish stays UNKNOWN until resolved by a sign scan.
 
-## P1 — Seattle Restriction Layering
+## Phase 1 — Data Discovery (Arlington GIS Open Data)
 
-Today the `SeattleBlockfaceProvider` writes exactly one rule per blockface from `PARKING_CATEGORY`. To get to 3–5 rules/segment we layer additional SDOT datasets and write them as additional `parking_rules` rows attached to the **same** `street_segments` (matched by spatial proximity to the blockface centerline).
+Arlington publishes geospatial data primarily through the **Arlington County GIS Open Data Hub** (ArcGIS Hub) and **TransportationGIS** ArcGIS REST services. I'll audit and document:
 
-New providers (additive, each in its own `*.server.ts`):
+| # | Dataset | Source (ArcGIS REST / Hub) | Geometry | Usable for curb legality? |
+|---|---|---|---|---|
+| 1 | Street Centerlines | `gisdata.arlingtonva.us/.../MapServer` | LineString | Yes — base for segments |
+| 2 | Parking Meters | Arlington GIS Hub: Parking Meters layer | Point | Yes — `metered` |
+| 3 | Residential Permit Parking (RPP) Zones | Hub: RPP District polygons | Polygon | Yes — `permit_only` overlay |
+| 4 | Loading Zones | Hub: Curbspace / Loading layer (if published) | Point/Line | Yes — `loading_only` |
+| 5 | Time-Limited Parking | Hub: Curb Regulations (if published) | Line | Yes — `time_limited` |
+| 6 | Street Sweeping | Hub: DES sweeping routes (if published) | Line | Yes — `street_sweeping` |
+| 7 | Tow-away / No-Parking | Hub: signage layer (often absent) | Point | Partial — usually UNKNOWN |
+| 8 | Garages & Lots | Hub: Parking Facilities | Point/Polygon | Off-street, info-only |
 
-1. `SeattleSignpostsProvider` — SDOT Signposts FeatureService (point dataset of every posted sign). Parse the sign text into restrictions (no parking, time-limit, tow-away, loading zone) using the existing `sign-ai`/`scan-summary` rule extractor. Snap each sign to the nearest blockface within ~25 m and append rules.
-2. `SeattleStreetCleaningProvider` — SDOT Street Sweeping routes. Append `street_cleaning` rules with day-of-week + time windows.
-3. `SeattleRpzProvider` — SDOT Restricted Parking Zones (RPZ) polygons. For every blockface intersecting an RPZ polygon, append a `permit` rule with `permit_zone = <zone#>`.
-4. `SeattleTemporaryRestrictionsProvider` — SDOT Temporary No-Parking permits. Append rules with `effective_from`/`effective_to` set so the engine auto-expires them.
+The discovery report (saved as `docs/arlington-coverage-discovery.md`) will list final URLs, feature counts, last-update dates, and an explicit "UNKNOWN — not published" entry for any dataset Arlington doesn't expose. Datasets not present at sync time are skipped gracefully and logged in `provider_health.notes`.
 
-Sync orchestration:
+## Phase 2 — Providers
 
-- New `syncCityAllProviders(citySlug, bbox)` server fn that runs every provider registered for the city in series and **appends** rules instead of replacing the whole rule set (current `syncProvider` deletes-then-inserts — change it to delete only rules whose `data_source` matches the provider being synced, by adding a `data_source` column to `parking_rules`).
-- `registry.server.ts` returns an array of providers per city (not single).
+Following `src/lib/parking/providers/types.ts`:
 
-Schema migration:
+- `src/lib/parking/providers/arlington.server.ts` — `ArlingtonProvider` (segment-creating, street centerlines + meters baseline).
+- `src/lib/parking/providers/arlington-permit.server.ts` — `ArlingtonPermitOverlay` (RPP polygons → `permit_only` rules on segments via PostGIS spatial join, mirroring `weho-permit.server.ts`).
+- `src/lib/parking/providers/arlington-loading.server.ts` — overlay for loading zones (if dataset exists).
+- `src/lib/parking/providers/arlington-sweeping.server.ts` — overlay for sweeping routes (if dataset exists).
 
-- `ALTER TABLE parking_rules ADD COLUMN data_source TEXT;` + index on `(street_segment_id, data_source)`.
+Each registers in `src/lib/parking/providers/registry.server.ts` with `cities: ["arlington"]`, writes to `provider_health`, and participates in `syncProvider` / `syncAllProvidersForCity`.
 
-## P2 — LA Coverage Expansion
+## Phase 3 — Segment generation
 
-Today `SantaMonicaProvider`, `PasadenaProvider`, `WestHollywoodProvider` exist but have **0 segments synced** because nobody has triggered a sync for their bboxes. Two fixes:
+`ArlingtonProvider.fetchSegments` returns `NormalizedSegment[]` from street centerlines, deduped by `external_id = arlington:centerline/<OBJECTID>`. Existing upsert logic in `parking.functions.ts` handles dedup + `data_source` attribution. Side = `both` unless the dataset provides a curb side.
 
-1. **Trigger initial sync.** Extend the admin LA sync endpoint (`/api/public/admin/sync-la`) to call `syncProvider` for each of `santa-monica`, `pasadena`, `west-hollywood` using each city's full bbox (computed from the existing `cities.center` + a sensible radius per city). Also enroll them in the same daily provider re-sync that LADOT uses.
-2. **Add real datasets** beyond street sweeping where they exist:
-   - Santa Monica: Preferential Parking Zones (permit polygons), Metered Parking inventory.
-   - Pasadena: Preferential Parking Districts, Metered Zones.
-   - West Hollywood: Permit Parking Districts (already partially wired), Time-Limited Zones.
+## Phase 4 — Rule mapping
 
-Each new dataset goes into the same `*.server.ts` provider as additional `fetchSegments` calls; rules are appended to the same blockfaces.
+| Arlington dataset | restriction_code |
+|---|---|
+| Meters | `metered` |
+| RPP zone | `permit_only` (+ `permit_zone`) |
+| Loading zone | `loading_only` |
+| Time-limited curb | `time_limited` (+ `time_limit_minutes`) |
+| Sweeping route | `street_sweeping` (+ day/time) |
+| Tow-away sign point | `tow_away` |
+| No matching data | row omitted → engine returns UNKNOWN |
 
-## P3 — Occupancy Verification
+Priority order matches the existing engine. No legality is fabricated.
 
-Cron already runs `/api/public/cron/sync-la-occupancy` every 5 minutes. Add:
+## Phase 5 — Admin dashboard
 
-- `getOccupancyHealth()` server fn returning `{ rowCount, freshestEventAgeMin, last5RunDurations, last5RunErrors }` from `la_meter_occupancy` + `sync_logs`.
-- New `/api/public/cron/health-check` endpoint that:
-  - Asserts `freshestAgeMin < 15`
-  - Asserts `rowCount > 0`
-  - Inserts a `usage_events` row tagged `provider_health` on failure for alerting.
-- Surface freshness in the existing `/admin/accuracy` dashboard (already partially present; add per-cron last-run + error rate).
+- Add `arlington` to the city list in `src/routes/api/public/admin.sync-la.ts` (or a new `admin.sync-arlington.ts` endpoint mirroring it — I'll add the dedicated route per the task).
+- Extend `src/lib/parking/la-coverage.functions.ts` → rename internal helpers to be city-agnostic and add Arlington areas (Rosslyn, Courthouse, Clarendon, Ballston, Crystal City, Pentagon City, Shirlington, Columbia Pike). The existing `/admin/la-coverage` page stays; I'll add `/admin/arlington-coverage` reusing the same component shape.
+- Surface Arlington in `admin.accuracy.tsx`, `admin.health.tsx`, `admin.provider-sync.tsx` city pickers.
 
-## P4 — Scanner Validation QA
+## Phase 6 — Coverage report
 
-Programmatic test harness, NOT a UI feature.
+Generate `docs/arlington-coverage-report.md` summarizing segments, rules, rule density, % sweeping / permit / metered / unknown, provider health, dataset limitations, and recommended next steps (e.g. "Arlington does not publish a curb-regulations dataset — resolve via AI Sign Scanner").
 
-- New server fn `runScannerSelfTest()` that submits 5 synthetic scans per city:
-  - inside a known segment (expect `matched`)
-  - 10 m off a segment with conflicting OCR text (expect `conflict`)
-  - 5 km from any segment (expect `out_of_range`)
-  - no GPS provided (expect `no_gps`)
-  - inside a segment with no posted rule (expect `unmatched`)
-- Persist results to `scan_validation_results` tagged `source = 'self_test'`.
-- Surface pass/fail matrix on `/admin/accuracy` ("Scanner QA" card per city).
+## Database changes
 
-## P5 — Accuracy Dashboard Expansion
+One migration:
+1. `INSERT INTO public.cities (slug, name, timezone, center, default_zoom)` for `arlington` (timezone `America/New_York`, center near Courthouse `[-77.0852, 38.8903]`).
+2. Postgres function `arlington_area_counts(p_city_id, bbox...)` mirroring `la_area_counts` for the coverage dashboard.
 
-Extend `getAccuracyReport()` and `/admin/accuracy` to add:
+No new tables — Arlington reuses `street_segments`, `parking_rules`, `provider_health`, `sync_logs`.
 
-- **Rule depth histogram per city** (1/2/3/4/5+ rules per segment).
-- **Provider completeness matrix** — rows = providers, columns = (segments synced, rules contributed, last run, last error).
-- **Occupancy panel** — rowCount, freshness, last 5 cron run durations.
-- **Scanner QA panel** — pass/fail matrix from P4.
-- **Multi-rule coverage** — % of segments with ≥2 overlapping rules per city (target ≥80% Seattle, ≥50% LA).
+## Technical notes
 
-## Technical Details
+- All Arlington REST calls use bbox filtering and pagination (`resultOffset` / `resultRecordCount`) like the existing LA providers.
+- Network failures or missing datasets set `provider_health.healthy = false` with a clear `last_error`, never throw out of the sync.
+- New providers follow the `*.server.ts` naming so they stay out of the client bundle.
+- Endpoint: `GET /api/public/admin/sync-arlington?wait=1` runs the bounded city sync (same safety rails as `sync-la`).
 
-Files added:
+## Files to add
 
-- `src/lib/parking/providers/seattle-signposts.server.ts`
-- `src/lib/parking/providers/seattle-street-cleaning.server.ts`
-- `src/lib/parking/providers/seattle-rpz.server.ts`
-- `src/lib/parking/providers/seattle-temp-restrictions.server.ts`
-- `src/lib/parking/scanner-self-test.functions.ts`
-- `src/routes/api/public/cron.health-check.ts`
+- `src/lib/parking/providers/arlington.server.ts`
+- `src/lib/parking/providers/arlington-permit.server.ts`
+- `src/lib/parking/providers/arlington-loading.server.ts`
+- `src/lib/parking/providers/arlington-sweeping.server.ts`
+- `src/lib/parking/arlington-coverage.functions.ts`
+- `src/routes/admin.arlington-coverage.tsx`
+- `src/routes/api/public/admin.sync-arlington.ts`
+- `docs/arlington-coverage-discovery.md`
+- `docs/arlington-coverage-report.md`
 
-Files changed:
+## Files to edit
 
-- `src/lib/parking/providers/registry.server.ts` — return `ParkingProvider[]` per city.
-- `src/lib/parking/parking.functions.ts` — `syncProvider` becomes provider-scoped rule replace (uses new `data_source` column); add `syncCityAllProviders`.
-- `src/lib/parking/providers/santa-monica.server.ts`, `pasadena.server.ts`, `west-hollywood.server.ts` — add permit/meter datasets.
-- `src/routes/api/public/admin.sync-la.ts` — sync all 4 LA cities, not just LADOT.
-- `src/lib/parking/accuracy.functions.ts` + `src/routes/admin.accuracy.tsx` — new panels (rule depth, provider matrix, scanner QA, occupancy panel).
-- `supabase` migration: add `parking_rules.data_source TEXT` + index.
+- `src/lib/parking/providers/registry.server.ts` — register Arlington providers.
+- `src/routes/admin.index.tsx` — link to Arlington coverage page.
+- One Supabase migration for the `cities` row + `arlington_area_counts` SQL function.
 
-## Out of Scope
-
-- No new end-user UI.
-- No changes to the parking decision engine ranking logic itself.
-- No mobile / CarPlay work.
-- ML-based predictive availability (Phase 5+).
-
-## Success Criteria
-
-- Seattle `rulesPerSegment` ≥ 3 average; `twoPlusRuleSegments / segments` ≥ 0.8.
-- Santa Monica, Pasadena, West Hollywood each have ≥ 500 segments and ≥ 1 rule/segment.
-- Occupancy cron health-check green; freshness < 15 min.
-- Scanner self-test produces ≥ 1 example of each verdict (`matched`, `conflict`, `unmatched`, `out_of_range`, `no_gps`) per city.
-- Accuracy dashboard shows all five new panels with live data.
+After approval I'll implement Phases 1–6 in that order, starting with the migration.
