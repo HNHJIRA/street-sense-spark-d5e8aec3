@@ -233,6 +233,47 @@ function ArlingtonCoveragePage() {
                 </>
               )}
             </div>
+
+            {permitRun && (
+              <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#0f172a", textTransform: "uppercase", letterSpacing: 0.6 }}>
+                  Permit Overlay Pipeline (arlington-permit)
+                </div>
+                {permitRun.error && (
+                  <div style={{ color: "#dc2626", fontSize: 12 }}>
+                    error: {String(permitRun.error)}
+                  </div>
+                )}
+                <div style={{ overflow: "auto", border: "1px solid #e2e8f0", borderRadius: 8 }}>
+                  <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
+                    <tbody>
+                      {[
+                        ["imported (rules_inserted)", permitRun.imported],
+                        ["lines_input", permitRun.diagnostics?.lines_input],
+                        ["lines_parsed", permitRun.diagnostics?.lines_parsed],
+                        ["candidate_pairs (bbox prefilter)", permitRun.diagnostics?.candidate_pairs],
+                        ["matched_segments", permitRun.diagnostics?.matched_segments],
+                        ["unmatched_lines", permitRun.diagnostics?.unmatched_lines],
+                        ["rows_updated", permitRun.diagnostics?.rows_updated],
+                        ["ms_parse", permitRun.diagnostics?.ms_parse],
+                        ["ms_match", permitRun.diagnostics?.ms_match],
+                        ["ms_update", permitRun.diagnostics?.ms_update],
+                        ["ms_total (rpc_runtime_ms)", permitRun.diagnostics?.ms_total],
+                        ["timeout_stage", permitRun.diagnostics?.timeout_stage],
+                        ["rpc_error", permitRun.diagnostics?.rpc_error],
+                      ].map(([k, v]) => (
+                        <tr key={String(k)} style={{ borderTop: "1px solid #f1f5f9" }}>
+                          <td style={{ ...td, fontWeight: 600, width: "45%" }}>{k}</td>
+                          <td style={{ ...td, color: v == null ? "#94a3b8" : "#0f172a" }}>
+                            {v == null ? "—" : String(v)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </section>
