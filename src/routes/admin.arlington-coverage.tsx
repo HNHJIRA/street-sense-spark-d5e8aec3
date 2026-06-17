@@ -81,6 +81,8 @@ function ArlingtonCoveragePage() {
   const imported = providersRun.reduce((s, p) => s + (p?.imported ?? p?.segments_imported ?? 0), 0);
   const skipped = providersRun.reduce((s, p) => s + (p?.skipped ?? 0), 0);
   const diagnostics: any[] = Array.isArray(debug?.body?.diagnostics) ? debug!.body.diagnostics : [];
+  const providerResults: any[] = Array.isArray(debug?.body?.providerRun?.results) ? debug!.body.providerRun.results : [];
+  const permitRun = providerResults.find((r) => r?.provider === "arlington-permit");
 
   return (
     <div style={{ display: "grid", gap: 20 }}>
