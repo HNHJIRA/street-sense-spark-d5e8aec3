@@ -903,6 +903,22 @@ export type Database = {
           segments_touched: number
         }[]
       }
+      arlington_area_counts: {
+        Args: {
+          p_city_id: string
+          p_max_lat: number
+          p_max_lng: number
+          p_min_lat: number
+          p_min_lng: number
+        }
+        Returns: {
+          metered: number
+          permit: number
+          segments: number
+          sweeping: number
+          unknown: number
+        }[]
+      }
       city_center_geojson: { Args: { p_slug: string }; Returns: string }
       disablelongtransactions: { Args: never; Returns: string }
       dropgeometrycolumn:
