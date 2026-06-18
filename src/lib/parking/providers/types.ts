@@ -99,6 +99,12 @@ export interface OverlayResult {
     skipped_inactive?: number;
     polygons_fetched?: number;
     polygons_in_bbox?: number;
+    signs_fetched?: number;
+    parking_signs?: number;
+    signs_classified?: number;
+    signs_matched?: number;
+    rules_inserted?: number;
+    unmatched_signs?: number;
   };
 }
 
