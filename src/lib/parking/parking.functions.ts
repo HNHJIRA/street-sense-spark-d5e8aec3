@@ -568,10 +568,25 @@ export const syncAllProvidersForCity = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { getSegmentProvidersForCity, getOverlayProvidersForCity } =
       await import("./providers/registry.server");
-    const ordered = [
-      ...getSegmentProvidersForCity(data.citySlug),
-      ...getOverlayProvidersForCity(data.citySlug),
-    ];
+    const segmentProviders = getSegmentProvidersForCity(data.citySlug);
+    const overlayProviders = getOverlayProvidersForCity(data.citySlug);
+    const ordered = [...segmentProviders, ...overlayProviders];
+
+    if (data.citySlug === "bellevue") {
+      console.log(
+        "Bellevue Segment Providers:",
+        segmentProviders.map((p) => p.id),
+      );
+      console.log(
+        "Bellevue Overlay Providers:",
+        overlayProviders.map((p) => p.id),
+      );
+      console.log(
+        "Bellevue Total Providers:",
+        ordered.map((p) => p.id),
+      );
+    }
+
     const results: Array<SyncRunResult & { providerName: string }> = [];
     for (const p of ordered) {
       try {
