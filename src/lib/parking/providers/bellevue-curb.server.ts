@@ -163,11 +163,12 @@ export const BellevueCurbOverlay: OverlayProvider = {
 
         for (const f of feats) {
           const a = f.attributes;
-          const neighborhood = (a.neighborhood ?? "").toString().trim().toLowerCase();
-          if (neighborhood !== "belred") {
-            skipped_neighborhood++;
-            continue;
-          }
+          // Track neighborhood for diagnostics but don't gate on it: the
+          // upstream feed is the city's published curb-typology dataset
+          // and every row is equally authoritative.
+          const neighborhood = (a.neighborhood ?? "").toString().trim();
+          neighborhood_counts[neighborhood || "(none)"] =
+            (neighborhood_counts[neighborhood || "(none)"] ?? 0) + 1;
           const cls = classify(a);
           if (!cls) {
             skipped_unclassified++;
