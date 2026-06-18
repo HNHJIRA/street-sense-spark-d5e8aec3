@@ -216,8 +216,16 @@ export const runAdminSync = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const bbox = CITY_BBOX[data.citySlug];
     if (!bbox) return { imported: 0, skipped: 0, provider: "none", error: `No bbox configured for ${data.citySlug}` };
-    const { syncProvider } = await import("./parking.functions");
-    return syncProvider({ data: { citySlug: data.citySlug, ...bbox, force: true } as any });
+    const { syncAllProvidersForCity } = await import("./parking.functions");
+    const providerRun = await syncAllProvidersForCity({
+      data: { citySlug: data.citySlug, ...bbox, force: true },
+    });
+    return {
+      imported: providerRun.totals.imported,
+      skipped: providerRun.totals.skipped,
+      provider: "all",
+      providerRun,
+    };
   });
 
 // ----------------- Forecast matrix (multi-time evaluation) -----------------
