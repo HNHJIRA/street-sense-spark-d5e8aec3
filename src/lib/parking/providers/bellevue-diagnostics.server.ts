@@ -19,6 +19,10 @@ const CBD_ENDPOINT =
   "https://gis-web.bellevuewa.gov/gisext/rest/services/Enterprise/Enterprise_Transportation/MapServer/95/query";
 const RPZ_STREETS_ENDPOINT =
   "https://gis-web.bellevuewa.gov/gisext/rest/services/Enterprise/Enterprise_Transportation/MapServer/97/query";
+const PAINTED_CURBS_ENDPOINT =
+  "https://gis-web.bellevuewa.gov/gisext/rest/services/Enterprise/Enterprise_Transportation/MapServer/647/query";
+const BUS_LAYOVERS_ENDPOINT =
+  "https://gis-web.bellevuewa.gov/gisext/rest/services/Enterprise/Enterprise_Transportation/MapServer/108/query";
 
 export interface ProviderDiagnostic {
   provider: string;
