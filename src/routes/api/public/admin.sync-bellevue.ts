@@ -28,6 +28,28 @@ async function run({ request }: { request: Request }) {
       data: { citySlug: "bellevue", ...BELLEVUE_BBOX, force: true },
     });
 
+    // Derive complementary `allowed` rules from time-bounded restrictions
+    // (cbd / rpz-streets) so the map shows green outside published windows
+    // instead of falling back to the priority-900 unknown baseline.
+    let derivedAllowed: unknown = null;
+    let derivedAllowedError: string | null = null;
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: city } = await supabaseAdmin
+        .from("cities").select("id").eq("slug", "bellevue").maybeSingle();
+      if (city?.id) {
+        const { data, error } = await supabaseAdmin.rpc(
+          "apply_bellevue_derived_allowed",
+          { p_city_id: city.id },
+        );
+        if (error) throw new Error(error.message);
+        derivedAllowed = Array.isArray(data) ? data[0] : data;
+      }
+    } catch (e) {
+      derivedAllowedError = (e as Error).message;
+    }
+
+
     // ---------- Diagnostics (read-only) ----------
     const { runBellevueDiagnostics } = await import(
       "@/lib/parking/providers/bellevue-diagnostics.server"
@@ -61,6 +83,8 @@ async function run({ request }: { request: Request }) {
     return new Response(JSON.stringify({
       ok: true,
       providerRun,
+      derivedAllowed,
+      derivedAllowedError,
       diagnostics,
       diagnosticsError,
     }), {
