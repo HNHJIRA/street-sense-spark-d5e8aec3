@@ -23,6 +23,8 @@ const PAINTED_CURBS_ENDPOINT =
   "https://gis-web.bellevuewa.gov/gisext/rest/services/Enterprise/Enterprise_Transportation/MapServer/647/query";
 const BUS_LAYOVERS_ENDPOINT =
   "https://gis-web.bellevuewa.gov/gisext/rest/services/Enterprise/Enterprise_Transportation/MapServer/108/query";
+const SIGNS_ENDPOINT =
+  "https://gis-web.bellevuewa.gov/gisext/rest/services/Enterprise/Enterprise_Transportation/MapServer/137/query";
 
 export interface ProviderDiagnostic {
   provider: string;
@@ -423,6 +425,79 @@ export async function runBellevueDiagnostics(bbox: SyncBbox): Promise<ProviderDi
       sample_feature: null,
       error: (e as Error).message,
       notes: `bus_layovers_fetch_error="${(e as Error).message}"`,
+    });
+  }
+
+  // ---------- bellevue-signs (Enterprise_Transportation / Layer 137) ----------
+  try {
+    // Server-side prefilter: only R7-/R8- parking sign series.
+    const PAGE = 2000;
+    const HARD = 50_000;
+    const all: Array<{ geometry?: unknown; attributes?: { SignTypeDescription?: string } }> = [];
+    let offset = 0;
+    let more = true;
+    while (more) {
+      const json = (await fetchArcgis(SIGNS_ENDPOINT, {
+        where: "SignTypeDescription LIKE 'R7%' OR SignTypeDescription LIKE 'R8%'",
+        outFields: "OBJECTID,SignTypeDescription",
+        returnGeometry: "true",
+        outSR: "4326",
+        resultRecordCount: String(PAGE),
+        resultOffset: String(offset),
+        orderByFields: "OBJECTID",
+      })) as {
+        features?: Array<{ geometry?: unknown; attributes?: { SignTypeDescription?: string } }>;
+        exceededTransferLimit?: boolean;
+      };
+      const feats = json.features ?? [];
+      all.push(...feats);
+      more = !!json.exceededTransferLimit && feats.length > 0;
+      offset += feats.length;
+      if (offset > HARD) break;
+    }
+    const gType = geomType(all[0]);
+    const afterBbox = bboxFilterCount(all, bbox, gType);
+    const counts: Record<string, number> = {};
+    for (const f of all) {
+      const d = (f.attributes?.SignTypeDescription ?? "").trim();
+      const m = d.match(/^(R[78])-?(\d{1,4})/i);
+      if (!m) continue;
+      const k = `${m[1].toUpperCase()}-${m[2]}`;
+      counts[k] = (counts[k] ?? 0) + 1;
+    }
+    const top = Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([k, v]) => `${k}=${v}`)
+      .join(" ");
+    out.push({
+      provider: "bellevue-signs",
+      dataset_url: SIGNS_ENDPOINT,
+      geometry_type: gType,
+      features_fetched: all.length,
+      features_after_bbox: afterBbox,
+      segments_generated: 0,
+      rules_generated: 0,
+      sample_feature: all[0] ?? null,
+      error: null,
+      notes:
+        `signs_fetched=${all.length} signs_in_bbox=${afterBbox}` +
+        ` (Enterprise/L137 — Sign Status; R7-/R8- MUTCD parking series only.` +
+        ` Mapping: R7-1/2/101/201/202/401 + R8-1/3/301/4/8 → no_parking,` +
+        ` R7-108 → time_limited, R7-6/10801 → loading_zone, R7-107/701 → bus_zone,` +
+        ` R7-10802 PARALLEL PARKING ONLY skipped as advisory).` +
+        (top ? ` top: ${top}` : ""),
+    });
+  } catch (e) {
+    out.push({
+      provider: "bellevue-signs",
+      dataset_url: SIGNS_ENDPOINT,
+      geometry_type: "unknown",
+      features_fetched: 0, features_after_bbox: 0,
+      segments_generated: 0, rules_generated: 0,
+      sample_feature: null,
+      error: (e as Error).message,
+      notes: `signs_fetch_error="${(e as Error).message}"`,
     });
   }
 
