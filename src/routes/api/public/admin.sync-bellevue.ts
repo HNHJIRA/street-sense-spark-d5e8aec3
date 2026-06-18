@@ -83,6 +83,8 @@ async function run({ request }: { request: Request }) {
     return new Response(JSON.stringify({
       ok: true,
       providerRun,
+      derivedAllowed,
+      derivedAllowedError,
       diagnostics,
       diagnosticsError,
     }), {
