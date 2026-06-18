@@ -11,6 +11,10 @@ const STREETS_ENDPOINT =
 // Probed but NOT consumed: schema has no day-of-week / time-of-day fields.
 const SWEEPING_ENDPOINT =
   "https://services1.arcgis.com/EYzEZbDhXZjURPbP/arcgis/rest/services/Arterial_Sweeping_Routes/FeatureServer/0/query";
+const RPZ_ENDPOINT =
+  "https://gis-web.bellevuewa.gov/gisext/rest/services/Transportation/TIMS_Reference/MapServer/10/query";
+const CURB_ENDPOINT =
+  "https://services1.arcgis.com/EYzEZbDhXZjURPbP/arcgis/rest/services/Curb_Space_Typology/FeatureServer/23/query";
 
 export interface ProviderDiagnostic {
   provider: string;
@@ -185,6 +189,88 @@ export async function runBellevueDiagnostics(bbox: SyncBbox): Promise<ProviderDi
       sample_feature: null,
       error: (e as Error).message,
       notes: `sweeping_fetch_error="${(e as Error).message}"`,
+    });
+  }
+
+  // ---------- bellevue-rpz (TIMS_Reference / Layer 10) ----------
+  try {
+    const feats = await probeArcgis(RPZ_ENDPOINT, bbox);
+    const gType = geomType(feats[0]);
+    const afterBbox = bboxFilterCount(feats, bbox, gType);
+    out.push({
+      provider: "bellevue-rpz",
+      dataset_url: RPZ_ENDPOINT,
+      geometry_type: gType,
+      features_fetched: feats.length,
+      features_after_bbox: afterBbox,
+      segments_generated: 0,
+      rules_generated: 0,
+      sample_feature: feats[0] ?? null,
+      error: null,
+      notes:
+        `polygons_fetched=${feats.length} polygons_in_bbox=${afterBbox}` +
+        ` (TIMS_Reference/L10 — 16 official Residential Parking Zones with CODENO/RPZ_ID).` +
+        ` Snapped to Bellevue street_segments via apply_permit_polygon_overlay.`,
+    });
+  } catch (e) {
+    out.push({
+      provider: "bellevue-rpz",
+      dataset_url: RPZ_ENDPOINT,
+      geometry_type: "unknown",
+      features_fetched: 0, features_after_bbox: 0,
+      segments_generated: 0, rules_generated: 0,
+      sample_feature: null,
+      error: (e as Error).message,
+      notes: `rpz_fetch_error="${(e as Error).message}"`,
+    });
+  }
+
+  // ---------- bellevue-curb (Curb_Space_Typology / Layer 23) ----------
+  try {
+    const feats = await probeArcgis(CURB_ENDPOINT, bbox);
+    const gType = geomType(feats[0]);
+    const afterBbox = bboxFilterCount(feats, bbox, gType);
+    const sample = feats[0] as { attributes?: { neighborhood?: string } } | undefined;
+    let belRedCount = 0;
+    for (const f of feats) {
+      const a = (f as { attributes?: { neighborhood?: string } }).attributes;
+      if ((a?.neighborhood ?? "").toLowerCase() === "belred") belRedCount++;
+    }
+    const projectionBroken = feats.length > 0 && afterBbox === 0;
+    out.push({
+      provider: "bellevue-curb",
+      dataset_url: CURB_ENDPOINT,
+      geometry_type: gType,
+      features_fetched: feats.length,
+      features_after_bbox: afterBbox,
+      segments_generated: 0,
+      rules_generated: 0,
+      sample_feature: sample ?? null,
+      error: projectionBroken
+        ? "upstream layer is misregistered: outSR=4326 returns coordinates outside Bellevue's WGS84 bbox; 0 features pass spatial validation"
+        : null,
+      notes:
+        `features_fetched=${feats.length} features_in_bbox=${afterBbox}` +
+        ` belred_rows=${belRedCount}` +
+        ` (Curb_Space_Typology/L23 — typology flags typ_s_auto/typ_a/typ_m_transit/etc.;` +
+        ` mapping: typ_s_auto→allowed, typ_s_transit/typ_m_transit→bus_zone, typ_a→loading_zone,` +
+        ` movement-only with no storage→no_parking).` +
+        (projectionBroken
+          ? " UPSTREAM PROJECTION ISSUE: layer reports SR 3857 but stored geometry is in a custom CRS;"
+            + " outSR=4326 returns junk coordinates. Provider validates each feature against the Bellevue bbox"
+            + " and inserts zero rules until the layer is corrected. Will activate automatically when fixed."
+          : ""),
+    });
+  } catch (e) {
+    out.push({
+      provider: "bellevue-curb",
+      dataset_url: CURB_ENDPOINT,
+      geometry_type: "unknown",
+      features_fetched: 0, features_after_bbox: 0,
+      segments_generated: 0, rules_generated: 0,
+      sample_feature: null,
+      error: (e as Error).message,
+      notes: `curb_fetch_error="${(e as Error).message}"`,
     });
   }
 
