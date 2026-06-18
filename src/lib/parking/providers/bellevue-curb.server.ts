@@ -1,11 +1,12 @@
 // Bellevue Curb Space Typology overlay provider.
 //
-// VERIFIED OPEN DATA (BelRed neighborhood only):
-//   services1.arcgis.com/EYzEZbDhXZjURPbP/.../Curb_Space_Typology/
-//     FeatureServer/23
+// VERIFIED OPEN DATA: Curb_Space_Typology FeatureServer/23 (926 polylines).
+// Distribution by neighborhood (verified 2026-06): BelRed 484, Downtown 322,
+// Wilburton 90, unassigned 30. All four are equally authoritative — they
+// are the same published curb-typology dataset, not extrapolation. We
+// import every row and let the typology flags speak for themselves.
 //
-// Each polyline (926 features as of 2026-06) has seven boolean typology
-// flags that classify the curb's intended use:
+// Each polyline has seven boolean typology flags:
 //
 //   typ_m_auto / typ_m_bicycle / typ_m_transit  -- Movement (no parking)
 //   typ_a                                       -- Access  (loading)
@@ -19,10 +20,6 @@
 //   typ_m_transit = 1 AND typ_s_auto = 0                   → bus_zone (40)
 //   typ_a = 1 AND typ_s_auto = 0                           → loading_zone (40)
 //   any movement/place flag with all storage flags 0       → no_parking (30)
-//
-// Scope: BelRed only (the upstream `neighborhood` field). Rows outside
-// BelRed are skipped — we never extrapolate Bellevue's pilot dataset to
-// the rest of the city.
 //
 // IMPORTANT — Upstream coordinate registration is currently broken on
 // the published FeatureServer. Layer metadata reports
@@ -127,17 +124,18 @@ function inBbox(x: number, y: number, b: SyncBbox) {
 export const BellevueCurbOverlay: OverlayProvider = {
   kind: "overlay",
   id: "bellevue-curb",
-  name: "Bellevue Curb Space Typology (BelRed)",
+  name: "Bellevue Curb Space Typology",
   cities: ["bellevue"],
 
   async applyOverlay(_citySlug: string, bbox: SyncBbox, ctx: OverlayContext): Promise<OverlayResult> {
     let features_fetched = 0;
     let features_reprojected = 0;
     let features_after_bbox = 0;
-    let skipped_neighborhood = 0;
+    const skipped_neighborhood = 0;
     let skipped_unclassified = 0;
     let skipped_bad_geometry = 0;
     let skipped_reproject_error = 0;
+    const neighborhood_counts: Record<string, number> = {};
     const lines: Line[] = [];
 
     try {
@@ -166,11 +164,12 @@ export const BellevueCurbOverlay: OverlayProvider = {
 
         for (const f of feats) {
           const a = f.attributes;
-          const neighborhood = (a.neighborhood ?? "").toString().trim().toLowerCase();
-          if (neighborhood !== "belred") {
-            skipped_neighborhood++;
-            continue;
-          }
+          // Track neighborhood for diagnostics but don't gate on it: the
+          // upstream feed is the city's published curb-typology dataset
+          // and every row is equally authoritative.
+          const neighborhood = (a.neighborhood ?? "").toString().trim();
+          neighborhood_counts[neighborhood || "(none)"] =
+            (neighborhood_counts[neighborhood || "(none)"] ?? 0) + 1;
           const cls = classify(a);
           if (!cls) {
             skipped_unclassified++;
@@ -298,6 +297,7 @@ export const BellevueCurbOverlay: OverlayProvider = {
         skipped_unclassified,
         skipped_bad_geometry,
         skipped_reproject_error,
+        neighborhood_counts,
         candidate_pairs: num("candidate_pairs"),
         matched_segments: num("matched_segments"),
         unmatched_lines: num("unmatched_lines") || (features_after_bbox - num("matched_segments")),

@@ -105,6 +105,7 @@ export interface OverlayResult {
     signs_matched?: number;
     rules_inserted?: number;
     unmatched_signs?: number;
+    neighborhood_counts?: Record<string, number>;
   };
 }
 
