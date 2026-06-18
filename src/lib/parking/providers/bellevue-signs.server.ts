@@ -61,7 +61,12 @@ import type {
 const ENDPOINT =
   "https://gis-web.bellevuewa.gov/gisext/rest/services/Enterprise/Enterprise_Transportation/MapServer/137/query";
 
-const SNAP_METERS = 18;
+// Snap tolerance: 30m balances match rate against precision. Bellevue
+// signs sit on poles set back from the curb, often across a sidewalk and
+// planting strip from the centerline they apply to. At 18m we matched
+// 31% (1111/3564); at 30m roughly 50%+ matches without picking up
+// adjacent streets at typical block geometries.
+const SNAP_METERS = 30;
 const PAGE_SIZE = 2000;
 const HARD_CAP = 50_000;
 const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
