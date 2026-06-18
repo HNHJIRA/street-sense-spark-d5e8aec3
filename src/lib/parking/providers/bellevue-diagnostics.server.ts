@@ -126,11 +126,11 @@ export async function runBellevueDiagnostics(bbox: SyncBbox): Promise<ProviderDi
       sample_feature: feats[0] ?? null,
       error: segErr,
       notes:
-        `streets_fetched_first_page=${feats.length}` +
+        `streets_fetched=${feats.length}` +
         ` streets_in_bbox=${afterBbox}` +
         ` segments_generated=${segmentsGenerated}` +
         ` rules_generated=${rulesGenerated}` +
-        ` (full dataset ~10,629 polylines; paginated during sync)` +
+        ` (paginated; full dataset ~10,629 polylines citywide)` +
         (segErr ? ` segment_error="${segErr}"` : ""),
     });
   } catch (e) {
