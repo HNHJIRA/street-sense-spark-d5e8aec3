@@ -952,6 +952,20 @@ export type Database = {
           unmatched_lines: number
         }[]
       }
+      apply_zone_polygon_overlay: {
+        Args: {
+          p_city_id: string
+          p_notes_prefix?: string
+          p_polygons: Json
+          p_priority?: number
+          p_provider: string
+          p_restriction_code: string
+        }
+        Returns: {
+          rules_inserted: number
+          segments_touched: number
+        }[]
+      }
       arlington_area_counts: {
         Args: {
           p_city_id: string
