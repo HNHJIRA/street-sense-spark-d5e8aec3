@@ -15,6 +15,10 @@ const RPZ_ENDPOINT =
   "https://gis-web.bellevuewa.gov/gisext/rest/services/Transportation/TIMS_Reference/MapServer/10/query";
 const CURB_ENDPOINT =
   "https://services1.arcgis.com/EYzEZbDhXZjURPbP/arcgis/rest/services/Curb_Space_Typology/FeatureServer/23/query";
+const CBD_ENDPOINT =
+  "https://gis-web.bellevuewa.gov/gisext/rest/services/Enterprise/Enterprise_Transportation/MapServer/95/query";
+const RPZ_STREETS_ENDPOINT =
+  "https://gis-web.bellevuewa.gov/gisext/rest/services/Enterprise/Enterprise_Transportation/MapServer/97/query";
 
 export interface ProviderDiagnostic {
   provider: string;
@@ -271,6 +275,75 @@ export async function runBellevueDiagnostics(bbox: SyncBbox): Promise<ProviderDi
       sample_feature: null,
       error: (e as Error).message,
       notes: `curb_fetch_error="${(e as Error).message}"`,
+    });
+  }
+
+  // ---------- bellevue-cbd (Enterprise_Transportation / Layer 95) ----------
+  try {
+    const feats = await probeArcgis(CBD_ENDPOINT, bbox);
+    const gType = geomType(feats[0]);
+    const afterBbox = bboxFilterCount(feats, bbox, gType);
+    let proposed = 0;
+    for (const f of feats) {
+      const a = (f as { attributes?: { PRK_TYPE?: string } }).attributes;
+      if (/^\s*proposed\b/i.test(a?.PRK_TYPE ?? "")) proposed++;
+    }
+    out.push({
+      provider: "bellevue-cbd",
+      dataset_url: CBD_ENDPOINT,
+      geometry_type: gType,
+      features_fetched: feats.length,
+      features_after_bbox: afterBbox,
+      segments_generated: 0,
+      rules_generated: 0,
+      sample_feature: feats[0] ?? null,
+      error: null,
+      notes:
+        `features_fetched=${feats.length} features_in_bbox=${afterBbox} proposed_skipped=${proposed}` +
+        ` (Enterprise/L95 — downtown CBD curb regulations; PRK_TYPE → time_limited / no_parking / loading_zone / bus_zone).`,
+    });
+  } catch (e) {
+    out.push({
+      provider: "bellevue-cbd",
+      dataset_url: CBD_ENDPOINT,
+      geometry_type: "unknown",
+      features_fetched: 0, features_after_bbox: 0,
+      segments_generated: 0, rules_generated: 0,
+      sample_feature: null,
+      error: (e as Error).message,
+      notes: `cbd_fetch_error="${(e as Error).message}"`,
+    });
+  }
+
+  // ---------- bellevue-rpz-streets (Enterprise_Transportation / Layer 97) ----------
+  try {
+    const feats = await probeArcgis(RPZ_STREETS_ENDPOINT, bbox);
+    const gType = geomType(feats[0]);
+    const afterBbox = bboxFilterCount(feats, bbox, gType);
+    out.push({
+      provider: "bellevue-rpz-streets",
+      dataset_url: RPZ_STREETS_ENDPOINT,
+      geometry_type: gType,
+      features_fetched: feats.length,
+      features_after_bbox: afterBbox,
+      segments_generated: 0,
+      rules_generated: 0,
+      sample_feature: feats[0] ?? null,
+      error: null,
+      notes:
+        `features_fetched=${feats.length} features_in_bbox=${afterBbox}` +
+        ` (Enterprise/L97 — RPZ block-face polylines with parsed Restriction text → permit rule with hours).`,
+    });
+  } catch (e) {
+    out.push({
+      provider: "bellevue-rpz-streets",
+      dataset_url: RPZ_STREETS_ENDPOINT,
+      geometry_type: "unknown",
+      features_fetched: 0, features_after_bbox: 0,
+      segments_generated: 0, rules_generated: 0,
+      sample_feature: null,
+      error: (e as Error).message,
+      notes: `rpz_streets_fetch_error="${(e as Error).message}"`,
     });
   }
 
