@@ -29,15 +29,36 @@ function inBbox(x: number, y: number, b: SyncBbox) {
   return x >= b.minLng && x <= b.maxLng && y >= b.minLat && y <= b.maxLat;
 }
 
+// Paginate the same way BellevueProvider.fetchSegments does so diagnostics
+// reflect the full dataset, not just the first 2,000-row page.
 async function probeArcgis(url: string, bbox: SyncBbox) {
-  const json = (await fetchArcgis(url, {
+  const PAGE = 2000;
+  const HARD_CAP = 50_000;
+  const baseParams = {
     geometry: `${bbox.minLng},${bbox.minLat},${bbox.maxLng},${bbox.maxLat}`,
     geometryType: "esriGeometryEnvelope",
     inSR: "4326",
     spatialRel: "esriSpatialRelIntersects",
-    resultRecordCount: "2000",
-  })) as { features?: Array<{ geometry?: unknown; attributes?: unknown }> };
-  return json.features ?? [];
+  } as const;
+  const out: Array<{ geometry?: unknown; attributes?: unknown }> = [];
+  let offset = 0;
+  let more = true;
+  while (more) {
+    const json = (await fetchArcgis(url, {
+      ...baseParams,
+      resultRecordCount: String(PAGE),
+      resultOffset: String(offset),
+    })) as {
+      features?: Array<{ geometry?: unknown; attributes?: unknown }>;
+      exceededTransferLimit?: boolean;
+    };
+    const feats = json.features ?? [];
+    out.push(...feats);
+    more = !!json.exceededTransferLimit && feats.length > 0;
+    offset += feats.length;
+    if (offset > HARD_CAP) break;
+  }
+  return out;
 }
 
 function geomType(f: { geometry?: unknown } | undefined): string {
@@ -105,11 +126,11 @@ export async function runBellevueDiagnostics(bbox: SyncBbox): Promise<ProviderDi
       sample_feature: feats[0] ?? null,
       error: segErr,
       notes:
-        `streets_fetched_first_page=${feats.length}` +
+        `streets_fetched=${feats.length}` +
         ` streets_in_bbox=${afterBbox}` +
         ` segments_generated=${segmentsGenerated}` +
         ` rules_generated=${rulesGenerated}` +
-        ` (full dataset ~10,629 polylines; paginated during sync)` +
+        ` (paginated; full dataset ~10,629 polylines citywide)` +
         (segErr ? ` segment_error="${segErr}"` : ""),
     });
   } catch (e) {
