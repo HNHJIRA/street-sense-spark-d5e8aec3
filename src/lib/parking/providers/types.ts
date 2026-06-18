@@ -95,6 +95,10 @@ export interface OverlayResult {
     skipped_reproject_error?: number;
     skipped_proposed?: number;
     skipped_unparsable_restriction?: number;
+    skipped_island?: number;
+    skipped_inactive?: number;
+    polygons_fetched?: number;
+    polygons_in_bbox?: number;
   };
 }
 

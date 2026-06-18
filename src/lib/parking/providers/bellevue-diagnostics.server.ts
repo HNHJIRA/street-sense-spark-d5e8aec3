@@ -19,6 +19,10 @@ const CBD_ENDPOINT =
   "https://gis-web.bellevuewa.gov/gisext/rest/services/Enterprise/Enterprise_Transportation/MapServer/95/query";
 const RPZ_STREETS_ENDPOINT =
   "https://gis-web.bellevuewa.gov/gisext/rest/services/Enterprise/Enterprise_Transportation/MapServer/97/query";
+const PAINTED_CURBS_ENDPOINT =
+  "https://gis-web.bellevuewa.gov/gisext/rest/services/Enterprise/Enterprise_Transportation/MapServer/647/query";
+const BUS_LAYOVERS_ENDPOINT =
+  "https://gis-web.bellevuewa.gov/gisext/rest/services/Enterprise/Enterprise_Transportation/MapServer/108/query";
 
 export interface ProviderDiagnostic {
   provider: string;
@@ -344,6 +348,81 @@ export async function runBellevueDiagnostics(bbox: SyncBbox): Promise<ProviderDi
       sample_feature: null,
       error: (e as Error).message,
       notes: `rpz_streets_fetch_error="${(e as Error).message}"`,
+    });
+  }
+  // ---------- bellevue-painted-curbs (Enterprise_Transportation / Layer 647) ----------
+  try {
+    const feats = await probeArcgis(PAINTED_CURBS_ENDPOINT, bbox);
+    const gType = geomType(feats[0]);
+    const afterBbox = bboxFilterCount(feats, bbox, gType);
+    let yellow = 0, white = 0, red = 0, island = 0;
+    for (const f of feats) {
+      const a = (f as { attributes?: { Color?: string; CurbType?: string } }).attributes;
+      const c = (a?.Color ?? "").trim().toUpperCase();
+      const ct = (a?.CurbType ?? "").trim().toUpperCase();
+      if (c === "YELLOW") yellow++;
+      else if (c === "WHITE") white++;
+      else if (c === "RED") red++;
+      if (ct === "ISLAND") island++;
+    }
+    out.push({
+      provider: "bellevue-painted-curbs",
+      dataset_url: PAINTED_CURBS_ENDPOINT,
+      geometry_type: gType,
+      features_fetched: feats.length,
+      features_after_bbox: afterBbox,
+      segments_generated: 0,
+      rules_generated: 0,
+      sample_feature: feats[0] ?? null,
+      error: null,
+      notes:
+        `features_fetched=${feats.length} features_in_bbox=${afterBbox}` +
+        ` yellow=${yellow} white=${white} red=${red} island_skipped=${island}` +
+        ` (Enterprise/L647 — Painted Traffic Curbs; YELLOW→loading_zone, WHITE→passenger_loading,` +
+        ` RED→no_parking. ISLAND curbtype skipped — these are traffic islands, not blockface curbs).`,
+    });
+  } catch (e) {
+    out.push({
+      provider: "bellevue-painted-curbs",
+      dataset_url: PAINTED_CURBS_ENDPOINT,
+      geometry_type: "unknown",
+      features_fetched: 0, features_after_bbox: 0,
+      segments_generated: 0, rules_generated: 0,
+      sample_feature: null,
+      error: (e as Error).message,
+      notes: `painted_curbs_fetch_error="${(e as Error).message}"`,
+    });
+  }
+
+  // ---------- bellevue-bus-layovers (Enterprise_Transportation / Layer 108) ----------
+  try {
+    const feats = await probeArcgis(BUS_LAYOVERS_ENDPOINT, bbox);
+    const gType = geomType(feats[0]);
+    const afterBbox = bboxFilterCount(feats, bbox, gType);
+    out.push({
+      provider: "bellevue-bus-layovers",
+      dataset_url: BUS_LAYOVERS_ENDPOINT,
+      geometry_type: gType,
+      features_fetched: feats.length,
+      features_after_bbox: afterBbox,
+      segments_generated: 0,
+      rules_generated: 0,
+      sample_feature: feats[0] ?? null,
+      error: null,
+      notes:
+        `polygons_fetched=${feats.length} polygons_in_bbox=${afterBbox}` +
+        ` (Enterprise/L108 — Bus Layover Zones; polygon → bus_zone via apply_zone_polygon_overlay).`,
+    });
+  } catch (e) {
+    out.push({
+      provider: "bellevue-bus-layovers",
+      dataset_url: BUS_LAYOVERS_ENDPOINT,
+      geometry_type: "unknown",
+      features_fetched: 0, features_after_bbox: 0,
+      segments_generated: 0, rules_generated: 0,
+      sample_feature: null,
+      error: (e as Error).message,
+      notes: `bus_layovers_fetch_error="${(e as Error).message}"`,
     });
   }
 
