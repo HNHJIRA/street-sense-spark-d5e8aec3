@@ -890,6 +890,15 @@ export type Database = {
             }
             Returns: string
           }
+      apply_bellevue_derived_allowed: {
+        Args: { p_city_id: string }
+        Returns: {
+          rules_deleted: number
+          rules_inserted: number
+          segments_touched: number
+          source_rules_considered: number
+        }[]
+      }
       apply_curb_zone_polyline_overlay: {
         Args: {
           p_city_id: string
