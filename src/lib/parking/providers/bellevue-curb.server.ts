@@ -297,6 +297,7 @@ export const BellevueCurbOverlay: OverlayProvider = {
         skipped_unclassified,
         skipped_bad_geometry,
         skipped_reproject_error,
+        neighborhood_counts,
         candidate_pairs: num("candidate_pairs"),
         matched_segments: num("matched_segments"),
         unmatched_lines: num("unmatched_lines") || (features_after_bbox - num("matched_segments")),
