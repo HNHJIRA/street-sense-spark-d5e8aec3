@@ -88,6 +88,11 @@ export interface OverlayResult {
     conflict_suppressed_segments?: number;
     conflict_suppressed_rules?: number;
     conflict_retained_np_segments?: number;
+    features_reprojected?: number;
+    skipped_neighborhood?: number;
+    skipped_unclassified?: number;
+    skipped_bad_geometry?: number;
+    skipped_reproject_error?: number;
   };
 }
 

@@ -38,8 +38,22 @@
 // remains in the registry so coverage automatically lights up the day
 // Bellevue corrects the layer's projection.
 
-import { fetchArcgis } from "./_la-shared.server";
+import proj4 from "proj4";
+
 import type { OverlayContext, OverlayProvider, OverlayResult, SyncBbox } from "./types";
+
+// EPSG:2926 — NAD83(HARN) / Washington State Plane North, US survey feet.
+// Verified by audit: Layer 23 advertises WKID 3857 but stores geometry in
+// this CRS. Forward transform to WGS84 is mathematically deterministic.
+const EPSG_2926 =
+  "+proj=lcc +lat_1=48.73333333333333 +lat_2=47.5 +lat_0=47 " +
+  "+lon_0=-120.8333333333333 +x_0=500000.0001016 +y_0=0 " +
+  "+ellps=GRS80 +datum=NAD83 +units=us-ft +no_defs";
+const EPSG_4326 = "+proj=longlat +datum=WGS84 +no_defs";
+const reproject2926to4326 = (x: number, y: number): [number, number] => {
+  const [lng, lat] = proj4(EPSG_2926, EPSG_4326, [x, y]) as [number, number];
+  return [lng, lat];
+};
 
 const ENDPOINT =
   "https://services1.arcgis.com/EYzEZbDhXZjURPbP/arcgis/rest/services/Curb_Space_Typology/FeatureServer/23/query";
@@ -96,17 +110,14 @@ function classify(a: Attrs): { code: string; priority: number; reason: string } 
   return null;
 }
 
-function arcgisLineToGeoJSON(geometry: unknown): { type: "LineString"; coordinates: [number, number][] } | null {
+function arcgisLineRaw(geometry: unknown): [number, number][] | null {
   const g = geometry as { paths?: number[][][] } | null;
   const paths = g?.paths ?? [];
   if (!paths.length) return null;
   let longest = paths[0];
   for (const p of paths) if (p.length > longest.length) longest = p;
   if (longest.length < 2) return null;
-  return {
-    type: "LineString",
-    coordinates: longest.map((c) => [Number(c[0]), Number(c[1])] as [number, number]),
-  };
+  return longest.map((c) => [Number(c[0]), Number(c[1])] as [number, number]);
 }
 
 function inBbox(x: number, y: number, b: SyncBbox) {
@@ -121,22 +132,31 @@ export const BellevueCurbOverlay: OverlayProvider = {
 
   async applyOverlay(_citySlug: string, bbox: SyncBbox, ctx: OverlayContext): Promise<OverlayResult> {
     let features_fetched = 0;
+    let features_reprojected = 0;
     let features_after_bbox = 0;
     let skipped_neighborhood = 0;
     let skipped_unclassified = 0;
     let skipped_bad_geometry = 0;
+    let skipped_reproject_error = 0;
     const lines: Line[] = [];
 
     try {
       let offset = 0;
       while (offset < HARD_CAP) {
-        const json = (await fetchArcgis(ENDPOINT, {
+        // Bypass fetchArcgis: it forces outSR=4326, which returns broken
+        // coords for this misregistered layer. Request native geometry
+        // directly (no outSR ⇒ stored EPSG:2926 feet) and reproject.
+        const qs = new URLSearchParams({
+          f: "json",
           where: "1=1",
           outFields: "*",
-          outSR: "4326",
+          returnGeometry: "true",
           resultRecordCount: String(PAGE_SIZE),
           resultOffset: String(offset),
-        })) as {
+        });
+        const res = await fetch(`${ENDPOINT}?${qs.toString()}`);
+        if (!res.ok) throw new Error(`ArcGIS ${ENDPOINT} responded ${res.status}`);
+        const json = (await res.json()) as {
           features?: Array<{ attributes: Attrs; geometry?: unknown }>;
           exceededTransferLimit?: boolean;
         };
@@ -156,17 +176,24 @@ export const BellevueCurbOverlay: OverlayProvider = {
             skipped_unclassified++;
             continue;
           }
-          const geo = arcgisLineToGeoJSON(f.geometry);
-          if (!geo) {
+          const raw = arcgisLineRaw(f.geometry);
+          if (!raw) {
             skipped_bad_geometry++;
             continue;
           }
-          // Validate that returned coordinates land inside Bellevue —
-          // upstream layer is misregistered; do not feed garbage geometry
-          // into the snap RPC.
+          // Reproject EPSG:2926 (US survey feet) → EPSG:4326 (WGS84).
+          let coords: [number, number][];
+          try {
+            coords = raw.map(([x, y]) => reproject2926to4326(x, y));
+          } catch {
+            skipped_reproject_error++;
+            continue;
+          }
+          features_reprojected++;
+          // Validate every reprojected vertex lands inside Bellevue.
           let allValid = true;
-          for (const [x, y] of geo.coordinates) {
-            if (!inBbox(x, y, bbox)) { allValid = false; break; }
+          for (const [lng, lat] of coords) {
+            if (!inBbox(lng, lat, bbox)) { allValid = false; break; }
           }
           if (!allValid) {
             skipped_bad_geometry++;
@@ -183,7 +210,8 @@ export const BellevueCurbOverlay: OverlayProvider = {
             permit_zone: null,
             time_limit_minutes: null,
             notes: `Bellevue curb typology (${cls.reason}, side=${a.side_of_street ?? "?"}, BelRed)`,
-            geometry: JSON.stringify(geo),
+            geometry: JSON.stringify({ type: "LineString", coordinates: coords }),
+
           });
         }
 
@@ -202,9 +230,7 @@ export const BellevueCurbOverlay: OverlayProvider = {
     if (lines.length === 0) {
       const msg =
         features_fetched > 0 && features_after_bbox === 0
-          ? "Bellevue Curb_Space_Typology layer is misregistered upstream: 0 of " +
-            `${features_fetched} fetched features fall inside Bellevue's WGS84 bbox after outSR=4326. ` +
-            "No rules inserted; provider will activate automatically once Bellevue fixes the layer's spatial reference."
+          ? `Bellevue curb reprojection produced no in-bbox features: fetched=${features_fetched}, reprojected=${features_reprojected}, in_bbox=0.`
           : "no curb typology features matched";
       return {
         segments_touched: 0,
@@ -214,14 +240,20 @@ export const BellevueCurbOverlay: OverlayProvider = {
         diagnostics: {
           lines_input: features_fetched,
           lines_parsed: features_after_bbox,
+          features_reprojected,
+          skipped_neighborhood,
+          skipped_unclassified,
+          skipped_bad_geometry,
+          skipped_reproject_error,
           matched_segments: 0,
           rows_updated: 0,
           unmatched_lines: features_fetched,
-          timeout_stage: features_after_bbox === 0 ? "upstream-projection-broken" : "no-rows",
+          timeout_stage: features_after_bbox === 0 ? "no-in-bbox" : "no-rows",
           rpc_error: features_after_bbox === 0 ? msg : undefined,
         },
       };
     }
+
 
     const t0 = Date.now();
     const { data, error } = await ctx.admin.rpc("apply_curb_zone_polyline_overlay", {
@@ -261,6 +293,11 @@ export const BellevueCurbOverlay: OverlayProvider = {
       diagnostics: {
         lines_input: num("lines_input") || features_fetched,
         lines_parsed: num("lines_parsed") || features_after_bbox,
+        features_reprojected,
+        skipped_neighborhood,
+        skipped_unclassified,
+        skipped_bad_geometry,
+        skipped_reproject_error,
         candidate_pairs: num("candidate_pairs"),
         matched_segments: num("matched_segments"),
         unmatched_lines: num("unmatched_lines") || (features_after_bbox - num("matched_segments")),
