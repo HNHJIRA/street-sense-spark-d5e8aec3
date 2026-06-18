@@ -22,6 +22,8 @@ import { BellevueRpzOverlay } from "./bellevue-rpz.server";
 import { BellevueCurbOverlay } from "./bellevue-curb.server";
 import { BellevueCbdOverlay } from "./bellevue-cbd.server";
 import { BellevueRpzStreetsOverlay } from "./bellevue-rpz-streets.server";
+import { BellevuePaintedCurbsOverlay } from "./bellevue-painted-curbs.server";
+import { BellevueBusLayoversOverlay } from "./bellevue-bus-layovers.server";
 import type { AnyProvider, OverlayProvider, ParkingProvider } from "./types";
 import { isOverlayProvider } from "./types";
 
