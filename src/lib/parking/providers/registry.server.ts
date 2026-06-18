@@ -49,6 +49,7 @@ const REGISTRY: AnyProvider[] = [
   BellevueRpzStreetsOverlay,
   BellevuePaintedCurbsOverlay,
   BellevueBusLayoversOverlay,
+  BellevueSignsOverlay,
 ];
 
 export function getProvidersForCity(citySlug: string): AnyProvider[] {
