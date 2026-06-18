@@ -93,6 +93,8 @@ export interface OverlayResult {
     skipped_unclassified?: number;
     skipped_bad_geometry?: number;
     skipped_reproject_error?: number;
+    skipped_proposed?: number;
+    skipped_unparsable_restriction?: number;
   };
 }
 
