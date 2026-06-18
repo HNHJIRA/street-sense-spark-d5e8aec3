@@ -1,11 +1,12 @@
 // Bellevue Curb Space Typology overlay provider.
 //
-// VERIFIED OPEN DATA (BelRed neighborhood only):
-//   services1.arcgis.com/EYzEZbDhXZjURPbP/.../Curb_Space_Typology/
-//     FeatureServer/23
+// VERIFIED OPEN DATA: Curb_Space_Typology FeatureServer/23 (926 polylines).
+// Distribution by neighborhood (verified 2026-06): BelRed 484, Downtown 322,
+// Wilburton 90, unassigned 30. All four are equally authoritative — they
+// are the same published curb-typology dataset, not extrapolation. We
+// import every row and let the typology flags speak for themselves.
 //
-// Each polyline (926 features as of 2026-06) has seven boolean typology
-// flags that classify the curb's intended use:
+// Each polyline has seven boolean typology flags:
 //
 //   typ_m_auto / typ_m_bicycle / typ_m_transit  -- Movement (no parking)
 //   typ_a                                       -- Access  (loading)
@@ -19,10 +20,6 @@
 //   typ_m_transit = 1 AND typ_s_auto = 0                   → bus_zone (40)
 //   typ_a = 1 AND typ_s_auto = 0                           → loading_zone (40)
 //   any movement/place flag with all storage flags 0       → no_parking (30)
-//
-// Scope: BelRed only (the upstream `neighborhood` field). Rows outside
-// BelRed are skipped — we never extrapolate Bellevue's pilot dataset to
-// the rest of the city.
 //
 // IMPORTANT — Upstream coordinate registration is currently broken on
 // the published FeatureServer. Layer metadata reports
