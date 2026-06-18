@@ -228,6 +228,7 @@ export const runAdminSync = createServerFn({ method: "POST" })
       imported: providerRun.totals.imported,
       skipped: providerRun.totals.skipped,
       provider: "all",
+      error: undefined,
       providerRun,
     };
   });
