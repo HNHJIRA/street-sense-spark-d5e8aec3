@@ -124,17 +124,18 @@ function inBbox(x: number, y: number, b: SyncBbox) {
 export const BellevueCurbOverlay: OverlayProvider = {
   kind: "overlay",
   id: "bellevue-curb",
-  name: "Bellevue Curb Space Typology (BelRed)",
+  name: "Bellevue Curb Space Typology",
   cities: ["bellevue"],
 
   async applyOverlay(_citySlug: string, bbox: SyncBbox, ctx: OverlayContext): Promise<OverlayResult> {
     let features_fetched = 0;
     let features_reprojected = 0;
     let features_after_bbox = 0;
-    let skipped_neighborhood = 0;
+    const skipped_neighborhood = 0;
     let skipped_unclassified = 0;
     let skipped_bad_geometry = 0;
     let skipped_reproject_error = 0;
+    const neighborhood_counts: Record<string, number> = {};
     const lines: Line[] = [];
 
     try {
