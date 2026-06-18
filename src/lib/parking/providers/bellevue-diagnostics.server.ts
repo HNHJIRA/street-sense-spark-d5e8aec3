@@ -23,6 +23,8 @@ const PAINTED_CURBS_ENDPOINT =
   "https://gis-web.bellevuewa.gov/gisext/rest/services/Enterprise/Enterprise_Transportation/MapServer/647/query";
 const BUS_LAYOVERS_ENDPOINT =
   "https://gis-web.bellevuewa.gov/gisext/rest/services/Enterprise/Enterprise_Transportation/MapServer/108/query";
+const SIGNS_ENDPOINT =
+  "https://gis-web.bellevuewa.gov/gisext/rest/services/Enterprise/Enterprise_Transportation/MapServer/137/query";
 
 export interface ProviderDiagnostic {
   provider: string;
