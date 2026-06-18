@@ -18,6 +18,8 @@ import { ArlingtonProvider } from "./arlington.server";
 import { ArlingtonPermitOverlay } from "./arlington-permit.server";
 import { ArlingtonCurbOverlay } from "./arlington-curb.server";
 import { BellevueProvider } from "./bellevue.server";
+import { BellevueRpzOverlay } from "./bellevue-rpz.server";
+import { BellevueCurbOverlay } from "./bellevue-curb.server";
 import type { AnyProvider, OverlayProvider, ParkingProvider } from "./types";
 import { isOverlayProvider } from "./types";
 
@@ -36,6 +38,8 @@ const REGISTRY: AnyProvider[] = [
   ArlingtonPermitOverlay,
   ArlingtonCurbOverlay,
   BellevueProvider,
+  BellevueRpzOverlay,
+  BellevueCurbOverlay,
 ];
 
 export function getProvidersForCity(citySlug: string): AnyProvider[] {
