@@ -654,6 +654,10 @@ export const syncAllProvidersForCity = createServerFn({ method: "POST" })
       minLng: z.number(), minLat: z.number(),
       maxLng: z.number(), maxLat: z.number(),
       force: z.boolean().optional(),
+      /** Restrict the run to a single provider id. */
+      onlyProviderId: z.string().min(1).max(64).optional(),
+      /** Per-provider params, keyed by provider id. */
+      providerParams: z.record(z.string(), z.record(z.string(), z.unknown())).optional(),
     }).parse(input),
   )
   .handler(async ({ data }) => {
@@ -661,21 +665,9 @@ export const syncAllProvidersForCity = createServerFn({ method: "POST" })
       await import("./providers/registry.server");
     const segmentProviders = getSegmentProvidersForCity(data.citySlug);
     const overlayProviders = getOverlayProvidersForCity(data.citySlug);
-    const ordered = [...segmentProviders, ...overlayProviders];
-
-    if (data.citySlug === "bellevue") {
-      console.log(
-        "Bellevue Segment Providers:",
-        segmentProviders.map((p) => p.id),
-      );
-      console.log(
-        "Bellevue Overlay Providers:",
-        overlayProviders.map((p) => p.id),
-      );
-      console.log(
-        "Bellevue Total Providers:",
-        ordered.map((p) => p.id),
-      );
+    let ordered = [...segmentProviders, ...overlayProviders];
+    if (data.onlyProviderId) {
+      ordered = ordered.filter((p) => p.id === data.onlyProviderId);
     }
 
     const results: Array<SyncRunResult & { providerName: string }> = [];
@@ -688,6 +680,7 @@ export const syncAllProvidersForCity = createServerFn({ method: "POST" })
             maxLng: data.maxLng, maxLat: data.maxLat,
             force: data.force,
             providerId: p.id,
+            providerParams: data.providerParams?.[p.id],
           },
         });
         results.push({ ...r, providerName: p.name });
