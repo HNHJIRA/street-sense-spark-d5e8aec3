@@ -658,6 +658,17 @@ export function MapView({ token, city }: MapViewProps) {
   const zoomIn = () => mapRef.current?.zoomIn();
   const zoomOut = () => mapRef.current?.zoomOut();
   const toggleGlobe = () => setGlobeMode((v) => !v);
+  const toggleTopView = () => {
+    const map = mapRef.current;
+    if (!map) return;
+    const next = !topView;
+    setTopView(next);
+    map.easeTo({
+      pitch: next ? 0 : 60,
+      bearing: next ? 0 : -18,
+      duration: 600,
+    });
+  };
   const locate = () => {
     const loc = useLocationStore.getState().current ?? useLocationStore.getState().lastKnown;
     if (geolocateRef.current) {
