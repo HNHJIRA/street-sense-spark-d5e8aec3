@@ -204,7 +204,7 @@ export function StreetSheet({ timezone, restrictionTypes, cityId, citySlug }: St
                   requestCheckSegment(data.id);
                   selectSegment(null);
                 }}
-                className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3 text-sm font-bold text-primary-foreground transition active:scale-95"
+                className="pc-bg-gradient-brand pc-shadow-brand mt-4 flex w-full items-center justify-center gap-2 rounded-full py-3 text-sm font-bold text-white transition active:scale-95"
               >
                 <Navigation className="h-4 w-4" strokeWidth={2.5} />
                 Can I park here?
