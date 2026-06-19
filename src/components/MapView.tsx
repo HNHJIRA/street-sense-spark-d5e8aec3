@@ -677,7 +677,7 @@ export function MapView({ token, city }: MapViewProps) {
     if (loc && mapRef.current) {
       syncUserLocationMarker({ lng: loc.lng, lat: loc.lat, accuracy: loc.accuracy, heading: loc.heading });
       
-      mapRef.current.flyTo({ center: [loc.lng, loc.lat], zoom: 17, pitch: 60, duration: 1200, essential: true });
+      mapRef.current.flyTo({ center: [loc.lng, loc.lat], zoom: 17, pitch: topView ? 0 : 60, bearing: topView ? 0 : -18, duration: 1200, essential: true });
       return;
     }
     if (useLocationStore.getState().status === "denied") {
