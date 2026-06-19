@@ -152,8 +152,9 @@ function Legend() {
     </div>
   );
 }
+function LegendDot({ color, label }: { color: string; label: string }) {
   return (
-    <span className="flex items-center gap-1.5 text-[11px] font-semibold">
+    <span className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
       <span className={`h-2.5 w-2.5 rounded-full ${color}`} />
       {label}
     </span>
