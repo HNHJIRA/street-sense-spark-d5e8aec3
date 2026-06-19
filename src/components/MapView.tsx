@@ -702,11 +702,11 @@ export function MapView({ token, city }: MapViewProps) {
           className="pointer-events-none absolute right-0 z-20 flex flex-col items-end gap-2 px-3"
           style={{ top: "calc(var(--safe-top) + 4.5rem)" }}
         >
-          <MapBtn onClick={zoomIn} ariaLabel="Zoom in"><Plus className="h-5 w-5" /></MapBtn>
-          <MapBtn onClick={zoomOut} ariaLabel="Zoom out"><Minus className="h-5 w-5" /></MapBtn>
+          <MapBtn onClick={zoomIn} ariaLabel="Zoom in"><Plus className="h-4 w-4" /></MapBtn>
+          <MapBtn onClick={zoomOut} ariaLabel="Zoom out"><Minus className="h-4 w-4" /></MapBtn>
           <div className="h-1" />
-          <MapBtn onClick={toggleGlobe} ariaLabel="Rotate globe"><Globe2 className="h-5 w-5" /></MapBtn>
-          <MapBtn onClick={locate} ariaLabel="My location"><LocateFixed className="h-5 w-5" /></MapBtn>
+          <MapBtn onClick={toggleGlobe} ariaLabel="Rotate globe"><Globe2 className="h-4 w-4" /></MapBtn>
+          <MapBtn onClick={locate} ariaLabel="My location"><LocateFixed className="h-4 w-4" /></MapBtn>
           <MapLayerButton className="relative" />
         </div>
       )}
