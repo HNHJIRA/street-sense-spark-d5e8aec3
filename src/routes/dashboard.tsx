@@ -109,15 +109,22 @@ function SideDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
         onClick={onClose}
       />
       <aside
-        className={`absolute inset-y-0 left-0 w-[82%] max-w-sm bg-white shadow-2xl transition-transform duration-300 ${
+        className={`absolute inset-y-0 left-0 w-[82%] max-w-sm shadow-2xl transition-transform duration-300 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
+        style={{
+          background: "linear-gradient(90deg, var(--pc-brand-end) 0%, var(--pc-brand-start) 100%)",
+        }}
       >
-        <div className="pc-bg-gradient-brand safe-top relative px-6 pt-12 pb-8 text-white">
-          <button onClick={onClose} className="absolute right-4 top-4 rounded-full bg-white/20 p-2">
+        <div className="safe-top relative flex h-full flex-col px-5 pt-6 pb-8 text-white">
+          <button
+            onClick={onClose}
+            className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-white/15"
+            aria-label="Close menu"
+          >
             <X className="h-4 w-4" />
           </button>
-          <div className="flex items-center gap-3">
+          <div className="mb-4 flex items-center gap-3">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/20 text-xl font-semibold">
               JD
             </div>
@@ -126,19 +133,22 @@ function SideDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
               <div className="text-xs opacity-90">john@parkclear.app</div>
             </div>
           </div>
+          <nav className="flex flex-1 flex-col">
+            {items.map(({ icon: Icon, label, to }) => (
+              <Link
+                key={label}
+                to={to}
+                onClick={onClose}
+                className="flex items-center gap-4 py-3.5 text-[17px] font-medium tracking-wide text-white"
+              >
+                <span className="flex w-7 items-center justify-center">
+                  <Icon className="h-6 w-6" strokeWidth={2.2} />
+                </span>
+                {label}
+              </Link>
+            ))}
+          </nav>
         </div>
-        <nav className="flex flex-col p-4">
-          {items.map(({ icon: Icon, label, to }) => (
-            <Link
-              key={label}
-              to={to}
-              onClick={onClose}
-              className="flex items-center gap-3 rounded-xl px-3 py-3.5 text-sm font-medium text-slate-900 hover:bg-slate-50"
-            >
-              <Icon className="h-5 w-5" style={{ color: "var(--pc-brand-end)" }} /> {label}
-            </Link>
-          ))}
-        </nav>
       </aside>
     </div>
   );
