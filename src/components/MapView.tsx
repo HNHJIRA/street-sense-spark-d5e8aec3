@@ -717,6 +717,7 @@ export function MapView({ token, city }: MapViewProps) {
           <MapBtn onClick={zoomIn} ariaLabel="Zoom in"><Plus className="h-4 w-4" /></MapBtn>
           <MapBtn onClick={zoomOut} ariaLabel="Zoom out"><Minus className="h-4 w-4" /></MapBtn>
           <div className="h-1" />
+          <MapBtn onClick={toggleTopView} ariaLabel="Top view"><Square className={`h-4 w-4 ${topView ? "fill-current" : ""}`} /></MapBtn>
           <MapBtn onClick={toggleGlobe} ariaLabel="Rotate globe"><Globe2 className="h-4 w-4" /></MapBtn>
           <MapBtn onClick={locate} ariaLabel="My location"><LocateFixed className="h-4 w-4" /></MapBtn>
           <MapLayerButton className="relative" />
