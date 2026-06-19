@@ -467,6 +467,8 @@ export const syncProvider = createServerFn({ method: "POST" })
       force: z.boolean().optional(),
       /** Optional explicit provider id; defaults to the city's first segment provider. */
       providerId: z.string().min(1).max(64).optional(),
+      /** Optional provider-specific params (e.g. NYC borough filter). */
+      providerParams: z.record(z.string(), z.unknown()).optional(),
     }).parse(input),
   )
   .handler(async ({ data }): Promise<SyncRunResult> => {
@@ -492,7 +494,11 @@ export const syncProvider = createServerFn({ method: "POST" })
     // ---- Overlay provider path ----
     if (isOverlayProvider(provider)) {
       try {
-        const r = await provider.applyOverlay(data.citySlug, bbox, { cityId: city.id as string, admin });
+        const r = await provider.applyOverlay(data.citySlug, bbox, {
+          cityId: city.id as string,
+          admin,
+          params: data.providerParams,
+        });
         const res: { imported: number; skipped: number; error?: string } = {
           imported: r.rules_inserted,
           skipped: 0,
