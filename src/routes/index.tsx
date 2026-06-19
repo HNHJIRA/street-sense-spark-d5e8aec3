@@ -109,7 +109,7 @@ function HomePage() {
   const canGoBack = typeof window !== "undefined" && window.history.length > 1;
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-background">
+    <div className="relative h-full w-full overflow-hidden bg-[#e8eef5]">
       <MapView token={tokenQuery.data.token} city={city} />
       <TopBar
         cityName={city.name}
