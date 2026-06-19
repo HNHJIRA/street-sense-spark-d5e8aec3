@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
 import { getCityInfo, getMapboxToken } from "@/lib/parking/parking.functions";
 import { MapView } from "@/components/MapView";
@@ -105,6 +105,8 @@ function HomePage() {
   const displayTime = forecastAt ?? now;
   void tick;
   const city = cityQuery.data;
+  const router = useRouter();
+  const canGoBack = typeof window !== "undefined" && window.history.length > 1;
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-background">
@@ -117,6 +119,7 @@ function HomePage() {
         now={displayTime}
         timezone={city.timezone}
         isForecast={!!forecastAt}
+        onBack={canGoBack ? () => router.history.back() : undefined}
       />
       <Legend />
       <ActiveSessionWidget restrictionTypes={city.restrictionTypes} />

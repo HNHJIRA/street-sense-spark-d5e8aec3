@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Search, MapPin, Check, ChevronDown } from "lucide-react";
+import { Search, MapPin, Check, ChevronDown, ChevronLeft } from "lucide-react";
 import { useAppStore } from "@/stores/app-store";
 
 interface CityOption { slug: string; name: string }
@@ -12,6 +12,7 @@ interface TopBarProps {
   now: Date | null;
   timezone: string;
   isForecast: boolean;
+  onBack?: () => void;
 }
 
 function formatTime(d: Date, tz: string) {
@@ -20,7 +21,7 @@ function formatTime(d: Date, tz: string) {
   }).format(d);
 }
 
-export function TopBar({ cityName, citySlug, cities, onCityChange, now, timezone, isForecast }: TopBarProps) {
+export function TopBar({ cityName, citySlug, cities, onCityChange, now, timezone, isForecast, onBack }: TopBarProps) {
   const setSearchOpen = useAppStore((s) => s.setSearchOpen);
   const clearForecast = useAppStore((s) => s.setForecastAt);
   const mapMode = useAppStore((s) => s.mapMode);
@@ -40,6 +41,16 @@ export function TopBar({ cityName, citySlug, cities, onCityChange, now, timezone
   return (
     <div className="pointer-events-none absolute inset-x-0 top-0 z-20 safe-top safe-x">
       <div className="mx-auto flex max-w-md items-center gap-2 px-3 pt-2">
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label="Back"
+            className="pointer-events-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white shadow-[0_2px_10px_rgba(0,0,0,0.15)]"
+          >
+            <ChevronLeft className="h-5 w-5" strokeWidth={2.4} style={{ color: "var(--pc-brand-end)" }} />
+          </button>
+        )}
         <div ref={wrapRef} className="pointer-events-auto relative">
           <button
             type="button"
