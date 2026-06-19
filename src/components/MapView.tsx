@@ -304,19 +304,15 @@ export function MapView({ token, city }: MapViewProps) {
           map.touchZoomRotate.enableRotation();
           if ((map as any).touchPitch?.enable) (map as any).touchPitch.enable();
           map.keyboard.enable();
-          map.addControl(
-            new mapboxgl.NavigationControl({ visualizePitch: true, showCompass: true, showZoom: true }),
-            "top-right"
-          );
           // Persistent user-location: blue dot + accuracy ring, driven by watchPosition.
           const geolocate = new mapboxgl.GeolocateControl({
             positionOptions: { enableHighAccuracy: true, timeout: 8000 },
             trackUserLocation: true,
             showUserHeading: true,
-            showAccuracyCircle: true,
+            showAccuracyCircle: false,
             fitBoundsOptions: { maxZoom: 17 },
           });
-          map.addControl(geolocate, "top-right");
+          map.addControl(geolocate, "bottom-right");
           geolocateRef.current = geolocate;
           geolocate.on("error", (e: GeolocationPositionError) => {
             const msg =
