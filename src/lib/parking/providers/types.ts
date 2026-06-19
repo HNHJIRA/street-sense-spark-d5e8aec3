@@ -63,7 +63,12 @@ export interface ParkingProvider {
 /** Minimal supabase-admin surface passed to overlay providers. */
 export interface OverlayContext {
   cityId: string;
-  admin: { rpc: (n: string, a?: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }> };
+  admin: {
+    rpc: (n: string, a?: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
+    from?: (t: string) => any;
+  };
+  /** Optional provider-specific parameters (e.g. NYC borough filter). */
+  params?: Record<string, unknown>;
 }
 
 export interface OverlayResult {
