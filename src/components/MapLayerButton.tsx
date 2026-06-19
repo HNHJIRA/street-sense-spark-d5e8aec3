@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 
 const OPTIONS: { value: MapType; label: string; hint: string }[] = [
   { value: "standard", label: "Standard", hint: "Road map" },
+  { value: "basic", label: "Basic", hint: "Flat, minimal" },
   { value: "satellite", label: "Satellite", hint: "Imagery only" },
   { value: "hybrid", label: "Hybrid", hint: "Imagery + labels" },
 ];

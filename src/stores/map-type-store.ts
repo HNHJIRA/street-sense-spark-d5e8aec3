@@ -4,10 +4,11 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
-export type MapType = "standard" | "satellite" | "hybrid";
+export type MapType = "standard" | "basic" | "satellite" | "hybrid";
 
 export const MAPBOX_STYLE_FOR_TYPE: Record<MapType, string> = {
   standard: "mapbox://styles/mapbox/streets-v12",
+  basic: "mapbox://styles/mapbox/light-v11",
   satellite: "mapbox://styles/mapbox/satellite-v9",
   hybrid: "mapbox://styles/mapbox/satellite-streets-v12",
 };
