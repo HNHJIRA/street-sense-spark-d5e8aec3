@@ -228,13 +228,13 @@ export function StreetSheet({ timezone, restrictionTypes, cityId, citySlug }: St
 
 
             {saveOpen && (
-              <div className="mt-3 space-y-2 rounded-2xl bg-surface p-3">
+              <div className="mt-3 space-y-2 rounded-2xl bg-[var(--pc-surface)] p-3">
                 <input
                   value={nickname}
                   onChange={(e) => setNickname(e.target.value)}
                   placeholder="Nickname (Work Parking, Gym…)"
                   maxLength={60}
-                  className="w-full rounded-xl bg-elevated px-3 py-2 text-sm outline-none"
+                  className="w-full rounded-xl bg-white px-3 py-2 text-sm text-slate-900 outline-none border border-[var(--pc-border)]"
                 />
                 <textarea
                   value={notes}
@@ -242,11 +242,11 @@ export function StreetSheet({ timezone, restrictionTypes, cityId, citySlug }: St
                   placeholder="Notes (e.g. block 200 side near hydrant)"
                   maxLength={240}
                   rows={2}
-                  className="w-full resize-none rounded-xl bg-elevated px-3 py-2 text-sm outline-none"
+                  className="w-full resize-none rounded-xl bg-white px-3 py-2 text-sm text-slate-900 outline-none border border-[var(--pc-border)]"
                 />
                 <div className="flex gap-2">
-                  <button onClick={() => setSaveOpen(false)} className="flex-1 rounded-full bg-muted py-2 text-xs font-semibold">Cancel</button>
-                  <button onClick={handleSave} className="flex-1 rounded-full bg-primary py-2 text-xs font-bold text-primary-foreground">Save spot</button>
+                  <button onClick={() => setSaveOpen(false)} className="flex-1 rounded-full bg-slate-200 py-2 text-xs font-semibold text-slate-700">Cancel</button>
+                  <button onClick={handleSave} className="pc-bg-gradient-brand flex-1 rounded-full py-2 text-xs font-bold text-white">Save spot</button>
                 </div>
               </div>
             )}
