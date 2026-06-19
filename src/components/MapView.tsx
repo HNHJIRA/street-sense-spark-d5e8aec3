@@ -700,7 +700,7 @@ export function MapView({ token, city }: MapViewProps) {
       {ready && (
         <div
           className="pointer-events-none absolute right-0 z-20 flex flex-col items-end gap-2 px-3"
-          style={{ top: "calc(var(--safe-top) + 3.5rem)" }}
+          style={{ top: "calc(var(--safe-top) + 2.5rem)" }}
         >
           <MapBtn onClick={zoomIn} ariaLabel="Zoom in"><Plus className="h-5 w-5" /></MapBtn>
           <MapBtn onClick={zoomOut} ariaLabel="Zoom out"><Minus className="h-5 w-5" /></MapBtn>
