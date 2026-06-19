@@ -1,8 +1,8 @@
 // New York City — authoritative centerline provider.
 //
-// VERIFIED OPEN DATA: NYC DCP / DOITT publishes the CSCL street centerline
-// (NYC_Street_Centerline FeatureServer, ~115k polylines citywide) as the
-// canonical street base. This provider imports those centerlines as
+// VERIFIED OPEN DATA: NYC Open Data publishes the canonical Citywide Street
+// Centerline (CSCL) — dataset id `inkn-q76z`, ~115k polylines citywide,
+// owned by NYC DOITT GIS. This provider imports those centerlines as
 // street_segments and attaches an explicit `unknown` rule per segment.
 //
 // Phase 1 (foundation) only:
@@ -15,32 +15,29 @@
 // See docs/nyc-coverage-discovery.md for the full discovery report.
 
 import { normalizeSide, resolveRuleConflicts } from "./normalize";
-import { arcgisPolyline, fetchArcgis, unknownRule } from "./_la-shared.server";
-import type { NormalizedRule, NormalizedSegment, ParkingProvider } from "./types";
+import { unknownRule } from "./_la-shared.server";
+import type { NormalizedRule, NormalizedSegment, ParkingProvider, SyncBbox } from "./types";
 
-// CSCL — NYC Street Centerline. Hosted FeatureServer published by NYC DOITT
-// via the City's ArcGIS Online org. EPSG:4326 source; fetchArcgis forces
-// outSR=4326 anyway so we always get [lng,lat] pairs back.
-const CENTERLINE_ENDPOINT =
-  "https://services5.arcgis.com/GfwWNkhOj9bNBqoJ/arcgis/rest/services/NYC_Street_Centerline/FeatureServer/0/query";
+// Socrata GeoJSON endpoint for NYC Centerline (DOITT GIS).
+const CENTERLINE_GEOJSON =
+  "https://data.cityofnewyork.us/resource/inkn-q76z.geojson";
 
-interface CenterlineAttrs {
-  OBJECTID?: number;
-  PHYSICALID?: number | string;
-  L_LOW_HN?: string;
-  L_HIGH_HN?: string;
-  R_LOW_HN?: string;
-  R_HIGH_HN?: string;
-  ST_LABEL?: string;
-  FULL_STREE?: string;
-  FULL_STREET?: string;
-  ST_NAME?: string;
-  RW_TYPE?: string | number;        // 1=street, 2=highway, 9=alley, 11=walkway, 13=path, etc.
-  STATUS?: string | number;          // 2=active, 1=proposed, 4=ramp, etc.
-  BOROCODE?: string | number;        // 1=MN 2=BX 3=BK 4=QN 5=SI
-  POST_TYPE?: string;
-  TRAFDIR?: string;
-  SHAPE_Length?: number;
+interface CenterlineProps {
+  objectid?: string;
+  physicalid?: string;
+  status?: string;          // "2" = active
+  rw_type?: string;         // "1" = street
+  boroughcode?: string;     // "1"=MN "2"=BX "3"=BK "4"=QN "5"=SI
+  trafdir?: string;
+  stname_label?: string;
+  full_street_name?: string;
+  street_name?: string;
+  pre_type?: string;
+  post_type?: string;
+  l_low_hn?: string;
+  l_high_hn?: string;
+  r_low_hn?: string;
+  r_high_hn?: string;
 }
 
 const BORO_NAME: Record<string, string> = {
@@ -51,60 +48,81 @@ const BORO_NAME: Record<string, string> = {
   "5": "Staten Island",
 };
 
-/** Pull every page until the server stops setting exceededTransferLimit. */
-async function fetchAllPaginated<T>(
-  endpoint: string,
-  params: Record<string, string>,
-): Promise<Array<{ attributes: T; geometry?: unknown }>> {
-  const PAGE = 2000;
+interface GeoJsonFeature {
+  type: "Feature";
+  properties: CenterlineProps;
+  geometry:
+    | { type: "LineString"; coordinates: [number, number][] }
+    | { type: "MultiLineString"; coordinates: [number, number][][] }
+    | null;
+}
+
+interface GeoJsonResponse {
+  type: "FeatureCollection";
+  features: GeoJsonFeature[];
+}
+
+/** Socrata `within_box(field, north_lat, west_lng, south_lat, east_lng)` —
+ *  yes, the order is N/W/S/E (counterintuitive). */
+function buildWithinBox(bbox: SyncBbox): string {
+  return `within_box(the_geom, ${bbox.maxLat}, ${bbox.minLng}, ${bbox.minLat}, ${bbox.maxLng})`;
+}
+
+export async function fetchCsclGeoJson(
+  bbox: SyncBbox,
+): Promise<GeoJsonFeature[]> {
+  const PAGE = 10_000;
   // NYC has ~115k centerline records. Allow up to 200k headroom; bbox-scoped
   // syncs (boroughs / neighborhoods) will normally come in well under this.
   const HARD_CAP = 200_000;
+  // Filter server-side to active streets only (RW_TYPE=1, STATUS=2). This
+  // matches the per-feature filter in the diagnostic.
+  const where =
+    `${buildWithinBox(bbox)} AND status='2' AND rw_type='1'`;
+
+  const out: GeoJsonFeature[] = [];
   let offset = 0;
-  let more = true;
-  const out: Array<{ attributes: T; geometry?: unknown }> = [];
-  while (more) {
-    const json = (await fetchArcgis(endpoint, {
-      ...params,
-      resultRecordCount: String(PAGE),
-      resultOffset: String(offset),
-      orderByFields: "OBJECTID",
-    })) as {
-      features?: Array<{ attributes: T; geometry?: unknown }>;
-      exceededTransferLimit?: boolean;
-    };
+  while (offset <= HARD_CAP) {
+    const qs = new URLSearchParams({
+      $where: where,
+      $limit: String(PAGE),
+      $offset: String(offset),
+      $order: "objectid",
+    });
+    const url = `${CENTERLINE_GEOJSON}?${qs.toString()}`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error(`NYC CSCL ${url} responded ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    }
+    const json = (await res.json()) as GeoJsonResponse;
     const feats = json.features ?? [];
     out.push(...feats);
-    more = !!json.exceededTransferLimit && feats.length > 0;
+    if (feats.length < PAGE) break;
     offset += feats.length;
-    if (offset > HARD_CAP) break;
   }
   return out;
 }
 
-function pickName(a: CenterlineAttrs): string {
+function pickName(p: CenterlineProps): string {
   const n =
-    (a.ST_LABEL ?? a.FULL_STREET ?? a.FULL_STREE ?? a.ST_NAME ?? "")
+    (p.stname_label ?? p.full_street_name ?? p.street_name ?? "")
       .toString()
       .trim();
   if (n) return n;
-  const oid = a.OBJECTID;
-  return oid != null ? `NYC centerline ${oid}` : "NYC street";
+  return p.objectid != null ? `NYC centerline ${p.objectid}` : "NYC street";
 }
 
-/** Filter out non-curb-parking geometry: highways, ramps, paths, walkways,
- *  alleys, and proposed/inactive features. CSCL field semantics:
- *    RW_TYPE: 1=street, 2=highway, 3=bridge, 4=tunnel, 9=alley,
- *             11=walkway, 13=path, 14=stair, 5=boardwalk, etc.
- *    STATUS:  2=active. Anything else (proposed, demapped) is dropped. */
-function isCurbParkable(a: CenterlineAttrs): boolean {
-  const status = String(a.STATUS ?? "").trim();
-  if (status && status !== "2") return false;
-  const rw = String(a.RW_TYPE ?? "").trim();
-  // Keep only "street" (1). NYC has no curb parking on highways/ramps,
-  // walkways, paths, stairs, boardwalks, or interior alleys (per DOT).
-  if (rw && rw !== "1") return false;
-  return true;
+/** Pick the longest LineString out of a (Multi)LineString geometry. */
+function geomToCoords(
+  g: GeoJsonFeature["geometry"],
+): [number, number][] {
+  if (!g) return [];
+  if (g.type === "LineString") return g.coordinates as [number, number][];
+  const lines = g.coordinates ?? [];
+  if (!lines.length) return [];
+  let longest = lines[0];
+  for (const l of lines) if (l.length > longest.length) longest = l;
+  return longest as [number, number][];
 }
 
 export const NycCenterlineProvider: ParkingProvider = {
@@ -113,25 +131,17 @@ export const NycCenterlineProvider: ParkingProvider = {
   cities: ["nyc"],
 
   async fetchSegments(_citySlug, bbox) {
-    const feats = await fetchAllPaginated<CenterlineAttrs>(CENTERLINE_ENDPOINT, {
-      geometry: `${bbox.minLng},${bbox.minLat},${bbox.maxLng},${bbox.maxLat}`,
-      geometryType: "esriGeometryEnvelope",
-      inSR: "4326",
-      spatialRel: "esriSpatialRelIntersects",
-    });
-
+    const feats = await fetchCsclGeoJson(bbox);
     const out: NormalizedSegment[] = [];
     for (const f of feats) {
-      const a = f.attributes;
-      const oid = a.OBJECTID;
+      const p = f.properties ?? {};
+      const oid = p.objectid;
       if (oid == null) continue;
-      if (!isCurbParkable(a)) continue;
-
-      const coords = arcgisPolyline(f.geometry);
+      const coords = geomToCoords(f.geometry);
       if (coords.length < 2) continue;
 
-      const physicalId = a.PHYSICALID != null ? String(a.PHYSICALID) : String(oid);
-      const boro = BORO_NAME[String(a.BOROCODE ?? "")] ?? null;
+      const physicalId = p.physicalid != null ? String(p.physicalid) : String(oid);
+      const boro = BORO_NAME[String(p.boroughcode ?? "")] ?? null;
 
       const rules: NormalizedRule[] = [
         unknownRule(
@@ -144,25 +154,23 @@ export const NycCenterlineProvider: ParkingProvider = {
 
       out.push({
         external_id: `nyc:cscl/${physicalId}`,
-        name: pickName(a),
+        name: pickName(p),
         side: normalizeSide(null), // CSCL has no curb-side; both curbs share
         coordinates: coords,
         metadata: {
           source_provider: "NYC Street Centerline (CSCL)",
-          dataset: "NYC_Street_Centerline",
-          layer_id: 0,
+          dataset: "data.cityofnewyork.us/inkn-q76z",
           physical_id: physicalId,
           borough: boro,
-          borocode: a.BOROCODE ?? null,
-          rw_type: a.RW_TYPE ?? null,
-          status: a.STATUS ?? null,
-          trafdir: a.TRAFDIR ?? null,
+          borocode: p.boroughcode ?? null,
+          rw_type: p.rw_type ?? null,
+          status: p.status ?? null,
+          trafdir: p.trafdir ?? null,
           posted_restrictions: "unknown",
         },
         rules: resolveRuleConflicts(rules),
       });
     }
-
     return out;
   },
 };
