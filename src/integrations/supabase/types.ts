@@ -1243,6 +1243,22 @@ export type Database = {
           side: string
         }[]
       }
+      nyc_area_counts: {
+        Args: {
+          p_city_id: string
+          p_max_lat: number
+          p_max_lng: number
+          p_min_lat: number
+          p_min_lng: number
+        }
+        Returns: {
+          metered: number
+          permit: number
+          segments: number
+          sweeping: number
+          unknown: number
+        }[]
+      }
       populate_geometry_columns:
         | { Args: { tbl_oid: unknown; use_typmod?: boolean }; Returns: number }
         | { Args: { use_typmod?: boolean }; Returns: string }
