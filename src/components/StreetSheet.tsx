@@ -253,20 +253,20 @@ export function StreetSheet({ timezone, restrictionTypes, cityId, citySlug }: St
 
             {segment && segment.rules.length > 0 && (
               <div className="mt-5">
-                <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Posted Rules</div>
+                <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">Posted Rules</div>
                 <div className="space-y-1.5">
                   {[...segment.rules].sort((a, b) => a.priority - b.priority).map((r) => {
                     const t = restrictionTypes.find((x) => x.code === r.restriction_code);
                     return (
-                      <div key={r.id} className="flex items-start gap-3 rounded-2xl bg-surface p-3">
+                      <div key={r.id} className="flex items-start gap-3 rounded-2xl bg-[var(--pc-surface)] p-3">
                         <span className={cn("mt-1 h-2.5 w-2.5 shrink-0 rounded-full", {
                           "bg-park-green": t?.color === "green",
                           "bg-park-yellow": t?.color === "yellow",
                           "bg-park-red": t?.color === "red",
                         })} />
                         <div className="min-w-0 flex-1">
-                          <div className="text-sm font-semibold">{t?.label ?? r.restriction_code}</div>
-                          <div className="mt-0.5 text-xs text-muted-foreground">
+                          <div className="text-sm font-semibold text-slate-900">{t?.label ?? r.restriction_code}</div>
+                          <div className="mt-0.5 text-xs text-slate-500">
                             {r.days_of_week.length === 7 ? "Every day" : r.days_of_week.map((d) => DOW[d]).join(", ")}
                             {r.time_start && r.time_end ? ` · ${r.time_start.slice(0,5)}–${r.time_end.slice(0,5)}` : " · All day"}
                             {r.notes ? ` · ${r.notes}` : ""}
@@ -283,7 +283,7 @@ export function StreetSheet({ timezone, restrictionTypes, cityId, citySlug }: St
               <DayPlannerCard segmentId={selectedSegmentId} citySlug={citySlug} />
             </div>
 
-            <div className="mt-5 text-center text-[10px] text-muted-foreground">
+            <div className="mt-5 text-center text-[10px] text-slate-400">
               {data?.source_label ? `Source: ${data.source_label} · ` : ""}Verify posted signs before parking.
             </div>
 
