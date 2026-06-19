@@ -330,17 +330,17 @@ function DriverSummaryCard({
   });
 
   return (
-    <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4">
-      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-primary">
+    <div className="rounded-2xl border border-[var(--pc-brand)]/30 bg-[color-mix(in_oklab,var(--pc-brand)_8%,white)] p-4">
+      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--pc-brand-end)" }}>
         <Sparkles className="h-3.5 w-3.5" /> AI driver summary
       </div>
-      <div className="mt-2 min-h-[3rem] text-sm leading-relaxed text-foreground">
+      <div className="mt-2 min-h-[3rem] text-sm leading-relaxed text-slate-800">
         {summaryQuery.isLoading ? (
-          <span className="inline-flex items-center gap-2 text-muted-foreground">
+          <span className="inline-flex items-center gap-2 text-slate-500">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Generating summary…
           </span>
         ) : summaryQuery.isError ? (
-          <span className="text-muted-foreground">Summary unavailable right now.</span>
+          <span className="text-slate-500">Summary unavailable right now.</span>
         ) : (
           summaryQuery.data?.summary
         )}
