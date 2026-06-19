@@ -5,7 +5,7 @@ import type { Feature, FeatureCollection, LineString } from "geojson";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
-import { Sliders, Info, LocateFixed, Plus, Minus, Globe2 } from "lucide-react";
+import { LocateFixed, Plus, Minus, Globe2 } from "lucide-react";
 import {
   getSegmentsInBbox,
   importSeattleBlockface,
