@@ -642,7 +642,7 @@ export function MapView({ token, city }: MapViewProps) {
 
     map.setProjection?.({ name: "globe" });
     map.setFog?.({ color: "rgb(236, 232, 226)", "high-color": "rgb(186, 210, 235)", "horizon-blend": 0.02 });
-    map.easeTo({ zoom: Math.max(15.5, map.getZoom()), pitch: 60, duration: 500 });
+    map.easeTo({ zoom: Math.max(15.5, map.getZoom()), pitch: topView ? 0 : 60, duration: 500 });
 
     const rotate = () => {
       map.rotateTo((map.getBearing() + 0.12) % 360, { duration: 0 });
