@@ -29,7 +29,7 @@ const VERDICT_META = {
   YES: { className: "border-park-green/40 bg-park-green-soft text-park-green", Icon: CircleCheck, label: "You can park here" },
   LIMITED: { className: "border-park-yellow/40 bg-park-yellow-soft text-park-yellow", Icon: TriangleAlert, label: "Limited parking" },
   NO: { className: "border-park-red/40 bg-park-red-soft text-park-red", Icon: CircleX, label: "No parking" },
-  UNKNOWN: { className: "border-border bg-surface text-muted-foreground", Icon: ShieldQuestion, label: "Status unknown" },
+  UNKNOWN: { className: "border-[var(--pc-border)] bg-[var(--pc-surface)] text-slate-500", Icon: ShieldQuestion, label: "Status unknown" },
 } as const;
 
 function formatTime(iso: string | null | undefined, tz: string): string | null {
@@ -177,20 +177,20 @@ function NextRestrictionCard({
   label: string; startsAt: string; timeUntilMs: number; timezone: string; currentLabel: string;
 }) {
   return (
-    <div className="rounded-2xl bg-surface p-4">
-      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+    <div className="rounded-2xl bg-[var(--pc-surface)] p-4">
+      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">
         <Bell className="h-3.5 w-3.5" /> Next restriction
       </div>
       <div className="mt-2 flex items-end justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-base font-bold leading-tight">{label}</div>
-          <div className="mt-0.5 text-xs text-muted-foreground">
+          <div className="text-base font-bold leading-tight text-slate-900">{label}</div>
+          <div className="mt-0.5 text-xs text-slate-500">
             Currently: {currentLabel}
           </div>
         </div>
         <div className="text-right">
-          <div className="text-xs font-semibold">{formatTime(startsAt, timezone)}</div>
-          <div className="text-[11px] text-muted-foreground">in {formatDuration(timeUntilMs)}</div>
+          <div className="text-xs font-semibold text-slate-900">{formatTime(startsAt, timezone)}</div>
+          <div className="text-[11px] text-slate-500">in {formatDuration(timeUntilMs)}</div>
         </div>
       </div>
     </div>
@@ -224,11 +224,11 @@ function DetailGrid({
   return (
     <div className="grid grid-cols-1 gap-1.5 text-xs">
       {rows.map((r) => (
-        <div key={r.label} className="flex items-center justify-between rounded-xl bg-surface px-3 py-2">
-          <span className="flex items-center gap-2 text-muted-foreground">
+        <div key={r.label} className="flex items-center justify-between rounded-xl bg-[var(--pc-surface)] px-3 py-2">
+          <span className="flex items-center gap-2 text-slate-500">
             <r.icon className="h-3.5 w-3.5" /> {r.label}
           </span>
-          <span className="max-w-[60%] truncate pl-2 text-right font-semibold">{r.value}</span>
+          <span className="max-w-[60%] truncate pl-2 text-right font-semibold text-slate-900">{r.value}</span>
         </div>
       ))}
     </div>
@@ -237,8 +237,8 @@ function DetailGrid({
 
 function TimelineCard({ decision, timezone }: { decision: ParkingDecision; timezone: string }) {
   return (
-    <div className="rounded-2xl bg-surface p-4">
-      <div className="mb-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+    <div className="rounded-2xl bg-[var(--pc-surface)] p-4">
+      <div className="mb-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">
         Parking timeline
       </div>
       <ol className="space-y-3">
@@ -252,18 +252,18 @@ function TimelineCard({ decision, timezone }: { decision: ParkingDecision; timez
           return (
             <li key={entry.iso} className="relative flex gap-3">
               <div className="flex flex-col items-center">
-                <span className={cn("h-2.5 w-2.5 rounded-full ring-4 ring-elevated", dot)} />
-                {!isLast && <span className="mt-1 h-full w-px flex-1 bg-border" />}
+                <span className={cn("h-2.5 w-2.5 rounded-full ring-4 ring-white", dot)} />
+                {!isLast && <span className="mt-1 h-full w-px flex-1 bg-slate-200" />}
               </div>
               <div className="min-w-0 flex-1 pb-1">
                 <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
                     {formatTimelineTime(entry.iso, timezone, entry.isNow)}
                   </span>
                 </div>
-                <div className="text-sm font-semibold leading-tight">{entry.label}</div>
+                <div className="text-sm font-semibold leading-tight text-slate-900">{entry.label}</div>
                 {entry.reason && (
-                  <div className="text-[11px] text-muted-foreground">{entry.reason}</div>
+                  <div className="text-[11px] text-slate-500">{entry.reason}</div>
                 )}
               </div>
             </li>
@@ -330,17 +330,17 @@ function DriverSummaryCard({
   });
 
   return (
-    <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4">
-      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-primary">
+    <div className="rounded-2xl border border-[var(--pc-brand)]/30 bg-[color-mix(in_oklab,var(--pc-brand)_8%,white)] p-4">
+      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--pc-brand-end)" }}>
         <Sparkles className="h-3.5 w-3.5" /> AI driver summary
       </div>
-      <div className="mt-2 min-h-[3rem] text-sm leading-relaxed text-foreground">
+      <div className="mt-2 min-h-[3rem] text-sm leading-relaxed text-slate-800">
         {summaryQuery.isLoading ? (
-          <span className="inline-flex items-center gap-2 text-muted-foreground">
+          <span className="inline-flex items-center gap-2 text-slate-500">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Generating summary…
           </span>
         ) : summaryQuery.isError ? (
-          <span className="text-muted-foreground">Summary unavailable right now.</span>
+          <span className="text-slate-500">Summary unavailable right now.</span>
         ) : (
           summaryQuery.data?.summary
         )}
@@ -354,10 +354,10 @@ export function ParkDecisionUnknownCTA({ onScanClick }: { onScanClick?: () => vo
     <button
       type="button"
       onClick={onScanClick}
-      className="mt-2 flex w-full items-center justify-between rounded-2xl bg-surface px-4 py-3 text-sm font-semibold transition active:scale-[0.99]"
+      className="mt-2 flex w-full items-center justify-between rounded-2xl bg-[var(--pc-surface)] px-4 py-3 text-sm font-semibold text-slate-800 transition active:scale-[0.99]"
     >
       <span>Scan the posted sign instead</span>
-      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+      <ChevronRight className="h-4 w-4 text-slate-400" />
     </button>
   );
 }

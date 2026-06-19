@@ -194,8 +194,8 @@ export function ParkHereButton({ cityId, timezone }: Props) {
           <div className="absolute inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={closeAll} />
           <div className="absolute inset-x-0 bottom-0 z-50 safe-bottom animate-in slide-in-from-bottom duration-200">
             <div className="mx-auto max-w-md px-3 pb-3">
-              <div className="max-h-[85vh] overflow-y-auto rounded-3xl border border-border bg-elevated p-5 shadow-2xl">
-                <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-muted" />
+              <div className="pc-shadow-card max-h-[85vh] overflow-y-auto rounded-3xl border border-[var(--pc-border)] bg-white p-5 text-slate-900">
+                <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-slate-200" />
 
                 {result.found && result.decision ? (
                   <ParkDecisionScreen
@@ -205,7 +205,7 @@ export function ParkHereButton({ cityId, timezone }: Props) {
                   />
                 ) : (
                   <div className="space-y-3">
-                    <div className="rounded-2xl border border-border bg-surface p-4 text-sm">
+                    <div className="rounded-2xl border border-[var(--pc-border)] bg-[var(--pc-surface)] p-4 text-sm text-slate-700">
                       {result.message}
                     </div>
                     <ParkDecisionUnknownCTA onScanClick={() => { window.location.href = "/scan"; }} />
@@ -215,15 +215,15 @@ export function ParkHereButton({ cityId, timezone }: Props) {
                 {(altsLoading || (alts && alts.length > 0)) && (
                   <div className="mt-4">
                     <div className="mb-2 flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                      <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                         <Sparkles className="h-3 w-3" /> Where should I park?
                       </div>
                       {alts && alts[0] && (
-                        <div className="text-[10px] text-muted-foreground">within {alts[0].search_tier_m} m</div>
+                        <div className="text-[10px] text-slate-500">within {alts[0].search_tier_m} m</div>
                       )}
                     </div>
                     {altsLoading && (
-                      <div className="flex items-center gap-2 rounded-2xl bg-surface px-3 py-3 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-2 rounded-2xl bg-[var(--pc-surface)] px-3 py-3 text-xs text-slate-500">
                         <Loader2 className="h-3.5 w-3.5 animate-spin" /> Searching nearby (100 → 250 → 500 m)…
                       </div>
                     )}
@@ -234,7 +234,9 @@ export function ParkHereButton({ cityId, timezone }: Props) {
                         onClick={() => viewOnMap(opt)}
                         className={cn(
                           "mt-1.5 flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition active:scale-[0.99]",
-                          idx === 0 ? "border border-primary/40 bg-primary/5" : "bg-surface",
+                          idx === 0
+                            ? "border border-[var(--pc-brand)]/40 bg-[color-mix(in_oklab,var(--pc-brand)_8%,white)]"
+                            : "bg-[var(--pc-surface)]",
                         )}
                       >
                         <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", {
@@ -244,11 +246,11 @@ export function ParkHereButton({ cityId, timezone }: Props) {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5">
                             {idx === 0 && (
-                              <span className="rounded-full bg-primary px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary-foreground">Best</span>
+                              <span className="pc-bg-gradient-brand rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white">Best</span>
                             )}
-                            <div className="truncate text-sm font-semibold">{opt.name}</div>
+                            <div className="truncate text-sm font-semibold text-slate-900">{opt.name}</div>
                           </div>
-                          <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+                          <div className="mt-0.5 flex items-center gap-2 text-[11px] text-slate-500">
                             <span>{Math.round(opt.distance_m)} m</span>
                             <span>·</span>
                             <span className="inline-flex items-center gap-1"><Footprints className="h-3 w-3" />{formatWalk(opt.walking_seconds)}</span>
@@ -256,7 +258,7 @@ export function ParkHereButton({ cityId, timezone }: Props) {
                             <span>{opt.label}</span>
                           </div>
                           {opt.allowed_until && (
-                            <div className="text-[10px] text-muted-foreground">until {formatTime(new Date(opt.allowed_until), timezone)}</div>
+                            <div className="text-[10px] text-slate-400">until {formatTime(new Date(opt.allowed_until), timezone)}</div>
                           )}
                         </div>
                         <div
@@ -268,11 +270,11 @@ export function ParkHereButton({ cityId, timezone }: Props) {
                         >
                           {opt.parking_score}
                         </div>
-                        <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                        <ArrowRight className="h-4 w-4 text-slate-400" />
                       </button>
                     ))}
                     {!altsLoading && alts && alts.length === 0 && (
-                      <div className="rounded-2xl bg-surface px-3 py-3 text-xs text-muted-foreground">
+                      <div className="rounded-2xl bg-[var(--pc-surface)] px-3 py-3 text-xs text-slate-500">
                         No legal parking found within 500 m right now.
                       </div>
                     )}
@@ -286,11 +288,11 @@ export function ParkHereButton({ cityId, timezone }: Props) {
                     setResult(null);
                     setAlts(null);
                   }}
-                  className="mt-4 w-full rounded-full bg-primary py-3 text-sm font-semibold text-primary-foreground"
+                  className="pc-bg-gradient-brand pc-shadow-brand mt-4 w-full rounded-full py-3 text-sm font-semibold text-white"
                 >
                   {result.found ? "See full street details" : "Got it"}
                 </button>
-                <p className="mt-3 text-center text-[10px] text-muted-foreground">
+                <p className="mt-3 text-center text-[10px] text-slate-400">
                   Verify posted signs before parking.
                 </p>
               </div>

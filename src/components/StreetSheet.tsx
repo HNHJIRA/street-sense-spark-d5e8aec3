@@ -132,21 +132,21 @@ export function StreetSheet({ timezone, restrictionTypes, cityId, citySlug }: St
       <div className="absolute inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={() => selectSegment(null)} />
       <div className="absolute inset-x-0 bottom-0 z-50 safe-bottom animate-in slide-in-from-bottom duration-200">
         <div className="mx-auto max-w-md px-3 pb-3">
-          <div className="flex max-h-[85vh] flex-col overflow-hidden rounded-3xl border border-border bg-elevated shadow-2xl">
+          <div className="pc-shadow-card flex max-h-[85vh] flex-col overflow-hidden rounded-3xl border border-[var(--pc-border)] bg-white text-slate-900">
             <div className="shrink-0 px-5 pt-3">
-              <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-muted" />
+              <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-slate-200" />
             </div>
             <div className="overflow-y-auto overscroll-contain px-5 pb-5 pt-2">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="font-display text-xl font-bold leading-tight">
+                <h2 className="font-display text-xl font-bold leading-tight text-slate-900">
                   {segment?.name ?? (detailsQuery.isLoading ? "Loading…" : "Street")}
                 </h2>
                 {data?.source_category && (
-                  <p className="mt-0.5 text-xs text-muted-foreground">{data.source_category}</p>
+                  <p className="mt-0.5 text-xs text-slate-500">{data.source_category}</p>
                 )}
               </div>
-              <button onClick={() => selectSegment(null)} className="rounded-full bg-muted p-2 text-muted-foreground hover:text-foreground" aria-label="Close">
+              <button onClick={() => selectSegment(null)} className="pc-bg-gradient-brand rounded-full p-2 text-white" aria-label="Close">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -204,7 +204,7 @@ export function StreetSheet({ timezone, restrictionTypes, cityId, citySlug }: St
                   requestCheckSegment(data.id);
                   selectSegment(null);
                 }}
-                className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3 text-sm font-bold text-primary-foreground transition active:scale-95"
+                className="pc-bg-gradient-brand pc-shadow-brand mt-4 flex w-full items-center justify-center gap-2 rounded-full py-3 text-sm font-bold text-white transition active:scale-95"
               >
                 <Navigation className="h-4 w-4" strokeWidth={2.5} />
                 Can I park here?
@@ -228,13 +228,13 @@ export function StreetSheet({ timezone, restrictionTypes, cityId, citySlug }: St
 
 
             {saveOpen && (
-              <div className="mt-3 space-y-2 rounded-2xl bg-surface p-3">
+              <div className="mt-3 space-y-2 rounded-2xl bg-[var(--pc-surface)] p-3">
                 <input
                   value={nickname}
                   onChange={(e) => setNickname(e.target.value)}
                   placeholder="Nickname (Work Parking, Gym…)"
                   maxLength={60}
-                  className="w-full rounded-xl bg-elevated px-3 py-2 text-sm outline-none"
+                  className="w-full rounded-xl bg-white px-3 py-2 text-sm text-slate-900 outline-none border border-[var(--pc-border)]"
                 />
                 <textarea
                   value={notes}
@@ -242,31 +242,31 @@ export function StreetSheet({ timezone, restrictionTypes, cityId, citySlug }: St
                   placeholder="Notes (e.g. block 200 side near hydrant)"
                   maxLength={240}
                   rows={2}
-                  className="w-full resize-none rounded-xl bg-elevated px-3 py-2 text-sm outline-none"
+                  className="w-full resize-none rounded-xl bg-white px-3 py-2 text-sm text-slate-900 outline-none border border-[var(--pc-border)]"
                 />
                 <div className="flex gap-2">
-                  <button onClick={() => setSaveOpen(false)} className="flex-1 rounded-full bg-muted py-2 text-xs font-semibold">Cancel</button>
-                  <button onClick={handleSave} className="flex-1 rounded-full bg-primary py-2 text-xs font-bold text-primary-foreground">Save spot</button>
+                  <button onClick={() => setSaveOpen(false)} className="flex-1 rounded-full bg-slate-200 py-2 text-xs font-semibold text-slate-700">Cancel</button>
+                  <button onClick={handleSave} className="pc-bg-gradient-brand flex-1 rounded-full py-2 text-xs font-bold text-white">Save spot</button>
                 </div>
               </div>
             )}
 
             {segment && segment.rules.length > 0 && (
               <div className="mt-5">
-                <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Posted Rules</div>
+                <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">Posted Rules</div>
                 <div className="space-y-1.5">
                   {[...segment.rules].sort((a, b) => a.priority - b.priority).map((r) => {
                     const t = restrictionTypes.find((x) => x.code === r.restriction_code);
                     return (
-                      <div key={r.id} className="flex items-start gap-3 rounded-2xl bg-surface p-3">
+                      <div key={r.id} className="flex items-start gap-3 rounded-2xl bg-[var(--pc-surface)] p-3">
                         <span className={cn("mt-1 h-2.5 w-2.5 shrink-0 rounded-full", {
                           "bg-park-green": t?.color === "green",
                           "bg-park-yellow": t?.color === "yellow",
                           "bg-park-red": t?.color === "red",
                         })} />
                         <div className="min-w-0 flex-1">
-                          <div className="text-sm font-semibold">{t?.label ?? r.restriction_code}</div>
-                          <div className="mt-0.5 text-xs text-muted-foreground">
+                          <div className="text-sm font-semibold text-slate-900">{t?.label ?? r.restriction_code}</div>
+                          <div className="mt-0.5 text-xs text-slate-500">
                             {r.days_of_week.length === 7 ? "Every day" : r.days_of_week.map((d) => DOW[d]).join(", ")}
                             {r.time_start && r.time_end ? ` · ${r.time_start.slice(0,5)}–${r.time_end.slice(0,5)}` : " · All day"}
                             {r.notes ? ` · ${r.notes}` : ""}
@@ -283,7 +283,7 @@ export function StreetSheet({ timezone, restrictionTypes, cityId, citySlug }: St
               <DayPlannerCard segmentId={selectedSegmentId} citySlug={citySlug} />
             </div>
 
-            <div className="mt-5 text-center text-[10px] text-muted-foreground">
+            <div className="mt-5 text-center text-[10px] text-slate-400">
               {data?.source_label ? `Source: ${data.source_label} · ` : ""}Verify posted signs before parking.
             </div>
 
@@ -297,11 +297,11 @@ export function StreetSheet({ timezone, restrictionTypes, cityId, citySlug }: St
 
 function Row({ icon: Icon, label, value }: { icon: typeof Clock; label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between rounded-2xl bg-surface px-4 py-3">
-      <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+    <div className="flex items-center justify-between rounded-2xl bg-[var(--pc-surface)] px-4 py-3">
+      <span className="flex items-center gap-2 text-xs font-medium text-slate-500">
         <Icon className="h-4 w-4" /> {label}
       </span>
-      <span className="text-sm font-semibold">{value}</span>
+      <span className="text-sm font-semibold text-slate-900">{value}</span>
     </div>
   );
 }
@@ -317,10 +317,10 @@ function ActionButton({
       className={cn(
         "flex flex-col items-center justify-center gap-1 rounded-2xl px-2 py-3 text-[11px] font-bold transition active:scale-95 disabled:opacity-40",
         primary
-          ? "bg-primary text-primary-foreground"
+          ? "pc-bg-gradient-brand text-white"
           : active
-            ? "bg-primary/20 text-primary"
-            : "bg-surface text-foreground",
+            ? "bg-[color-mix(in_oklab,var(--pc-brand)_15%,white)] text-[var(--pc-brand-end)]"
+            : "bg-[var(--pc-surface)] text-slate-700",
       )}
     >
       <Icon className="h-4 w-4" strokeWidth={2.4} />
