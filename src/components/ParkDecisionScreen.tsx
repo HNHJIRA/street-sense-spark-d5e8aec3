@@ -354,10 +354,10 @@ export function ParkDecisionUnknownCTA({ onScanClick }: { onScanClick?: () => vo
     <button
       type="button"
       onClick={onScanClick}
-      className="mt-2 flex w-full items-center justify-between rounded-2xl bg-surface px-4 py-3 text-sm font-semibold transition active:scale-[0.99]"
+      className="mt-2 flex w-full items-center justify-between rounded-2xl bg-[var(--pc-surface)] px-4 py-3 text-sm font-semibold text-slate-800 transition active:scale-[0.99]"
     >
       <span>Scan the posted sign instead</span>
-      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+      <ChevronRight className="h-4 w-4 text-slate-400" />
     </button>
   );
 }
