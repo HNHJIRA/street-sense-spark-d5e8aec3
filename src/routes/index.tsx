@@ -144,7 +144,7 @@ function Legend() {
       className="pointer-events-none absolute left-1/2 z-10 -translate-x-1/2"
       style={{ bottom: "calc(var(--safe-bottom) + 11rem)" }}
     >
-      <div className="flex items-center gap-3 rounded-full border border-border bg-surface/85 px-4 py-2 backdrop-blur-xl">
+      <div className="flex items-center gap-3 rounded-full bg-white px-4 py-2 pc-shadow-card">
         <LegendDot color="bg-park-green" label={labels[0]} />
         <LegendDot color="bg-park-yellow" label={labels[1]} />
         <LegendDot color="bg-park-red" label={labels[2]} />
@@ -154,7 +154,7 @@ function Legend() {
 }
 function LegendDot({ color, label }: { color: string; label: string }) {
   return (
-    <span className="flex items-center gap-1.5 text-[11px] font-semibold">
+    <span className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
       <span className={`h-2.5 w-2.5 rounded-full ${color}`} />
       {label}
     </span>
