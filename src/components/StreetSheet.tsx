@@ -317,10 +317,10 @@ function ActionButton({
       className={cn(
         "flex flex-col items-center justify-center gap-1 rounded-2xl px-2 py-3 text-[11px] font-bold transition active:scale-95 disabled:opacity-40",
         primary
-          ? "bg-primary text-primary-foreground"
+          ? "pc-bg-gradient-brand text-white"
           : active
-            ? "bg-primary/20 text-primary"
-            : "bg-surface text-foreground",
+            ? "bg-[color-mix(in_oklab,var(--pc-brand)_15%,white)] text-[var(--pc-brand-end)]"
+            : "bg-[var(--pc-surface)] text-slate-700",
       )}
     >
       <Icon className="h-4 w-4" strokeWidth={2.4} />
