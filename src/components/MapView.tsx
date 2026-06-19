@@ -5,7 +5,7 @@ import type { Feature, FeatureCollection, LineString } from "geojson";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
-import { Sliders, Info, LocateFixed, Plus, Minus, Globe2 } from "lucide-react";
+import { LocateFixed, Plus, Minus, Globe2 } from "lucide-react";
 import {
   getSegmentsInBbox,
   importSeattleBlockface,
@@ -714,12 +714,6 @@ export function MapView({ token, city }: MapViewProps) {
           <MapBtn onClick={zoomIn} ariaLabel="Zoom in"><Plus className="h-5 w-5" /></MapBtn>
           <MapBtn onClick={zoomOut} ariaLabel="Zoom out"><Minus className="h-5 w-5" /></MapBtn>
           <div className="h-1" />
-          <MapBtn onClick={() => toast.message("Map settings coming soon")} ariaLabel="Map settings">
-            <Sliders className="h-5 w-5" />
-          </MapBtn>
-          <MapBtn onClick={() => toast.message("Tap any colored line for details")} ariaLabel="Info">
-            <Info className="h-5 w-5" />
-          </MapBtn>
           <MapBtn onClick={toggleGlobe} ariaLabel="Rotate globe"><Globe2 className="h-5 w-5" /></MapBtn>
           <MapBtn onClick={locate} ariaLabel="My location"><LocateFixed className="h-5 w-5" /></MapBtn>
         </div>
