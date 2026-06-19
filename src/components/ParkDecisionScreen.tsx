@@ -237,8 +237,8 @@ function DetailGrid({
 
 function TimelineCard({ decision, timezone }: { decision: ParkingDecision; timezone: string }) {
   return (
-    <div className="rounded-2xl bg-surface p-4">
-      <div className="mb-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+    <div className="rounded-2xl bg-[var(--pc-surface)] p-4">
+      <div className="mb-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">
         Parking timeline
       </div>
       <ol className="space-y-3">
@@ -252,18 +252,18 @@ function TimelineCard({ decision, timezone }: { decision: ParkingDecision; timez
           return (
             <li key={entry.iso} className="relative flex gap-3">
               <div className="flex flex-col items-center">
-                <span className={cn("h-2.5 w-2.5 rounded-full ring-4 ring-elevated", dot)} />
-                {!isLast && <span className="mt-1 h-full w-px flex-1 bg-border" />}
+                <span className={cn("h-2.5 w-2.5 rounded-full ring-4 ring-white", dot)} />
+                {!isLast && <span className="mt-1 h-full w-px flex-1 bg-slate-200" />}
               </div>
               <div className="min-w-0 flex-1 pb-1">
                 <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
                     {formatTimelineTime(entry.iso, timezone, entry.isNow)}
                   </span>
                 </div>
-                <div className="text-sm font-semibold leading-tight">{entry.label}</div>
+                <div className="text-sm font-semibold leading-tight text-slate-900">{entry.label}</div>
                 {entry.reason && (
-                  <div className="text-[11px] text-muted-foreground">{entry.reason}</div>
+                  <div className="text-[11px] text-slate-500">{entry.reason}</div>
                 )}
               </div>
             </li>
