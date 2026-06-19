@@ -19,6 +19,8 @@ const NYC_BBOX = {
 async function run({ request }: { request: Request }) {
   const url = new URL(request.url);
   const wait = url.searchParams.get("wait") === "1";
+  const onlyProvider = url.searchParams.get("provider")?.trim() || undefined;
+  const boroughsParam = url.searchParams.get("boroughs")?.trim() || undefined;
 
   if (!wait) {
     return new Response(JSON.stringify({
@@ -31,7 +33,13 @@ async function run({ request }: { request: Request }) {
 
   try {
     const providerRun = await syncAllProvidersForCity({
-      data: { citySlug: "nyc", ...NYC_BBOX, force: true },
+      data: {
+        citySlug: "nyc", ...NYC_BBOX, force: true,
+        onlyProviderId: onlyProvider,
+        providerParams: boroughsParam
+          ? { "nyc-signs": { boroughs: boroughsParam } }
+          : undefined,
+      },
     });
 
     // ---------- Diagnostics (read-only) ----------
