@@ -67,17 +67,17 @@ export function SearchSheet({ token }: { token: string }) {
       <div className="absolute inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={() => setOpen(false)} />
       <div className="absolute inset-x-0 top-0 z-50 safe-top animate-in slide-in-from-top duration-200">
         <div className="mx-auto max-w-md px-3 pb-3">
-          <div className="rounded-3xl border border-border bg-elevated p-4 shadow-2xl">
-            <div className="flex items-center gap-2 rounded-full bg-surface px-3 py-2.5">
-              <Search className="h-5 w-5 text-muted-foreground" />
+          <div className="pc-shadow-card rounded-3xl border border-[var(--pc-border)] bg-white p-4 text-slate-900">
+            <div className="flex items-center gap-2 rounded-full bg-[var(--pc-surface)] px-3 py-2.5">
+              <Search className="h-5 w-5" style={{ color: "var(--pc-brand-end)" }} />
               <input
                 autoFocus
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Address, landmark, neighborhood…"
-                className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                className="flex-1 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
               />
-              <button onClick={() => setOpen(false)} className="rounded-full bg-muted p-1.5 text-muted-foreground">
+              <button onClick={() => setOpen(false)} className="pc-bg-gradient-brand rounded-full p-1.5 text-white">
                 <X className="h-4 w-4" />
               </button>
             </div>
