@@ -279,9 +279,10 @@ export function StreetSheet({ timezone, restrictionTypes, cityId, citySlug }: St
               </div>
             )}
 
-            <div className="mt-4">
+            {/* DayPlanner hidden for now — component preserved in repo */}
+            {/* <div className="mt-4">
               <DayPlannerCard segmentId={selectedSegmentId} citySlug={citySlug} />
-            </div>
+            </div> */}
 
             <div className="mt-5 text-center text-[10px] text-slate-400">
               {data?.source_label ? `Source: ${data.source_label} · ` : ""}Verify posted signs before parking.
