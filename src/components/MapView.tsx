@@ -698,15 +698,6 @@ export function MapView({ token, city }: MapViewProps) {
       <div ref={container} className="absolute inset-0 z-0 h-full w-full" />
 
       {ready && (
-        <MapLayerButton
-          className="right-3"
-          style={{ bottom: "calc(var(--safe-bottom) + 14.5rem)" }}
-        />
-      )}
-
-
-
-      {ready && (
         <div
           className="pointer-events-none absolute right-0 z-20 flex flex-col items-end gap-2 px-3"
           style={{ top: "calc(var(--safe-top) + 18rem)" }}
@@ -716,6 +707,7 @@ export function MapView({ token, city }: MapViewProps) {
           <div className="h-1" />
           <MapBtn onClick={toggleGlobe} ariaLabel="Rotate globe"><Globe2 className="h-5 w-5" /></MapBtn>
           <MapBtn onClick={locate} ariaLabel="My location"><LocateFixed className="h-5 w-5" /></MapBtn>
+          <MapLayerButton className="relative" />
         </div>
       )}
 
