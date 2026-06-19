@@ -167,27 +167,29 @@ export function ParkHereButton({ cityId, timezone }: Props) {
     <>
       <div
         className="pointer-events-none absolute inset-x-0 z-20 safe-x"
-        style={{ bottom: "calc(var(--safe-bottom) + 7rem)" }}
+        style={{ bottom: "calc(var(--safe-bottom) + 1.25rem)" }}
       >
-        <div className="mx-auto flex max-w-md items-center justify-center gap-2 px-3">
-          <button
-            type="button"
-            onClick={runGpsOrTap}
-            disabled={loading}
-            className="pointer-events-auto flex items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-bold text-primary-foreground shadow-[0_20px_60px_-10px_rgba(0,0,0,0.5)] transition active:scale-95 disabled:opacity-70"
+        <div className="mx-auto max-w-md px-3">
+          <div
+            className="pointer-events-auto rounded-[2rem] bg-white px-5 py-5"
+            style={{ boxShadow: "0 -8px 30px -10px rgba(15, 23, 42, 0.18), 0 20px 40px -15px rgba(15, 23, 42, 0.15)" }}
           >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Navigation className="h-4 w-4" strokeWidth={2.5} />}
-            {loading ? "Checking…" : "Can I park here?"}
-          </button>
-          {/*
-          <a
-            href="/scan"
-            className="pointer-events-auto flex items-center gap-1.5 rounded-full bg-surface px-4 py-3 text-sm font-bold shadow-[0_20px_60px_-10px_rgba(0,0,0,0.5)] transition active:scale-95"
-          >
-            <ScanLine className="h-4 w-4" strokeWidth={2.5} />
-            Scan sign
-          </a>
-          */}
+            <button
+              type="button"
+              onClick={runGpsOrTap}
+              disabled={loading}
+              className="flex w-full items-center justify-center gap-2 rounded-full px-6 py-4 text-base font-bold text-white transition active:scale-[0.98] disabled:opacity-70"
+              style={{
+                background: "linear-gradient(90deg, #24C5FA 0%, #2772F1 100%)",
+                boxShadow: "0 12px 24px -8px rgba(39, 114, 241, 0.55), 0 4px 12px -4px rgba(36, 197, 250, 0.4)",
+                fontFamily: "'Outfit', system-ui, sans-serif",
+                letterSpacing: "0.01em",
+              }}
+            >
+              {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
+              {loading ? "Checking…" : "Can I Park Here?"}
+            </button>
+          </div>
         </div>
       </div>
 
