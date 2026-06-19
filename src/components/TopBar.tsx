@@ -12,6 +12,7 @@ interface TopBarProps {
   now: Date | null;
   timezone: string;
   isForecast: boolean;
+  onBack?: () => void;
 }
 
 function formatTime(d: Date, tz: string) {
