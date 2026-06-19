@@ -166,30 +166,26 @@ export function ParkHereButton({ cityId, timezone }: Props) {
   return (
     <>
       <div
-        className="pointer-events-none absolute inset-x-0 z-20 safe-x"
-        style={{ bottom: "calc(var(--safe-bottom) + 1.25rem)" }}
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-20"
       >
-        <div className="mx-auto max-w-md px-3">
-          <div
-            className="pointer-events-auto rounded-t-[2.5rem] bg-white px-5 py-5"
-            style={{ boxShadow: "0 -8px 30px -10px rgba(15, 23, 42, 0.18), 0 20px 40px -15px rgba(15, 23, 42, 0.15)" }}
+        <div className="pointer-events-auto rounded-t-[2.5rem] bg-white px-5 py-5"
+          style={{ boxShadow: "0 -8px 30px -10px rgba(15, 23, 42, 0.18), 0 20px 40px -15px rgba(15, 23, 42, 0.15)" }}
+        >
+          <button
+            type="button"
+            onClick={runGpsOrTap}
+            disabled={loading}
+            className="flex w-full items-center justify-center gap-2 rounded-full px-6 py-4 text-base font-bold text-white transition active:scale-[0.98] disabled:opacity-70"
+            style={{
+              background: "linear-gradient(90deg, #24C5FA 0%, #2772F1 100%)",
+              boxShadow: "0 12px 24px -8px rgba(39, 114, 241, 0.55), 0 4px 12px -4px rgba(36, 197, 250, 0.4)",
+              fontFamily: "'Outfit', system-ui, sans-serif",
+              letterSpacing: "0.01em",
+            }}
           >
-            <button
-              type="button"
-              onClick={runGpsOrTap}
-              disabled={loading}
-              className="flex w-full items-center justify-center gap-2 rounded-full px-6 py-4 text-base font-bold text-white transition active:scale-[0.98] disabled:opacity-70"
-              style={{
-                background: "linear-gradient(90deg, #24C5FA 0%, #2772F1 100%)",
-                boxShadow: "0 12px 24px -8px rgba(39, 114, 241, 0.55), 0 4px 12px -4px rgba(36, 197, 250, 0.4)",
-                fontFamily: "'Outfit', system-ui, sans-serif",
-                letterSpacing: "0.01em",
-              }}
-            >
-              {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
-              {loading ? "Checking…" : "Can I Park Here?"}
-            </button>
-          </div>
+            {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
+            {loading ? "Checking…" : "Can I Park Here?"}
+          </button>
         </div>
       </div>
 
