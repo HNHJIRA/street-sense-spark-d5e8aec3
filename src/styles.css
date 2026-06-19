@@ -148,18 +148,18 @@
  * Scoped so they don't collide with the dark map theme tokens.
  * ============================================================ */
 :root {
-  --pc-brand-start: #5EE3A8;
-  --pc-brand-end: #34D399;
-  --pc-brand: #34D399;
-  --pc-success: #34D399;
+  --pc-brand-start: #24C5FA;
+  --pc-brand-end: #2772F1;
+  --pc-brand: #2772F1;
+  --pc-success: #49B945;
   --pc-danger: #F62C30;
-  --pc-surface: #0F172A;
-  --pc-border: #1F2937;
-  --pc-muted-foreground: #94A3B8;
+  --pc-surface: #F8F9FB;
+  --pc-border: #E6E8EE;
+  --pc-muted-foreground: #6B7280;
   --pc-gradient-brand: linear-gradient(90deg, var(--pc-brand-start) 0%, var(--pc-brand-end) 100%);
   --pc-gradient-brand-vert: linear-gradient(180deg, var(--pc-brand-start) 0%, var(--pc-brand-end) 70%);
   --pc-shadow-brand: 0 12px 30px -10px color-mix(in oklab, var(--pc-brand) 55%, transparent);
-  --pc-shadow-card: 0 10px 30px -12px rgba(0, 0, 0, 0.4);
+  --pc-shadow-card: 0 10px 30px -12px rgba(15, 23, 42, 0.12);
 }
 .pc-bg-gradient-brand { background: var(--pc-gradient-brand); }
 .pc-bg-gradient-brand-vert { background: var(--pc-gradient-brand-vert); }
