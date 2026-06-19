@@ -86,30 +86,30 @@ export function SearchSheet({ token }: { token: string }) {
               {q.trim().length < 2 && (
                 <>
                   {history.length === 0 ? (
-                    <div className="px-2 py-1 text-xs text-muted-foreground">
+                    <div className="px-2 py-1 text-xs text-slate-500">
                       Try "Space Needle", "Pike Place Market", or an address.
                     </div>
                   ) : (
                     <>
-                      <div className="mb-1 flex items-center justify-between px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                      <div className="mb-1 flex items-center justify-between px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                         <span>Recent</span>
-                        <button onClick={clearHistory} className="text-[10px] font-medium normal-case text-muted-foreground hover:text-foreground">Clear</button>
+                        <button onClick={clearHistory} className="text-[10px] font-medium normal-case text-slate-500 hover:text-slate-700">Clear</button>
                       </div>
                       {history.map((h) => (
                         <div key={h.id} className="group flex items-center gap-1">
                           <button
                             onClick={() => choose({ center: h.coordinates, place_name: h.placeName, text: h.query })}
-                            className="flex flex-1 items-start gap-3 rounded-2xl px-3 py-2.5 text-left hover:bg-surface"
+                            className="flex flex-1 items-start gap-3 rounded-2xl px-3 py-2.5 text-left hover:bg-[var(--pc-surface)]"
                           >
-                            <Clock className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                            <Clock className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
                             <div className="min-w-0">
-                              <div className="truncate text-sm font-semibold">{h.query}</div>
-                              <div className="truncate text-xs text-muted-foreground">{h.placeName}</div>
+                              <div className="truncate text-sm font-semibold text-slate-900">{h.query}</div>
+                              <div className="truncate text-xs text-slate-500">{h.placeName}</div>
                             </div>
                           </button>
                           <button
                             onClick={() => removeSearch(h.id)}
-                            className="rounded-full p-2 text-muted-foreground opacity-0 transition group-hover:opacity-100"
+                            className="rounded-full p-2 text-slate-400 opacity-0 transition group-hover:opacity-100"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -120,7 +120,7 @@ export function SearchSheet({ token }: { token: string }) {
                 </>
               )}
               {loading && (
-                <div className="flex items-center gap-2 px-2 py-3 text-xs text-muted-foreground">
+                <div className="flex items-center gap-2 px-2 py-3 text-xs text-slate-500">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" /> Searching…
                 </div>
               )}
@@ -128,18 +128,18 @@ export function SearchSheet({ token }: { token: string }) {
                 <div className="px-2 py-3 text-xs text-park-red">Couldn't search: {error}</div>
               )}
               {!loading && !error && q.trim().length >= 2 && results.length === 0 && (
-                <div className="px-2 py-3 text-xs text-muted-foreground">No matches for "{q}".</div>
+                <div className="px-2 py-3 text-xs text-slate-500">No matches for "{q}".</div>
               )}
               {results.map((f) => (
                 <button
                   key={f.id}
                   onClick={() => choose(f)}
-                  className="flex w-full items-start gap-3 rounded-2xl px-3 py-3 text-left hover:bg-surface"
+                  className="flex w-full items-start gap-3 rounded-2xl px-3 py-3 text-left hover:bg-[var(--pc-surface)]"
                 >
-                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  <MapPin className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "var(--pc-brand-end)" }} />
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold">{f.text}</div>
-                    <div className="truncate text-xs text-muted-foreground">{f.place_name}</div>
+                    <div className="truncate text-sm font-semibold text-slate-900">{f.text}</div>
+                    <div className="truncate text-xs text-slate-500">{f.place_name}</div>
                   </div>
                 </button>
               ))}
