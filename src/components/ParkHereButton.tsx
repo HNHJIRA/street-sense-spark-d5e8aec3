@@ -179,6 +179,7 @@ export function ParkHereButton({ cityId, timezone }: Props) {
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Navigation className="h-4 w-4" strokeWidth={2.5} />}
             {loading ? "Checking…" : "Can I park here?"}
           </button>
+          {/*
           <a
             href="/scan"
             className="pointer-events-auto flex items-center gap-1.5 rounded-full bg-surface px-4 py-3 text-sm font-bold shadow-[0_20px_60px_-10px_rgba(0,0,0,0.5)] transition active:scale-95"
@@ -186,6 +187,7 @@ export function ParkHereButton({ cityId, timezone }: Props) {
             <ScanLine className="h-4 w-4" strokeWidth={2.5} />
             Scan sign
           </a>
+          */}
         </div>
       </div>
 

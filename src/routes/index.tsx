@@ -124,7 +124,7 @@ function HomePage() {
       <Legend />
       <ActiveSessionWidget restrictionTypes={city.restrictionTypes} />
       <ParkHereButton cityId={city.id} timezone={city.timezone} />
-      <BottomNav />
+      {/* <BottomNav /> */}
       <SearchSheet token={tokenQuery.data.token} />
       <ForecastSheet />
       <StreetSheet timezone={city.timezone} restrictionTypes={city.restrictionTypes} cityId={city.id} citySlug={city.slug} />
