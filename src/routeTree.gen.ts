@@ -28,6 +28,7 @@ import { Route as DebugParkingRouteImport } from './routes/debug.parking'
 import { Route as AdminValidationRouteImport } from './routes/admin.validation'
 import { Route as AdminReportsRouteImport } from './routes/admin.reports'
 import { Route as AdminProviderSyncRouteImport } from './routes/admin.provider-sync'
+import { Route as AdminNycCoverageRouteImport } from './routes/admin.nyc-coverage'
 import { Route as AdminLaCoverageRouteImport } from './routes/admin.la-coverage'
 import { Route as AdminHealthRouteImport } from './routes/admin.health'
 import { Route as AdminForecastRouteImport } from './routes/admin.forecast'
@@ -38,6 +39,7 @@ import { Route as AdminAnalyticsRouteImport } from './routes/admin.analytics'
 import { Route as AdminAccuracyRouteImport } from './routes/admin.accuracy'
 import { Route as ApiPublicCronSyncLaOccupancyRouteImport } from './routes/api/public/cron.sync-la-occupancy'
 import { Route as ApiPublicCronHealthCheckRouteImport } from './routes/api/public/cron.health-check'
+import { Route as ApiPublicAdminSyncNycRouteImport } from './routes/api/public/admin.sync-nyc'
 import { Route as ApiPublicAdminSyncLaRouteImport } from './routes/api/public/admin.sync-la'
 import { Route as ApiPublicAdminSyncBellevueRouteImport } from './routes/api/public/admin.sync-bellevue'
 import { Route as ApiPublicAdminSyncArlingtonRouteImport } from './routes/api/public/admin.sync-arlington'
@@ -139,6 +141,11 @@ const AdminProviderSyncRoute = AdminProviderSyncRouteImport.update({
   path: '/provider-sync',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminNycCoverageRoute = AdminNycCoverageRouteImport.update({
+  id: '/nyc-coverage',
+  path: '/nyc-coverage',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminLaCoverageRoute = AdminLaCoverageRouteImport.update({
   id: '/la-coverage',
   path: '/la-coverage',
@@ -191,6 +198,11 @@ const ApiPublicCronHealthCheckRoute =
     path: '/api/public/cron/health-check',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicAdminSyncNycRoute = ApiPublicAdminSyncNycRouteImport.update({
+  id: '/api/public/admin/sync-nyc',
+  path: '/api/public/admin/sync-nyc',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicAdminSyncLaRoute = ApiPublicAdminSyncLaRouteImport.update({
   id: '/api/public/admin/sync-la',
   path: '/api/public/admin/sync-la',
@@ -244,6 +256,7 @@ export interface FileRoutesByFullPath {
   '/admin/forecast': typeof AdminForecastRoute
   '/admin/health': typeof AdminHealthRoute
   '/admin/la-coverage': typeof AdminLaCoverageRoute
+  '/admin/nyc-coverage': typeof AdminNycCoverageRoute
   '/admin/provider-sync': typeof AdminProviderSyncRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/validation': typeof AdminValidationRoute
@@ -254,6 +267,7 @@ export interface FileRoutesByFullPath {
   '/api/public/admin/sync-arlington': typeof ApiPublicAdminSyncArlingtonRoute
   '/api/public/admin/sync-bellevue': typeof ApiPublicAdminSyncBellevueRoute
   '/api/public/admin/sync-la': typeof ApiPublicAdminSyncLaRoute
+  '/api/public/admin/sync-nyc': typeof ApiPublicAdminSyncNycRoute
   '/api/public/cron/health-check': typeof ApiPublicCronHealthCheckRoute
   '/api/public/cron/sync-la-occupancy': typeof ApiPublicCronSyncLaOccupancyRoute
 }
@@ -279,6 +293,7 @@ export interface FileRoutesByTo {
   '/admin/forecast': typeof AdminForecastRoute
   '/admin/health': typeof AdminHealthRoute
   '/admin/la-coverage': typeof AdminLaCoverageRoute
+  '/admin/nyc-coverage': typeof AdminNycCoverageRoute
   '/admin/provider-sync': typeof AdminProviderSyncRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/validation': typeof AdminValidationRoute
@@ -289,6 +304,7 @@ export interface FileRoutesByTo {
   '/api/public/admin/sync-arlington': typeof ApiPublicAdminSyncArlingtonRoute
   '/api/public/admin/sync-bellevue': typeof ApiPublicAdminSyncBellevueRoute
   '/api/public/admin/sync-la': typeof ApiPublicAdminSyncLaRoute
+  '/api/public/admin/sync-nyc': typeof ApiPublicAdminSyncNycRoute
   '/api/public/cron/health-check': typeof ApiPublicCronHealthCheckRoute
   '/api/public/cron/sync-la-occupancy': typeof ApiPublicCronSyncLaOccupancyRoute
 }
@@ -316,6 +332,7 @@ export interface FileRoutesById {
   '/admin/forecast': typeof AdminForecastRoute
   '/admin/health': typeof AdminHealthRoute
   '/admin/la-coverage': typeof AdminLaCoverageRoute
+  '/admin/nyc-coverage': typeof AdminNycCoverageRoute
   '/admin/provider-sync': typeof AdminProviderSyncRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/validation': typeof AdminValidationRoute
@@ -326,6 +343,7 @@ export interface FileRoutesById {
   '/api/public/admin/sync-arlington': typeof ApiPublicAdminSyncArlingtonRoute
   '/api/public/admin/sync-bellevue': typeof ApiPublicAdminSyncBellevueRoute
   '/api/public/admin/sync-la': typeof ApiPublicAdminSyncLaRoute
+  '/api/public/admin/sync-nyc': typeof ApiPublicAdminSyncNycRoute
   '/api/public/cron/health-check': typeof ApiPublicCronHealthCheckRoute
   '/api/public/cron/sync-la-occupancy': typeof ApiPublicCronSyncLaOccupancyRoute
 }
@@ -354,6 +372,7 @@ export interface FileRouteTypes {
     | '/admin/forecast'
     | '/admin/health'
     | '/admin/la-coverage'
+    | '/admin/nyc-coverage'
     | '/admin/provider-sync'
     | '/admin/reports'
     | '/admin/validation'
@@ -364,6 +383,7 @@ export interface FileRouteTypes {
     | '/api/public/admin/sync-arlington'
     | '/api/public/admin/sync-bellevue'
     | '/api/public/admin/sync-la'
+    | '/api/public/admin/sync-nyc'
     | '/api/public/cron/health-check'
     | '/api/public/cron/sync-la-occupancy'
   fileRoutesByTo: FileRoutesByTo
@@ -389,6 +409,7 @@ export interface FileRouteTypes {
     | '/admin/forecast'
     | '/admin/health'
     | '/admin/la-coverage'
+    | '/admin/nyc-coverage'
     | '/admin/provider-sync'
     | '/admin/reports'
     | '/admin/validation'
@@ -399,6 +420,7 @@ export interface FileRouteTypes {
     | '/api/public/admin/sync-arlington'
     | '/api/public/admin/sync-bellevue'
     | '/api/public/admin/sync-la'
+    | '/api/public/admin/sync-nyc'
     | '/api/public/cron/health-check'
     | '/api/public/cron/sync-la-occupancy'
   id:
@@ -425,6 +447,7 @@ export interface FileRouteTypes {
     | '/admin/forecast'
     | '/admin/health'
     | '/admin/la-coverage'
+    | '/admin/nyc-coverage'
     | '/admin/provider-sync'
     | '/admin/reports'
     | '/admin/validation'
@@ -435,6 +458,7 @@ export interface FileRouteTypes {
     | '/api/public/admin/sync-arlington'
     | '/api/public/admin/sync-bellevue'
     | '/api/public/admin/sync-la'
+    | '/api/public/admin/sync-nyc'
     | '/api/public/cron/health-check'
     | '/api/public/cron/sync-la-occupancy'
   fileRoutesById: FileRoutesById
@@ -460,6 +484,7 @@ export interface RootRouteChildren {
   ApiPublicAdminSyncArlingtonRoute: typeof ApiPublicAdminSyncArlingtonRoute
   ApiPublicAdminSyncBellevueRoute: typeof ApiPublicAdminSyncBellevueRoute
   ApiPublicAdminSyncLaRoute: typeof ApiPublicAdminSyncLaRoute
+  ApiPublicAdminSyncNycRoute: typeof ApiPublicAdminSyncNycRoute
   ApiPublicCronHealthCheckRoute: typeof ApiPublicCronHealthCheckRoute
   ApiPublicCronSyncLaOccupancyRoute: typeof ApiPublicCronSyncLaOccupancyRoute
 }
@@ -599,6 +624,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminProviderSyncRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/nyc-coverage': {
+      id: '/admin/nyc-coverage'
+      path: '/nyc-coverage'
+      fullPath: '/admin/nyc-coverage'
+      preLoaderRoute: typeof AdminNycCoverageRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/la-coverage': {
       id: '/admin/la-coverage'
       path: '/la-coverage'
@@ -669,6 +701,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCronHealthCheckRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/admin/sync-nyc': {
+      id: '/api/public/admin/sync-nyc'
+      path: '/api/public/admin/sync-nyc'
+      fullPath: '/api/public/admin/sync-nyc'
+      preLoaderRoute: typeof ApiPublicAdminSyncNycRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/admin/sync-la': {
       id: '/api/public/admin/sync-la'
       path: '/api/public/admin/sync-la'
@@ -716,6 +755,7 @@ interface AdminRouteChildren {
   AdminForecastRoute: typeof AdminForecastRoute
   AdminHealthRoute: typeof AdminHealthRoute
   AdminLaCoverageRoute: typeof AdminLaCoverageRoute
+  AdminNycCoverageRoute: typeof AdminNycCoverageRoute
   AdminProviderSyncRoute: typeof AdminProviderSyncRoute
   AdminReportsRoute: typeof AdminReportsRoute
   AdminValidationRoute: typeof AdminValidationRoute
@@ -731,6 +771,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminForecastRoute: AdminForecastRoute,
   AdminHealthRoute: AdminHealthRoute,
   AdminLaCoverageRoute: AdminLaCoverageRoute,
+  AdminNycCoverageRoute: AdminNycCoverageRoute,
   AdminProviderSyncRoute: AdminProviderSyncRoute,
   AdminReportsRoute: AdminReportsRoute,
   AdminValidationRoute: AdminValidationRoute,
@@ -760,6 +801,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicAdminSyncArlingtonRoute: ApiPublicAdminSyncArlingtonRoute,
   ApiPublicAdminSyncBellevueRoute: ApiPublicAdminSyncBellevueRoute,
   ApiPublicAdminSyncLaRoute: ApiPublicAdminSyncLaRoute,
+  ApiPublicAdminSyncNycRoute: ApiPublicAdminSyncNycRoute,
   ApiPublicCronHealthCheckRoute: ApiPublicCronHealthCheckRoute,
   ApiPublicCronSyncLaOccupancyRoute: ApiPublicCronSyncLaOccupancyRoute,
 }
