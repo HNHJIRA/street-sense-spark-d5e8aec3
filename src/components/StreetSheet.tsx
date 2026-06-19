@@ -132,21 +132,21 @@ export function StreetSheet({ timezone, restrictionTypes, cityId, citySlug }: St
       <div className="absolute inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={() => selectSegment(null)} />
       <div className="absolute inset-x-0 bottom-0 z-50 safe-bottom animate-in slide-in-from-bottom duration-200">
         <div className="mx-auto max-w-md px-3 pb-3">
-          <div className="flex max-h-[85vh] flex-col overflow-hidden rounded-3xl border border-border bg-elevated shadow-2xl">
+          <div className="pc-shadow-card flex max-h-[85vh] flex-col overflow-hidden rounded-3xl border border-[var(--pc-border)] bg-white text-slate-900">
             <div className="shrink-0 px-5 pt-3">
-              <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-muted" />
+              <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-slate-200" />
             </div>
             <div className="overflow-y-auto overscroll-contain px-5 pb-5 pt-2">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="font-display text-xl font-bold leading-tight">
+                <h2 className="font-display text-xl font-bold leading-tight text-slate-900">
                   {segment?.name ?? (detailsQuery.isLoading ? "Loading…" : "Street")}
                 </h2>
                 {data?.source_category && (
-                  <p className="mt-0.5 text-xs text-muted-foreground">{data.source_category}</p>
+                  <p className="mt-0.5 text-xs text-slate-500">{data.source_category}</p>
                 )}
               </div>
-              <button onClick={() => selectSegment(null)} className="rounded-full bg-muted p-2 text-muted-foreground hover:text-foreground" aria-label="Close">
+              <button onClick={() => selectSegment(null)} className="pc-bg-gradient-brand rounded-full p-2 text-white" aria-label="Close">
                 <X className="h-4 w-4" />
               </button>
             </div>
