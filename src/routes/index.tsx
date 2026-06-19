@@ -105,6 +105,8 @@ function HomePage() {
   const displayTime = forecastAt ?? now;
   void tick;
   const city = cityQuery.data;
+  const router = useRouter();
+  const canGoBack = typeof window !== "undefined" && window.history.length > 1;
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-background">
@@ -117,6 +119,7 @@ function HomePage() {
         now={displayTime}
         timezone={city.timezone}
         isForecast={!!forecastAt}
+        onBack={canGoBack ? () => router.history.back() : undefined}
       />
       <Legend />
       <ActiveSessionWidget restrictionTypes={city.restrictionTypes} />
