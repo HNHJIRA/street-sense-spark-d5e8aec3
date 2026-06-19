@@ -224,11 +224,11 @@ function DetailGrid({
   return (
     <div className="grid grid-cols-1 gap-1.5 text-xs">
       {rows.map((r) => (
-        <div key={r.label} className="flex items-center justify-between rounded-xl bg-surface px-3 py-2">
-          <span className="flex items-center gap-2 text-muted-foreground">
+        <div key={r.label} className="flex items-center justify-between rounded-xl bg-[var(--pc-surface)] px-3 py-2">
+          <span className="flex items-center gap-2 text-slate-500">
             <r.icon className="h-3.5 w-3.5" /> {r.label}
           </span>
-          <span className="max-w-[60%] truncate pl-2 text-right font-semibold">{r.value}</span>
+          <span className="max-w-[60%] truncate pl-2 text-right font-semibold text-slate-900">{r.value}</span>
         </div>
       ))}
     </div>
