@@ -26,6 +26,7 @@ import { BellevuePaintedCurbsOverlay } from "./bellevue-painted-curbs.server";
 import { BellevueBusLayoversOverlay } from "./bellevue-bus-layovers.server";
 import { BellevueSignsOverlay } from "./bellevue-signs.server";
 import { NycCenterlineProvider } from "./nyc.server";
+import { NycSignsOverlay } from "./nyc-signs.server";
 import type { AnyProvider, OverlayProvider, ParkingProvider } from "./types";
 import { isOverlayProvider } from "./types";
 
@@ -52,6 +53,7 @@ const REGISTRY: AnyProvider[] = [
   BellevueBusLayoversOverlay,
   BellevueSignsOverlay,
   NycCenterlineProvider,
+  NycSignsOverlay,
 ];
 
 export function getProvidersForCity(citySlug: string): AnyProvider[] {
