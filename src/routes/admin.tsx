@@ -17,6 +17,7 @@ const TABS = [
   { to: "/admin/la-coverage", label: "LA Coverage" },
   { to: "/admin/arlington-coverage", label: "Arlington Coverage" },
   { to: "/admin/bellevue-coverage", label: "Bellevue Coverage" },
+  { to: "/admin/nyc-coverage", label: "NYC Coverage" },
 ] as const;
 
 function AdminLayout() {
