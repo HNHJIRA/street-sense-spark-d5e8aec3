@@ -171,7 +171,7 @@ export function ParkHereButton({ cityId, timezone }: Props) {
       >
         <div className="mx-auto max-w-md px-3">
           <div
-            className="pointer-events-auto rounded-[2rem] bg-white px-5 py-5"
+            className="pointer-events-auto rounded-t-[2.5rem] bg-white px-5 py-5"
             style={{ boxShadow: "0 -8px 30px -10px rgba(15, 23, 42, 0.18), 0 20px 40px -15px rgba(15, 23, 42, 0.15)" }}
           >
             <button
