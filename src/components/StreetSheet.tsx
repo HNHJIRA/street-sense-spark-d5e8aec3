@@ -297,11 +297,11 @@ export function StreetSheet({ timezone, restrictionTypes, cityId, citySlug }: St
 
 function Row({ icon: Icon, label, value }: { icon: typeof Clock; label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between rounded-2xl bg-surface px-4 py-3">
-      <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+    <div className="flex items-center justify-between rounded-2xl bg-[var(--pc-surface)] px-4 py-3">
+      <span className="flex items-center gap-2 text-xs font-medium text-slate-500">
         <Icon className="h-4 w-4" /> {label}
       </span>
-      <span className="text-sm font-semibold">{value}</span>
+      <span className="text-sm font-semibold text-slate-900">{value}</span>
     </div>
   );
 }
