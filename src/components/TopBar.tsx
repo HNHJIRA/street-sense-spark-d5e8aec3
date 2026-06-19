@@ -113,6 +113,7 @@ export function TopBar({ cityName, citySlug, cities, onCityChange, now, timezone
             </button>
           )}
         </div>
+        {/* Legal/Open toggle hidden for legacy parity
         {citySlug === "los-angeles" && (
           <div className="pointer-events-auto flex rounded-full bg-white p-0.5 pc-shadow-card">
             <button
@@ -140,7 +141,7 @@ export function TopBar({ cityName, citySlug, cities, onCityChange, now, timezone
               Open
             </button>
           </div>
-        )}
+        )} */}
         <button
           type="button"
           onClick={() => setSearchOpen(true)}
