@@ -82,7 +82,7 @@ export function MapLayerButton({ className, style }: Props) {
         onClick={() => setOpen((v) => !v)}
         aria-label="Change map layer"
         aria-expanded={open}
-        className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-neutral-800 shadow-lg ring-1 ring-black/5 transition hover:bg-neutral-50 active:scale-95"
+        className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-neutral-800 shadow-lg ring-1 ring-black/5 transition hover:bg-neutral-50 active:scale-95"
       >
         <Layers className="h-4 w-4" />
       </button>
