@@ -194,8 +194,8 @@ export function ParkHereButton({ cityId, timezone }: Props) {
           <div className="absolute inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={closeAll} />
           <div className="absolute inset-x-0 bottom-0 z-50 safe-bottom animate-in slide-in-from-bottom duration-200">
             <div className="mx-auto max-w-md px-3 pb-3">
-              <div className="max-h-[85vh] overflow-y-auto rounded-3xl border border-border bg-elevated p-5 shadow-2xl">
-                <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-muted" />
+              <div className="pc-shadow-card max-h-[85vh] overflow-y-auto rounded-3xl border border-[var(--pc-border)] bg-white p-5 text-slate-900">
+                <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-slate-200" />
 
                 {result.found && result.decision ? (
                   <ParkDecisionScreen
@@ -205,7 +205,7 @@ export function ParkHereButton({ cityId, timezone }: Props) {
                   />
                 ) : (
                   <div className="space-y-3">
-                    <div className="rounded-2xl border border-border bg-surface p-4 text-sm">
+                    <div className="rounded-2xl border border-[var(--pc-border)] bg-[var(--pc-surface)] p-4 text-sm text-slate-700">
                       {result.message}
                     </div>
                     <ParkDecisionUnknownCTA onScanClick={() => { window.location.href = "/scan"; }} />
