@@ -38,21 +38,28 @@ export function BottomNav() {
   return (
     <nav className="pointer-events-auto absolute inset-x-0 bottom-0 z-30 safe-bottom safe-x">
       <div className="mx-auto max-w-md px-3">
-        <div className="flex items-center justify-between rounded-3xl border border-border bg-surface/85 px-2 py-2 backdrop-blur-xl shadow-[0_20px_60px_-20px_rgba(0,0,0,0.7)]">
+        <div className="flex items-center justify-between rounded-3xl bg-white px-2 py-2 pc-shadow-card">
           {tabs.map((t) => {
             const Icon = t.icon;
             const inner = (
               <button
                 type="button"
                 onClick={t.onClick}
-                className={cn(
-                  "relative flex flex-1 flex-col items-center gap-0.5 rounded-2xl px-2 py-2 text-[11px] font-medium transition",
-                  t.active ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground",
-                )}
+                className="relative flex flex-1 flex-col items-center gap-0.5 rounded-2xl px-2 py-2 text-[11px] font-semibold transition"
+                style={
+                  t.active
+                    ? { background: "var(--pc-gradient-brand)", color: "#fff" }
+                    : { color: "#6B7280" }
+                }
               >
                 <Icon className="h-5 w-5" strokeWidth={2.2} />
                 <span>{t.label}</span>
-                {t.badge && <span className="absolute right-3 top-1 h-2 w-2 rounded-full bg-park-green ring-2 ring-surface" />}
+                {t.badge && (
+                  <span
+                    className="absolute right-3 top-1 h-2 w-2 rounded-full ring-2 ring-white"
+                    style={{ background: "var(--pc-success)" }}
+                  />
+                )}
               </button>
             );
             return t.to ? (
