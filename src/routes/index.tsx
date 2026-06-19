@@ -56,15 +56,15 @@ export const Route = createFileRoute("/")({
   },
   component: HomePage,
   pendingComponent: () => (
-    <div className="flex min-h-full items-center justify-center bg-background">
-      <div className="text-sm text-muted-foreground">Loading parking data…</div>
+    <div className="flex min-h-full items-center justify-center bg-[#e8eef5]">
+      <div className="text-sm text-slate-600">Loading parking data…</div>
     </div>
   ),
   errorComponent: ({ error }) => (
-    <div className="flex min-h-full items-center justify-center bg-background p-6 text-center">
+    <div className="flex min-h-full items-center justify-center bg-[#e8eef5] p-6 text-center">
       <div>
-        <h1 className="text-lg font-bold">Couldn't load the parking map</h1>
-        <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
+        <h1 className="text-lg font-bold text-slate-900">Couldn't load the parking map</h1>
+        <p className="mt-2 text-sm text-slate-600">{error.message}</p>
       </div>
     </div>
   ),
