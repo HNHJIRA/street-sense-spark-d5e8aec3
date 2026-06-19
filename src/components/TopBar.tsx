@@ -21,7 +21,7 @@ function formatTime(d: Date, tz: string) {
   }).format(d);
 }
 
-export function TopBar({ cityName, citySlug, cities, onCityChange, now, timezone, isForecast }: TopBarProps) {
+export function TopBar({ cityName, citySlug, cities, onCityChange, now, timezone, isForecast, onBack }: TopBarProps) {
   const setSearchOpen = useAppStore((s) => s.setSearchOpen);
   const clearForecast = useAppStore((s) => s.setForecastAt);
   const mapMode = useAppStore((s) => s.mapMode);
