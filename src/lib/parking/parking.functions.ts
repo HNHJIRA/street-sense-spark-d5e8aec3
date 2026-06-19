@@ -11,6 +11,7 @@ import type {
   ParkingEvent,
   StreetSegment,
 } from "./types";
+import type { NormalizedSegment } from "./providers/types";
 import { evaluateRulesAt } from "./engine";
 
 // ---------- Shared admin helper ----------
@@ -328,6 +329,11 @@ export interface SyncRunDiagnostics {
   ms_total?: number;
   timeout_stage?: string;
   rpc_error?: string;
+  fetched_segments?: number;
+  deduped_segments?: number;
+  duplicate_external_ids?: number;
+  duplicate_rows?: number;
+  duplicate_strategy?: string;
 }
 export interface SyncRunResult {
   imported: number;
@@ -335,6 +341,72 @@ export interface SyncRunResult {
   provider: string;
   error?: string;
   diagnostics?: SyncRunDiagnostics;
+}
+
+function makeExternalIdsUnique(segments: NormalizedSegment[]): {
+  segments: NormalizedSegment[];
+  diagnostics: SyncRunDiagnostics;
+} {
+  const totals = new Map<string, number>();
+  for (const s of segments) totals.set(s.external_id, (totals.get(s.external_id) ?? 0) + 1);
+
+  let duplicateExternalIds = 0;
+  let duplicateRows = 0;
+  for (const count of totals.values()) {
+    if (count > 1) {
+      duplicateExternalIds += 1;
+      duplicateRows += count - 1;
+    }
+  }
+
+  if (duplicateRows === 0) {
+    return {
+      segments,
+      diagnostics: {
+        fetched_segments: segments.length,
+        deduped_segments: segments.length,
+        duplicate_external_ids: 0,
+        duplicate_rows: 0,
+        duplicate_strategy: "none",
+      },
+    };
+  }
+
+  const seen = new Map<string, number>();
+  const unique = segments.map((segment) => {
+    const total = totals.get(segment.external_id) ?? 1;
+    if (total === 1) return segment;
+
+    const index = (seen.get(segment.external_id) ?? 0) + 1;
+    seen.set(segment.external_id, index);
+    const baseMetadata = {
+      ...segment.metadata,
+      dedupe_original_external_id: segment.external_id,
+      dedupe_sequence: index,
+      dedupe_group_size: total,
+    };
+
+    if (index === 1) {
+      return { ...segment, metadata: baseMetadata };
+    }
+
+    return {
+      ...segment,
+      external_id: `${segment.external_id}#duplicate-${index}`,
+      metadata: baseMetadata,
+    };
+  });
+
+  return {
+    segments: unique,
+    diagnostics: {
+      fetched_segments: segments.length,
+      deduped_segments: unique.length,
+      duplicate_external_ids: duplicateExternalIds,
+      duplicate_rows: duplicateRows,
+      duplicate_strategy: "preserve-first-id-and-suffix-additional-geometries",
+    },
+  };
 }
 
 async function recordSyncStart(
@@ -456,12 +528,13 @@ export const syncProvider = createServerFn({ method: "POST" })
 
     // ---- Segment provider path ----
     try {
-      const normalized = await provider.fetchSegments(data.citySlug, bbox);
+      const fetched = await provider.fetchSegments(data.citySlug, bbox);
+      const { segments: normalized, diagnostics: dedupeDiagnostics } = makeExternalIdsUnique(fetched);
       if (normalized.length === 0) {
         const res = { imported: 0, skipped: 0 };
         await recordSyncFinish(admin, logId, provider.id, city.id, res, startedAt);
         await maybeWriteProviderNotes(admin, provider.id, city.id as string);
-        return { ...res, provider: provider.id };
+        return { ...res, provider: provider.id, diagnostics: dedupeDiagnostics };
       }
 
       type SegInsert = {
@@ -502,10 +575,15 @@ export const syncProvider = createServerFn({ method: "POST" })
       const ids = insertedIds.map((r) => r.id);
       for (let i = 0; i < ids.length; i += 500) {
         const slice = ids.slice(i, i + 500);
-        await admin.from("parking_rules")
+        const { error: deleteError } = await admin.from("parking_rules")
           .delete()
           .in("street_segment_id", slice)
           .eq("data_source", provider.id);
+        if (deleteError) {
+          const res = { imported, skipped: normalized.length - imported, error: `Rule cleanup failed: ${(deleteError as { message?: string }).message}` };
+          await recordSyncFinish(admin, logId, provider.id, city.id, res, startedAt);
+          return { ...res, provider: provider.id, diagnostics: dedupeDiagnostics };
+        }
         const ruleRows = insertedIds
           .filter((r) => slice.includes(r.id))
           .flatMap((r) => (rulesByExt.get(r.external_id) ?? []).map((rule) => ({
@@ -522,13 +600,20 @@ export const syncProvider = createServerFn({ method: "POST" })
             notes: rule.notes,
             data_source: provider.id,
           })));
-        if (ruleRows.length) await admin.from("parking_rules").insert(ruleRows);
+        if (ruleRows.length) {
+          const { error: insertError } = await admin.from("parking_rules").insert(ruleRows);
+          if (insertError) {
+            const res = { imported, skipped: normalized.length - imported, error: `Rule insert failed: ${(insertError as { message?: string }).message}` };
+            await recordSyncFinish(admin, logId, provider.id, city.id, res, startedAt);
+            return { ...res, provider: provider.id, diagnostics: dedupeDiagnostics };
+          }
+        }
       }
 
       const res = { imported, skipped: inserts.length - imported };
       await recordSyncFinish(admin, logId, provider.id, city.id, res, startedAt);
       await maybeWriteProviderNotes(admin, provider.id, city.id as string);
-      return { ...res, provider: provider.id };
+      return { ...res, provider: provider.id, diagnostics: dedupeDiagnostics };
     } catch (e) {
       const res = { imported: 0, skipped: 0, error: (e as Error).message };
       await recordSyncFinish(admin, logId, provider.id, city.id, res, startedAt);
