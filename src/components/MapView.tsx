@@ -5,7 +5,7 @@ import type { Feature, FeatureCollection, LineString } from "geojson";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
-import { LocateFixed, Plus, Minus, Globe2 } from "lucide-react";
+import { LocateFixed, Plus, Minus, Globe2, Square } from "lucide-react";
 import {
   getSegmentsInBbox,
   importSeattleBlockface,
@@ -95,6 +95,7 @@ export function MapView({ token, city }: MapViewProps) {
   const [mapError, setMapError] = useState(false);
   const [ready, setReady] = useState(false);
   const [globeMode, setGlobeMode] = useState(false);
+  const [topView, setTopView] = useState(false);
   const [styleVersion, setStyleVersion] = useState(0);
   const mapType = useMapTypeStore((s) => s.mapType);
   // Latest mapType captured at init time so the effect that creates the map
@@ -641,7 +642,7 @@ export function MapView({ token, city }: MapViewProps) {
 
     map.setProjection?.({ name: "globe" });
     map.setFog?.({ color: "rgb(236, 232, 226)", "high-color": "rgb(186, 210, 235)", "horizon-blend": 0.02 });
-    map.easeTo({ zoom: Math.max(15.5, map.getZoom()), pitch: 60, duration: 500 });
+    map.easeTo({ zoom: Math.max(15.5, map.getZoom()), pitch: topView ? 0 : 60, duration: 500 });
 
     const rotate = () => {
       map.rotateTo((map.getBearing() + 0.12) % 360, { duration: 0 });
@@ -657,6 +658,17 @@ export function MapView({ token, city }: MapViewProps) {
   const zoomIn = () => mapRef.current?.zoomIn();
   const zoomOut = () => mapRef.current?.zoomOut();
   const toggleGlobe = () => setGlobeMode((v) => !v);
+  const toggleTopView = () => {
+    const map = mapRef.current;
+    if (!map) return;
+    const next = !topView;
+    setTopView(next);
+    map.easeTo({
+      pitch: next ? 0 : 60,
+      bearing: next ? 0 : -18,
+      duration: 600,
+    });
+  };
   const locate = () => {
     const loc = useLocationStore.getState().current ?? useLocationStore.getState().lastKnown;
     if (geolocateRef.current) {
@@ -665,7 +677,7 @@ export function MapView({ token, city }: MapViewProps) {
     if (loc && mapRef.current) {
       syncUserLocationMarker({ lng: loc.lng, lat: loc.lat, accuracy: loc.accuracy, heading: loc.heading });
       
-      mapRef.current.flyTo({ center: [loc.lng, loc.lat], zoom: 17, pitch: 60, duration: 1200, essential: true });
+      mapRef.current.flyTo({ center: [loc.lng, loc.lat], zoom: 17, pitch: topView ? 0 : 60, bearing: topView ? 0 : -18, duration: 1200, essential: true });
       return;
     }
     if (useLocationStore.getState().status === "denied") {
@@ -685,7 +697,7 @@ export function MapView({ token, city }: MapViewProps) {
         });
         mapRef.current?.flyTo({
           center: [pos.coords.longitude, pos.coords.latitude],
-          zoom: 17, pitch: 60, duration: 1200,
+          zoom: 17, pitch: topView ? 0 : 60, bearing: topView ? 0 : -18, duration: 1200,
         });
       },
       () => toast.error("Couldn't get your location"),
@@ -705,6 +717,7 @@ export function MapView({ token, city }: MapViewProps) {
           <MapBtn onClick={zoomIn} ariaLabel="Zoom in"><Plus className="h-4 w-4" /></MapBtn>
           <MapBtn onClick={zoomOut} ariaLabel="Zoom out"><Minus className="h-4 w-4" /></MapBtn>
           <div className="h-1" />
+          <MapBtn onClick={toggleTopView} ariaLabel="Top view"><Square className={`h-4 w-4 ${topView ? "fill-current" : ""}`} /></MapBtn>
           <MapBtn onClick={toggleGlobe} ariaLabel="Rotate globe"><Globe2 className="h-4 w-4" /></MapBtn>
           <MapBtn onClick={locate} ariaLabel="My location"><LocateFixed className="h-4 w-4" /></MapBtn>
           <MapLayerButton className="relative" />
