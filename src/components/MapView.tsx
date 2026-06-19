@@ -95,6 +95,7 @@ export function MapView({ token, city }: MapViewProps) {
   const [mapError, setMapError] = useState(false);
   const [ready, setReady] = useState(false);
   const [globeMode, setGlobeMode] = useState(false);
+  const [topView, setTopView] = useState(false);
   const [styleVersion, setStyleVersion] = useState(0);
   const mapType = useMapTypeStore((s) => s.mapType);
   // Latest mapType captured at init time so the effect that creates the map
