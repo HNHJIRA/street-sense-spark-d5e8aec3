@@ -29,7 +29,7 @@ const VERDICT_META = {
   YES: { className: "border-park-green/40 bg-park-green-soft text-park-green", Icon: CircleCheck, label: "You can park here" },
   LIMITED: { className: "border-park-yellow/40 bg-park-yellow-soft text-park-yellow", Icon: TriangleAlert, label: "Limited parking" },
   NO: { className: "border-park-red/40 bg-park-red-soft text-park-red", Icon: CircleX, label: "No parking" },
-  UNKNOWN: { className: "border-border bg-surface text-muted-foreground", Icon: ShieldQuestion, label: "Status unknown" },
+  UNKNOWN: { className: "border-[var(--pc-border)] bg-[var(--pc-surface)] text-slate-500", Icon: ShieldQuestion, label: "Status unknown" },
 } as const;
 
 function formatTime(iso: string | null | undefined, tz: string): string | null {
