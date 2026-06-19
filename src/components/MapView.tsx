@@ -697,7 +697,7 @@ export function MapView({ token, city }: MapViewProps) {
         });
         mapRef.current?.flyTo({
           center: [pos.coords.longitude, pos.coords.latitude],
-          zoom: 17, pitch: 60, duration: 1200,
+          zoom: 17, pitch: topView ? 0 : 60, bearing: topView ? 0 : -18, duration: 1200,
         });
       },
       () => toast.error("Couldn't get your location"),
