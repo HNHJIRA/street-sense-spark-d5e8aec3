@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Search, MapPin, Check, ChevronDown } from "lucide-react";
+import { Search, MapPin, Check, ChevronDown, ChevronLeft } from "lucide-react";
 import { useAppStore } from "@/stores/app-store";
 
 interface CityOption { slug: string; name: string }
