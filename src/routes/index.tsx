@@ -98,7 +98,10 @@ function HomePage() {
   useEffect(() => {
     setNow(new Date());
     if (forecastAt) return;
-    const id = window.setInterval(bumpTick, 60_000);
+    const id = window.setInterval(() => {
+      setNow(new Date());
+      bumpTick();
+    }, 30_000);
     return () => window.clearInterval(id);
   }, [forecastAt, bumpTick]);
 
