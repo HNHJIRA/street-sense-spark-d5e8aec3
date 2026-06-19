@@ -177,20 +177,20 @@ function NextRestrictionCard({
   label: string; startsAt: string; timeUntilMs: number; timezone: string; currentLabel: string;
 }) {
   return (
-    <div className="rounded-2xl bg-surface p-4">
-      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+    <div className="rounded-2xl bg-[var(--pc-surface)] p-4">
+      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">
         <Bell className="h-3.5 w-3.5" /> Next restriction
       </div>
       <div className="mt-2 flex items-end justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-base font-bold leading-tight">{label}</div>
-          <div className="mt-0.5 text-xs text-muted-foreground">
+          <div className="text-base font-bold leading-tight text-slate-900">{label}</div>
+          <div className="mt-0.5 text-xs text-slate-500">
             Currently: {currentLabel}
           </div>
         </div>
         <div className="text-right">
-          <div className="text-xs font-semibold">{formatTime(startsAt, timezone)}</div>
-          <div className="text-[11px] text-muted-foreground">in {formatDuration(timeUntilMs)}</div>
+          <div className="text-xs font-semibold text-slate-900">{formatTime(startsAt, timezone)}</div>
+          <div className="text-[11px] text-slate-500">in {formatDuration(timeUntilMs)}</div>
         </div>
       </div>
     </div>
