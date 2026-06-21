@@ -185,14 +185,7 @@ export function StreetSheet({ timezone, restrictionTypes, cityId, citySlug }: St
                 ruleCount: data.rules.length,
                 lastSyncedAt: null,
               });
-              return (
-                <div className="mt-3">
-                  <RiskBadge
-                    segment={segment}
-                    confidence_score={conf.score}
-                  />
-                </div>
-              );
+              return null; // RiskBadge hidden
             })()}
 
 
