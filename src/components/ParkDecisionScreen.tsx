@@ -269,21 +269,6 @@ function TimelineCard({ decision, timezone }: { decision: ParkingDecision; timez
   );
 }
 
-function ConfidenceCard({
-  level, summary, score,
-}: { level: ConfidenceLevel; summary: string; score: number }) {
-  return (
-    <div className={cn("flex items-center gap-3 rounded-2xl border p-3", confidenceColorClass(level))}>
-      <ShieldQuestion className="h-5 w-5 shrink-0" />
-      <div className="min-w-0 flex-1">
-        <div className="text-[11px] font-bold uppercase tracking-wider opacity-80">
-          {level} confidence · {score}/100
-        </div>
-        <div className="truncate text-xs opacity-90">{summary}</div>
-      </div>
-    </div>
-  );
-}
 
 function DriverSummaryCard({
   result, decision, timezone, evaluatedAt,
