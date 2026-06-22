@@ -420,38 +420,68 @@ export type Database = {
       provider_health: {
         Row: {
           city_id: string | null
+          duration_ms: number | null
           healthy: boolean
           id: string
           last_error: string | null
           last_error_at: string | null
+          last_incremental_at: string | null
           last_success_at: string | null
+          last_sync_completed_at: string | null
+          last_sync_started_at: string | null
+          next_scheduled_at: string | null
           notes: string | null
           provider: string
+          provider_error: string | null
+          provider_status: string
+          records_imported: number
+          records_skipped: number
           segments_total: number
+          supports_incremental: boolean
           updated_at: string
         }
         Insert: {
           city_id?: string | null
+          duration_ms?: number | null
           healthy?: boolean
           id?: string
           last_error?: string | null
           last_error_at?: string | null
+          last_incremental_at?: string | null
           last_success_at?: string | null
+          last_sync_completed_at?: string | null
+          last_sync_started_at?: string | null
+          next_scheduled_at?: string | null
           notes?: string | null
           provider: string
+          provider_error?: string | null
+          provider_status?: string
+          records_imported?: number
+          records_skipped?: number
           segments_total?: number
+          supports_incremental?: boolean
           updated_at?: string
         }
         Update: {
           city_id?: string | null
+          duration_ms?: number | null
           healthy?: boolean
           id?: string
           last_error?: string | null
           last_error_at?: string | null
+          last_incremental_at?: string | null
           last_success_at?: string | null
+          last_sync_completed_at?: string | null
+          last_sync_started_at?: string | null
+          next_scheduled_at?: string | null
           notes?: string | null
           provider?: string
+          provider_error?: string | null
+          provider_status?: string
+          records_imported?: number
+          records_skipped?: number
           segments_total?: number
+          supports_incremental?: boolean
           updated_at?: string
         }
         Relationships: [
@@ -1299,6 +1329,7 @@ export type Database = {
       }
       postgis_version: { Args: never; Returns: string }
       postgis_wagyu_version: { Args: never; Returns: string }
+      release_sync_lock: { Args: { p_key: string }; Returns: boolean }
       segments_in_bbox: {
         Args: {
           p_city_id: string
@@ -1923,6 +1954,7 @@ export type Database = {
           id: string
         }[]
       }
+      try_acquire_sync_lock: { Args: { p_key: string }; Returns: boolean }
       unlockrows: { Args: { "": string }; Returns: number }
       updategeometrysrid: {
         Args: {
