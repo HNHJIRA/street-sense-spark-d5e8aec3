@@ -494,7 +494,7 @@ export function MapView({ token, city }: MapViewProps) {
             // style.load fires again after each setStyle() call, but Mapbox
             // keeps map-level event handlers across style swaps.
             if (!mapRef.current) {
-              map.on("click", ["seg-left", "seg-right"] as any, (e: any) => {
+              map.on("click", ["seg-left", "seg-right", "seg-both"] as any, (e: any) => {
                 const f = e.features?.[0];
                 const id = f?.properties?.segmentId as string | undefined;
                 if (f?.properties?.sourceType === "availability") {
@@ -504,7 +504,7 @@ export function MapView({ token, city }: MapViewProps) {
                 if (id) selectSegment(id);
               });
 
-              for (const id of ["seg-left", "seg-right"]) {
+              for (const id of ["seg-left", "seg-right", "seg-both"]) {
                 map.on("mouseenter", id, () => { map.getCanvas().style.cursor = "pointer"; });
                 map.on("mouseleave", id, () => { map.getCanvas().style.cursor = ""; });
               }
