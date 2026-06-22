@@ -208,14 +208,29 @@ export function MapView({ token, city }: MapViewProps) {
     const features = Array.from(featuresRef.current.values());
     const data: FeatureCollection<LineString> = { type: "FeatureCollection", features };
     src.setData(data);
-    // Tally color counts from rendered feature set so the debug overlay
-    // reflects exactly what the map source contains (not a separate query).
+    // Tally counts + collect up to 5 jump-to samples per color from the
+    // exact GeoJSON features mounted into the Mapbox source — guarantees the
+    // panel reflects what the map is rendering.
     const counts = { green: 0, yellow: 0, red: 0, gray: 0, total: features.length };
+    const buckets: Record<ParkingColor, SampleEntry[]> = { green: [], yellow: [], red: [], gray: [] };
     for (const f of features) {
-      const c = (f.properties?.color as keyof typeof counts) ?? "gray";
-      if (c === "green" || c === "yellow" || c === "red" || c === "gray") counts[c]++;
+      const c = (f.properties?.color as ParkingColor) ?? "gray";
+      if (c !== "green" && c !== "yellow" && c !== "red" && c !== "gray") continue;
+      counts[c]++;
+      if (buckets[c].length < 5) {
+        const coords = f.geometry.coordinates as [number, number][];
+        if (coords.length) {
+          const mid = coords[Math.floor(coords.length / 2)];
+          buckets[c].push({
+            id: String(f.properties?.segmentId ?? f.id ?? ""),
+            name: String(f.properties?.name ?? "—"),
+            center: [mid[0], mid[1]],
+          });
+        }
+      }
     }
     setColorCounts(counts);
+    setSamples(buckets);
   }, []);
 
   const loadBbox = useCallback(async () => {
