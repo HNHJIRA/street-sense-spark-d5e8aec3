@@ -1,10 +1,11 @@
-import { X, Clock, ShieldAlert, BadgeInfo, Database, Timer, Bookmark, Heart, Car, Navigation } from "lucide-react";
+import { X, Clock, ShieldAlert, BadgeInfo, Database, Timer, Bookmark, Heart, Car, Navigation, Trophy, CheckCircle2, Circle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { getSegmentDetails } from "@/lib/parking/parking.functions";
 import { evaluateRulesAt } from "@/lib/parking/engine";
+import { isRuleActiveAt, providerLabel, formatDays, formatHours, explainWinner } from "@/lib/parking/rule-explain";
 import type { RestrictionType, StreetSegment } from "@/lib/parking/types";
 import { useAppStore } from "@/stores/app-store";
 import { useDeviceStore } from "@/stores/device-store";
@@ -244,33 +245,94 @@ export function StreetSheet({ timezone, restrictionTypes, cityId, citySlug }: St
               </div>
             )}
 
-            {segment && segment.rules.length > 0 && (
-              <div className="mt-5">
-                <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">Posted Rules</div>
-                <div className="space-y-1.5">
-                  {[...segment.rules].sort((a, b) => a.priority - b.priority).map((r) => {
-                    const t = restrictionTypes.find((x) => x.code === r.restriction_code);
-                    return (
-                      <div key={r.id} className="flex items-start gap-3 rounded-2xl bg-[var(--pc-surface)] p-3">
-                        <span className={cn("mt-1 h-2.5 w-2.5 shrink-0 rounded-full", {
-                          "bg-park-green": t?.color === "green",
-                          "bg-park-yellow": t?.color === "yellow",
-                          "bg-park-red": t?.color === "red",
-                        })} />
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-semibold text-slate-900">{t?.label ?? r.restriction_code}</div>
-                          <div className="mt-0.5 text-xs text-slate-500">
-                            {r.days_of_week.length === 7 ? "Every day" : r.days_of_week.map((d) => DOW[d]).join(", ")}
-                            {r.time_start && r.time_end ? ` · ${r.time_start.slice(0,5)}–${r.time_end.slice(0,5)}` : " · All day"}
-                            {r.notes ? ` · ${r.notes}` : ""}
+            {segment && segment.rules.length > 0 && (() => {
+              const sorted = [...segment.rules].sort((a, b) => a.priority - b.priority);
+              const winnerId = status?.rule_id ?? null;
+              const winner = sorted.find((r) => r.id === winnerId) ?? null;
+              return (
+                <div className="mt-5">
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                      Posted Rules ({sorted.length})
+                    </div>
+                    <div className="text-[10px] font-medium text-slate-400">Lowest priority wins</div>
+                  </div>
+
+                  {winner && (
+                    <div className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 p-3">
+                      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-amber-700">
+                        <Trophy className="h-3.5 w-3.5" /> Why this rule won
+                      </div>
+                      <p className="mt-1 text-xs leading-relaxed text-amber-900">
+                        {explainWinner(winner, sorted)}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    {sorted.map((r) => {
+                      const t = restrictionTypes.find((x) => x.code === r.restriction_code);
+                      const active = isRuleActiveAt(r, when, timezone);
+                      const isWinner = r.id === winnerId;
+                      return (
+                        <div
+                          key={r.id}
+                          className={cn(
+                            "rounded-2xl border p-3",
+                            isWinner
+                              ? "border-amber-300 bg-amber-50/60"
+                              : "border-transparent bg-[var(--pc-surface)]",
+                          )}
+                        >
+                          <div className="flex items-start gap-3">
+                            <span className={cn("mt-1 h-2.5 w-2.5 shrink-0 rounded-full", {
+                              "bg-park-green": t?.color === "green",
+                              "bg-park-yellow": t?.color === "yellow",
+                              "bg-park-red": t?.color === "red",
+                              "bg-slate-400": t?.color === "gray" || !t,
+                            })} />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm font-semibold text-slate-900">
+                                  {t?.label ?? r.restriction_code}
+                                </span>
+                                {isWinner && (
+                                  <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-900">
+                                    Winner
+                                  </span>
+                                )}
+                                <span
+                                  className={cn(
+                                    "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold",
+                                    active
+                                      ? "bg-green-100 text-green-800"
+                                      : "bg-slate-100 text-slate-500",
+                                  )}
+                                >
+                                  {active ? <CheckCircle2 className="h-3 w-3" /> : <Circle className="h-3 w-3" />}
+                                  {active ? "Active now" : "Not active"}
+                                </span>
+                              </div>
+                              <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+                                <Meta label="Source" value={providerLabel(r.data_source)} />
+                                <Meta label="Priority" value={String(r.priority)} mono />
+                                <Meta label="Days" value={formatDays(r.days_of_week)} />
+                                <Meta label="Hours" value={formatHours(r.time_start, r.time_end)} />
+                                <Meta label="Color" value={(t?.color ?? "gray").toUpperCase()} />
+                                <Meta label="Code" value={r.restriction_code} mono />
+                              </dl>
+                              {r.notes && (
+                                <p className="mt-1.5 text-[11px] italic text-slate-500">{r.notes}</p>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* DayPlanner hidden for now — component preserved in repo */}
             {/* <div className="mt-4">
@@ -320,5 +382,14 @@ function ActionButton({
       <Icon className="h-4 w-4" strokeWidth={2.4} />
       <span className="leading-tight text-center">{label}</span>
     </button>
+  );
+}
+
+function Meta({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex items-baseline gap-1.5 min-w-0">
+      <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400 shrink-0">{label}</dt>
+      <dd className={cn("truncate text-slate-700", mono && "font-mono text-[10px]")}>{value}</dd>
+    </div>
   );
 }

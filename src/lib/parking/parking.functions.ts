@@ -187,6 +187,27 @@ const SOURCE_LABELS: Record<string, string> = {
   osm: "OpenStreetMap",
   seed: "Demo data",
   curbiq: "CurbIQ",
+  "la-dot": "LADOT Parking Inventory",
+  "santa-monica-opendata": "Santa Monica Street Sweeping",
+  "santa-monica-meters": "Santa Monica Meters",
+  "santa-monica-permit": "Santa Monica Permits",
+  "weho-opendata": "West Hollywood Street Sweeping",
+  "weho-permit": "West Hollywood Permit Districts",
+  "pasadena-opendata": "Pasadena Street Sweeping",
+  "arlington-opendata": "Arlington Street Network",
+  "arlington-curb": "Arlington Curb Regulations",
+  "arlington-permit": "Arlington Permit Districts",
+  "bellevue-opendata": "Bellevue Street Network",
+  "bellevue-curb": "Bellevue Curb Regulations",
+  "bellevue-signs": "Bellevue Sign Inventory",
+  "bellevue-painted-curbs": "Bellevue Painted Curbs",
+  "bellevue-rpz": "Bellevue Restricted Parking Zones",
+  "bellevue-rpz-streets": "Bellevue RPZ Streets",
+  "bellevue-cbd": "Bellevue CBD Regulations",
+  "bellevue-bus-layovers": "Bellevue Bus Layovers",
+  "bellevue-derived-allowed": "Bellevue Derived (Inverse Hours)",
+  "nyc-centerline": "NYC Street Centerline (CSCL)",
+  "nyc-signs": "NYC Parking Regulation Signs",
 };
 
 export const getSegmentDetails = createServerFn({ method: "GET" })
@@ -203,7 +224,7 @@ export const getSegmentDetails = createServerFn({ method: "GET" })
     if (!seg) throw new Error("Segment not found");
     const { data: rules } = await admin
       .from("parking_rules")
-      .select("id, street_segment_id, priority, restriction_code, days_of_week, time_start, time_end, permit_zone, time_limit_minutes, effective_from, effective_to, notes")
+      .select("id, street_segment_id, priority, restriction_code, days_of_week, time_start, time_end, permit_zone, time_limit_minutes, effective_from, effective_to, notes, data_source")
       .eq("street_segment_id", data.id)
       .order("priority", { ascending: true });
     const { data: events } = await admin
