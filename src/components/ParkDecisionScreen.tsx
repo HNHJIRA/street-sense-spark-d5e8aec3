@@ -363,7 +363,7 @@ function buildDecisionParagraph({
   // Prepend the street name so the user still sees the location, mirroring
   // the scan screen's "Street" detail row above the paragraph.
   const street = result.name ? ` ${result.name}.` : "";
-  return paragraph.replace(/^(YES|NO|LIMITED|UNKNOWN)\./, (m) => `${m}${street}`);
+  return paragraph.replace(/^(YES|NO|LIMITED|UNKNOWN)\./, (m: string) => `${m}${street}`);
 }
 
 export function ParkDecisionUnknownCTA({ onScanClick }: { onScanClick?: () => void }) {
