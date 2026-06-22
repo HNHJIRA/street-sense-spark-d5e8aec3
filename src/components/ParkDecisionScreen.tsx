@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ParkingDecision } from "@/lib/parking/decision";
+import { buildOfficerParagraph, type OfficerArgs } from "@/lib/parking/officer-paragraph";
 import type { SegmentDecisionResult } from "@/lib/parking/decision.functions";
 import { formatTimelineTime } from "@/lib/parking/timeline";
 
@@ -301,36 +302,68 @@ function buildDecisionParagraph({
   decision: ParkingDecision;
   timezone: string;
 }): string {
-  const street = result.name ?? "this street";
-  const verdict = decision.verdict;
-  const statusLc = decision.status.label.toLowerCase();
+  const evaluatedAt = new Date(decision.evaluated_at);
+  const nowClock = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone, hour: "numeric", minute: "2-digit", hour12: true,
+  }).format(evaluatedAt);
+  const nowDay = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone, weekday: "long",
+  }).format(evaluatedAt);
+
   const allowedUntil = formatTime(decision.status.allowed_until, timezone);
-  const remaining = formatDuration(decision.time_remaining_ms);
-  const maxStay = decision.status.time_limit_minutes;
-  const permit = decision.status.permit_zone;
-  const nextLbl = decision.next_restriction?.label ?? null;
-  const nextAt = formatTime(decision.next_restriction?.starts_at, timezone);
+  const nextStart = formatTime(decision.next_restriction?.starts_at, timezone);
+  const reason = decision.status.notes ?? decision.status.label ?? "";
 
-  if (verdict === "UNKNOWN") {
-    return `UNKNOWN. Parking status on ${street} cannot be verified from current data. Please inspect the posted sign before parking.`;
-  }
+  const args: OfficerArgs = {
+    status: decision.verdict,
+    reason,
+    // Map-tap / GPS decisions don't have left/right arrows — use neutral phrasing.
+    appliesTo: "NONE",
+    hasArrows: false,
+    nowClock,
+    nowDay,
+    allowedUntilLabel: allowedUntil,
+    allowedUntilDayLabel: null,
+    maxStayLabel: null,
+    timeLimitMinutes: decision.status.time_limit_minutes ?? null,
+    nextReasonLabel: decision.next_restriction?.label ?? null,
+    nextStartLabel: nextStart,
+    nextStartDayLabel: null,
+    nextEndLabel: null,
+    becomesFreeDayLabel: null,
+    currentRuleWindow: null,
+    nextRuleWindow: null,
+    parsedWindow: null,
+    currentRuleActive: decision.verdict !== "YES" && decision.verdict !== "UNKNOWN"
+      ? true
+      : !!decision.status.rule_id,
+    sidesDiffer: false,
+    leftUntil: null,
+    rightUntil: null,
+    leftRuleLabel: null,
+    rightRuleLabel: null,
+    leftActive: false,
+    rightActive: false,
+    bothWindow: null,
+    restrictionStartsLabel: nextStart,
+    // No OCR pipeline here — engine output is fully confident.
+    decisionConfidence: 1,
+    activeCode: null,
+    loadingActivity: null,
+    restrictionEndLabel: null,
+    currentRuleStartLabel: null,
+    currentRuleEndLabel: allowedUntil,
+    nextRuleLabel: decision.next_restriction?.label ?? null,
+    nextRuleTimeLimit: null,
+    nextRuleStartLabel: nextStart,
+    nextRuleEndLabel: null,
+  };
 
-  const head =
-    verdict === "YES"
-      ? `YES. You can legally park here right now on ${street}.`
-      : verdict === "LIMITED"
-        ? `LIMITED. Parking on ${street} is restricted: ${statusLc}.`
-        : `NO. You cannot park on ${street} right now: ${statusLc}.`;
-
-  const parts: string[] = [head];
-  if (allowedUntil) parts.push(`Allowed until ${allowedUntil}.`);
-  if (remaining && verdict !== "NO") parts.push(`You have about ${remaining} remaining.`);
-  if (maxStay) parts.push(`Maximum stay is ${maxStay} minutes.`);
-  parts.push(permit ? `Permit zone ${permit} required.` : "No permit required.");
-  if (nextLbl && nextAt) {
-    parts.push(`Next: ${nextLbl} at ${nextAt} — move your vehicle before then.`);
-  }
-  return parts.join(" ");
+  const paragraph = buildOfficerParagraph(args);
+  // Prepend the street name so the user still sees the location, mirroring
+  // the scan screen's "Street" detail row above the paragraph.
+  const street = result.name ? ` ${result.name}.` : "";
+  return paragraph.replace(/^(YES|NO|LIMITED|UNKNOWN)\./, (m: string) => `${m}${street}`);
 }
 
 export function ParkDecisionUnknownCTA({ onScanClick }: { onScanClick?: () => void }) {
