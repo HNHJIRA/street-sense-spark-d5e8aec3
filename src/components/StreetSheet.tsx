@@ -248,7 +248,6 @@ export function StreetSheet({ timezone, restrictionTypes, cityId, citySlug }: St
             {segment && segment.rules.length > 0 && (() => {
               const sorted = [...segment.rules].sort((a, b) => a.priority - b.priority);
               const winnerId = status?.rule_id ?? null;
-              const winner = sorted.find((r) => r.id === winnerId) ?? null;
               return (
                 <div className="mt-5">
                   <div className="mb-2 flex items-center justify-between">
