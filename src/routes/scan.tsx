@@ -15,6 +15,7 @@ import { getCityInfo } from "@/lib/parking/parking.functions";
 import { scanSign, type SignScanResponse } from "@/lib/parking/scan.functions";
 import { buildRuleTimeline } from "@/lib/parking/driver-narrative";
 import type { NormalizedRule } from "@/lib/parking/providers/types";
+import { buildOfficerParagraph, type OfficerArgs } from "@/lib/parking/officer-paragraph";
 import { useLocationStore } from "@/stores/location-store";
 import { cn } from "@/lib/utils";
 
