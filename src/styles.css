@@ -82,8 +82,10 @@
   --input: oklch(1 0 0 / 10%);
   --ring: oklch(0.72 0.18 165);
 
-  --park-green: oklch(0.78 0.18 150);
-  --park-green-soft: oklch(0.78 0.18 150 / 20%);
+  /* Brighter, higher-chroma green so allowed-parking segments pop against
+     the Mapbox basemap. Yellow/red unchanged. */
+  --park-green: oklch(0.82 0.24 148);
+  --park-green-soft: oklch(0.82 0.24 148 / 22%);
   --park-yellow: oklch(0.85 0.16 90);
   --park-yellow-soft: oklch(0.85 0.16 90 / 25%);
   --park-red: oklch(0.68 0.22 25);
