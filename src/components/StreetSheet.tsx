@@ -1,11 +1,11 @@
-import { X, Clock, ShieldAlert, BadgeInfo, Database, Timer, Bookmark, Heart, Car, Navigation, Trophy, CheckCircle2, Circle } from "lucide-react";
+import { X, Clock, ShieldAlert, BadgeInfo, Database, Timer, Bookmark, Heart, Car, Navigation, CheckCircle2, Circle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { getSegmentDetails } from "@/lib/parking/parking.functions";
 import { evaluateRulesAt } from "@/lib/parking/engine";
-import { isRuleActiveAt, providerLabel, formatDays, formatHours, explainWinner } from "@/lib/parking/rule-explain";
+import { isRuleActiveAt, providerLabel, formatDays, formatHours } from "@/lib/parking/rule-explain";
 import type { RestrictionType, StreetSegment } from "@/lib/parking/types";
 import { useAppStore } from "@/stores/app-store";
 import { useDeviceStore } from "@/stores/device-store";
@@ -248,26 +248,13 @@ export function StreetSheet({ timezone, restrictionTypes, cityId, citySlug }: St
             {segment && segment.rules.length > 0 && (() => {
               const sorted = [...segment.rules].sort((a, b) => a.priority - b.priority);
               const winnerId = status?.rule_id ?? null;
-              const winner = sorted.find((r) => r.id === winnerId) ?? null;
               return (
                 <div className="mt-5">
                   <div className="mb-2 flex items-center justify-between">
                     <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
                       Posted Rules ({sorted.length})
                     </div>
-                    <div className="text-[10px] font-medium text-slate-400">Lowest priority wins</div>
                   </div>
-
-                  {winner && (
-                    <div className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 p-3">
-                      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-amber-700">
-                        <Trophy className="h-3.5 w-3.5" /> Why this rule won
-                      </div>
-                      <p className="mt-1 text-xs leading-relaxed text-amber-900">
-                        {explainWinner(winner, sorted)}
-                      </p>
-                    </div>
-                  )}
 
                   <div className="space-y-2">
                     {sorted.map((r) => {
@@ -315,7 +302,6 @@ export function StreetSheet({ timezone, restrictionTypes, cityId, citySlug }: St
                               </div>
                               <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
                                 <Meta label="Source" value={providerLabel(r.data_source)} />
-                                <Meta label="Priority" value={String(r.priority)} mono />
                                 <Meta label="Days" value={formatDays(r.days_of_week)} />
                                 <Meta label="Hours" value={formatHours(r.time_start, r.time_end)} />
                                 <Meta label="Color" value={(t?.color ?? "gray").toUpperCase()} />
