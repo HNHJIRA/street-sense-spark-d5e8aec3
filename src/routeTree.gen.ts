@@ -31,14 +31,23 @@ import { Route as AdminProviderSyncRouteImport } from './routes/admin.provider-s
 import { Route as AdminNycCoverageRouteImport } from './routes/admin.nyc-coverage'
 import { Route as AdminLaCoverageRouteImport } from './routes/admin.la-coverage'
 import { Route as AdminHealthRouteImport } from './routes/admin.health'
+import { Route as AdminFreshnessRouteImport } from './routes/admin.freshness'
 import { Route as AdminForecastRouteImport } from './routes/admin.forecast'
 import { Route as AdminBetaReadinessRouteImport } from './routes/admin.beta-readiness'
 import { Route as AdminBellevueCoverageRouteImport } from './routes/admin.bellevue-coverage'
 import { Route as AdminArlingtonCoverageRouteImport } from './routes/admin.arlington-coverage'
 import { Route as AdminAnalyticsRouteImport } from './routes/admin.analytics'
 import { Route as AdminAccuracyRouteImport } from './routes/admin.accuracy'
+import { Route as ApiPublicCronSyncSeattleRouteImport } from './routes/api/public/cron.sync-seattle'
+import { Route as ApiPublicCronSyncNycIncrementalRouteImport } from './routes/api/public/cron.sync-nyc-incremental'
+import { Route as ApiPublicCronSyncNycFullRouteImport } from './routes/api/public/cron.sync-nyc-full'
 import { Route as ApiPublicCronSyncLaOccupancyRouteImport } from './routes/api/public/cron.sync-la-occupancy'
+import { Route as ApiPublicCronSyncLaIncrementalRouteImport } from './routes/api/public/cron.sync-la-incremental'
+import { Route as ApiPublicCronSyncLaFullRouteImport } from './routes/api/public/cron.sync-la-full'
+import { Route as ApiPublicCronSyncBellevueRouteImport } from './routes/api/public/cron.sync-bellevue'
+import { Route as ApiPublicCronSyncArlingtonRouteImport } from './routes/api/public/cron.sync-arlington'
 import { Route as ApiPublicCronHealthCheckRouteImport } from './routes/api/public/cron.health-check'
+import { Route as ApiPublicAdminSyncSeattleRouteImport } from './routes/api/public/admin.sync-seattle'
 import { Route as ApiPublicAdminSyncNycRouteImport } from './routes/api/public/admin.sync-nyc'
 import { Route as ApiPublicAdminSyncLaRouteImport } from './routes/api/public/admin.sync-la'
 import { Route as ApiPublicAdminSyncBellevueRouteImport } from './routes/api/public/admin.sync-bellevue'
@@ -156,6 +165,11 @@ const AdminHealthRoute = AdminHealthRouteImport.update({
   path: '/health',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminFreshnessRoute = AdminFreshnessRouteImport.update({
+  id: '/freshness',
+  path: '/freshness',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminForecastRoute = AdminForecastRouteImport.update({
   id: '/forecast',
   path: '/forecast',
@@ -186,16 +200,63 @@ const AdminAccuracyRoute = AdminAccuracyRouteImport.update({
   path: '/accuracy',
   getParentRoute: () => AdminRoute,
 } as any)
+const ApiPublicCronSyncSeattleRoute =
+  ApiPublicCronSyncSeattleRouteImport.update({
+    id: '/api/public/cron/sync-seattle',
+    path: '/api/public/cron/sync-seattle',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicCronSyncNycIncrementalRoute =
+  ApiPublicCronSyncNycIncrementalRouteImport.update({
+    id: '/api/public/cron/sync-nyc-incremental',
+    path: '/api/public/cron/sync-nyc-incremental',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicCronSyncNycFullRoute =
+  ApiPublicCronSyncNycFullRouteImport.update({
+    id: '/api/public/cron/sync-nyc-full',
+    path: '/api/public/cron/sync-nyc-full',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicCronSyncLaOccupancyRoute =
   ApiPublicCronSyncLaOccupancyRouteImport.update({
     id: '/api/public/cron/sync-la-occupancy',
     path: '/api/public/cron/sync-la-occupancy',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicCronSyncLaIncrementalRoute =
+  ApiPublicCronSyncLaIncrementalRouteImport.update({
+    id: '/api/public/cron/sync-la-incremental',
+    path: '/api/public/cron/sync-la-incremental',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicCronSyncLaFullRoute = ApiPublicCronSyncLaFullRouteImport.update({
+  id: '/api/public/cron/sync-la-full',
+  path: '/api/public/cron/sync-la-full',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicCronSyncBellevueRoute =
+  ApiPublicCronSyncBellevueRouteImport.update({
+    id: '/api/public/cron/sync-bellevue',
+    path: '/api/public/cron/sync-bellevue',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicCronSyncArlingtonRoute =
+  ApiPublicCronSyncArlingtonRouteImport.update({
+    id: '/api/public/cron/sync-arlington',
+    path: '/api/public/cron/sync-arlington',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicCronHealthCheckRoute =
   ApiPublicCronHealthCheckRouteImport.update({
     id: '/api/public/cron/health-check',
     path: '/api/public/cron/health-check',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicAdminSyncSeattleRoute =
+  ApiPublicAdminSyncSeattleRouteImport.update({
+    id: '/api/public/admin/sync-seattle',
+    path: '/api/public/admin/sync-seattle',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicAdminSyncNycRoute = ApiPublicAdminSyncNycRouteImport.update({
@@ -254,6 +315,7 @@ export interface FileRoutesByFullPath {
   '/admin/bellevue-coverage': typeof AdminBellevueCoverageRoute
   '/admin/beta-readiness': typeof AdminBetaReadinessRoute
   '/admin/forecast': typeof AdminForecastRoute
+  '/admin/freshness': typeof AdminFreshnessRoute
   '/admin/health': typeof AdminHealthRoute
   '/admin/la-coverage': typeof AdminLaCoverageRoute
   '/admin/nyc-coverage': typeof AdminNycCoverageRoute
@@ -268,8 +330,16 @@ export interface FileRoutesByFullPath {
   '/api/public/admin/sync-bellevue': typeof ApiPublicAdminSyncBellevueRoute
   '/api/public/admin/sync-la': typeof ApiPublicAdminSyncLaRoute
   '/api/public/admin/sync-nyc': typeof ApiPublicAdminSyncNycRoute
+  '/api/public/admin/sync-seattle': typeof ApiPublicAdminSyncSeattleRoute
   '/api/public/cron/health-check': typeof ApiPublicCronHealthCheckRoute
+  '/api/public/cron/sync-arlington': typeof ApiPublicCronSyncArlingtonRoute
+  '/api/public/cron/sync-bellevue': typeof ApiPublicCronSyncBellevueRoute
+  '/api/public/cron/sync-la-full': typeof ApiPublicCronSyncLaFullRoute
+  '/api/public/cron/sync-la-incremental': typeof ApiPublicCronSyncLaIncrementalRoute
   '/api/public/cron/sync-la-occupancy': typeof ApiPublicCronSyncLaOccupancyRoute
+  '/api/public/cron/sync-nyc-full': typeof ApiPublicCronSyncNycFullRoute
+  '/api/public/cron/sync-nyc-incremental': typeof ApiPublicCronSyncNycIncrementalRoute
+  '/api/public/cron/sync-seattle': typeof ApiPublicCronSyncSeattleRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -291,6 +361,7 @@ export interface FileRoutesByTo {
   '/admin/bellevue-coverage': typeof AdminBellevueCoverageRoute
   '/admin/beta-readiness': typeof AdminBetaReadinessRoute
   '/admin/forecast': typeof AdminForecastRoute
+  '/admin/freshness': typeof AdminFreshnessRoute
   '/admin/health': typeof AdminHealthRoute
   '/admin/la-coverage': typeof AdminLaCoverageRoute
   '/admin/nyc-coverage': typeof AdminNycCoverageRoute
@@ -305,8 +376,16 @@ export interface FileRoutesByTo {
   '/api/public/admin/sync-bellevue': typeof ApiPublicAdminSyncBellevueRoute
   '/api/public/admin/sync-la': typeof ApiPublicAdminSyncLaRoute
   '/api/public/admin/sync-nyc': typeof ApiPublicAdminSyncNycRoute
+  '/api/public/admin/sync-seattle': typeof ApiPublicAdminSyncSeattleRoute
   '/api/public/cron/health-check': typeof ApiPublicCronHealthCheckRoute
+  '/api/public/cron/sync-arlington': typeof ApiPublicCronSyncArlingtonRoute
+  '/api/public/cron/sync-bellevue': typeof ApiPublicCronSyncBellevueRoute
+  '/api/public/cron/sync-la-full': typeof ApiPublicCronSyncLaFullRoute
+  '/api/public/cron/sync-la-incremental': typeof ApiPublicCronSyncLaIncrementalRoute
   '/api/public/cron/sync-la-occupancy': typeof ApiPublicCronSyncLaOccupancyRoute
+  '/api/public/cron/sync-nyc-full': typeof ApiPublicCronSyncNycFullRoute
+  '/api/public/cron/sync-nyc-incremental': typeof ApiPublicCronSyncNycIncrementalRoute
+  '/api/public/cron/sync-seattle': typeof ApiPublicCronSyncSeattleRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -330,6 +409,7 @@ export interface FileRoutesById {
   '/admin/bellevue-coverage': typeof AdminBellevueCoverageRoute
   '/admin/beta-readiness': typeof AdminBetaReadinessRoute
   '/admin/forecast': typeof AdminForecastRoute
+  '/admin/freshness': typeof AdminFreshnessRoute
   '/admin/health': typeof AdminHealthRoute
   '/admin/la-coverage': typeof AdminLaCoverageRoute
   '/admin/nyc-coverage': typeof AdminNycCoverageRoute
@@ -344,8 +424,16 @@ export interface FileRoutesById {
   '/api/public/admin/sync-bellevue': typeof ApiPublicAdminSyncBellevueRoute
   '/api/public/admin/sync-la': typeof ApiPublicAdminSyncLaRoute
   '/api/public/admin/sync-nyc': typeof ApiPublicAdminSyncNycRoute
+  '/api/public/admin/sync-seattle': typeof ApiPublicAdminSyncSeattleRoute
   '/api/public/cron/health-check': typeof ApiPublicCronHealthCheckRoute
+  '/api/public/cron/sync-arlington': typeof ApiPublicCronSyncArlingtonRoute
+  '/api/public/cron/sync-bellevue': typeof ApiPublicCronSyncBellevueRoute
+  '/api/public/cron/sync-la-full': typeof ApiPublicCronSyncLaFullRoute
+  '/api/public/cron/sync-la-incremental': typeof ApiPublicCronSyncLaIncrementalRoute
   '/api/public/cron/sync-la-occupancy': typeof ApiPublicCronSyncLaOccupancyRoute
+  '/api/public/cron/sync-nyc-full': typeof ApiPublicCronSyncNycFullRoute
+  '/api/public/cron/sync-nyc-incremental': typeof ApiPublicCronSyncNycIncrementalRoute
+  '/api/public/cron/sync-seattle': typeof ApiPublicCronSyncSeattleRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -370,6 +458,7 @@ export interface FileRouteTypes {
     | '/admin/bellevue-coverage'
     | '/admin/beta-readiness'
     | '/admin/forecast'
+    | '/admin/freshness'
     | '/admin/health'
     | '/admin/la-coverage'
     | '/admin/nyc-coverage'
@@ -384,8 +473,16 @@ export interface FileRouteTypes {
     | '/api/public/admin/sync-bellevue'
     | '/api/public/admin/sync-la'
     | '/api/public/admin/sync-nyc'
+    | '/api/public/admin/sync-seattle'
     | '/api/public/cron/health-check'
+    | '/api/public/cron/sync-arlington'
+    | '/api/public/cron/sync-bellevue'
+    | '/api/public/cron/sync-la-full'
+    | '/api/public/cron/sync-la-incremental'
     | '/api/public/cron/sync-la-occupancy'
+    | '/api/public/cron/sync-nyc-full'
+    | '/api/public/cron/sync-nyc-incremental'
+    | '/api/public/cron/sync-seattle'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -407,6 +504,7 @@ export interface FileRouteTypes {
     | '/admin/bellevue-coverage'
     | '/admin/beta-readiness'
     | '/admin/forecast'
+    | '/admin/freshness'
     | '/admin/health'
     | '/admin/la-coverage'
     | '/admin/nyc-coverage'
@@ -421,8 +519,16 @@ export interface FileRouteTypes {
     | '/api/public/admin/sync-bellevue'
     | '/api/public/admin/sync-la'
     | '/api/public/admin/sync-nyc'
+    | '/api/public/admin/sync-seattle'
     | '/api/public/cron/health-check'
+    | '/api/public/cron/sync-arlington'
+    | '/api/public/cron/sync-bellevue'
+    | '/api/public/cron/sync-la-full'
+    | '/api/public/cron/sync-la-incremental'
     | '/api/public/cron/sync-la-occupancy'
+    | '/api/public/cron/sync-nyc-full'
+    | '/api/public/cron/sync-nyc-incremental'
+    | '/api/public/cron/sync-seattle'
   id:
     | '__root__'
     | '/'
@@ -445,6 +551,7 @@ export interface FileRouteTypes {
     | '/admin/bellevue-coverage'
     | '/admin/beta-readiness'
     | '/admin/forecast'
+    | '/admin/freshness'
     | '/admin/health'
     | '/admin/la-coverage'
     | '/admin/nyc-coverage'
@@ -459,8 +566,16 @@ export interface FileRouteTypes {
     | '/api/public/admin/sync-bellevue'
     | '/api/public/admin/sync-la'
     | '/api/public/admin/sync-nyc'
+    | '/api/public/admin/sync-seattle'
     | '/api/public/cron/health-check'
+    | '/api/public/cron/sync-arlington'
+    | '/api/public/cron/sync-bellevue'
+    | '/api/public/cron/sync-la-full'
+    | '/api/public/cron/sync-la-incremental'
     | '/api/public/cron/sync-la-occupancy'
+    | '/api/public/cron/sync-nyc-full'
+    | '/api/public/cron/sync-nyc-incremental'
+    | '/api/public/cron/sync-seattle'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -485,8 +600,16 @@ export interface RootRouteChildren {
   ApiPublicAdminSyncBellevueRoute: typeof ApiPublicAdminSyncBellevueRoute
   ApiPublicAdminSyncLaRoute: typeof ApiPublicAdminSyncLaRoute
   ApiPublicAdminSyncNycRoute: typeof ApiPublicAdminSyncNycRoute
+  ApiPublicAdminSyncSeattleRoute: typeof ApiPublicAdminSyncSeattleRoute
   ApiPublicCronHealthCheckRoute: typeof ApiPublicCronHealthCheckRoute
+  ApiPublicCronSyncArlingtonRoute: typeof ApiPublicCronSyncArlingtonRoute
+  ApiPublicCronSyncBellevueRoute: typeof ApiPublicCronSyncBellevueRoute
+  ApiPublicCronSyncLaFullRoute: typeof ApiPublicCronSyncLaFullRoute
+  ApiPublicCronSyncLaIncrementalRoute: typeof ApiPublicCronSyncLaIncrementalRoute
   ApiPublicCronSyncLaOccupancyRoute: typeof ApiPublicCronSyncLaOccupancyRoute
+  ApiPublicCronSyncNycFullRoute: typeof ApiPublicCronSyncNycFullRoute
+  ApiPublicCronSyncNycIncrementalRoute: typeof ApiPublicCronSyncNycIncrementalRoute
+  ApiPublicCronSyncSeattleRoute: typeof ApiPublicCronSyncSeattleRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -645,6 +768,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminHealthRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/freshness': {
+      id: '/admin/freshness'
+      path: '/freshness'
+      fullPath: '/admin/freshness'
+      preLoaderRoute: typeof AdminFreshnessRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/forecast': {
       id: '/admin/forecast'
       path: '/forecast'
@@ -687,6 +817,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAccuracyRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/api/public/cron/sync-seattle': {
+      id: '/api/public/cron/sync-seattle'
+      path: '/api/public/cron/sync-seattle'
+      fullPath: '/api/public/cron/sync-seattle'
+      preLoaderRoute: typeof ApiPublicCronSyncSeattleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/cron/sync-nyc-incremental': {
+      id: '/api/public/cron/sync-nyc-incremental'
+      path: '/api/public/cron/sync-nyc-incremental'
+      fullPath: '/api/public/cron/sync-nyc-incremental'
+      preLoaderRoute: typeof ApiPublicCronSyncNycIncrementalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/cron/sync-nyc-full': {
+      id: '/api/public/cron/sync-nyc-full'
+      path: '/api/public/cron/sync-nyc-full'
+      fullPath: '/api/public/cron/sync-nyc-full'
+      preLoaderRoute: typeof ApiPublicCronSyncNycFullRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/cron/sync-la-occupancy': {
       id: '/api/public/cron/sync-la-occupancy'
       path: '/api/public/cron/sync-la-occupancy'
@@ -694,11 +845,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCronSyncLaOccupancyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/cron/sync-la-incremental': {
+      id: '/api/public/cron/sync-la-incremental'
+      path: '/api/public/cron/sync-la-incremental'
+      fullPath: '/api/public/cron/sync-la-incremental'
+      preLoaderRoute: typeof ApiPublicCronSyncLaIncrementalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/cron/sync-la-full': {
+      id: '/api/public/cron/sync-la-full'
+      path: '/api/public/cron/sync-la-full'
+      fullPath: '/api/public/cron/sync-la-full'
+      preLoaderRoute: typeof ApiPublicCronSyncLaFullRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/cron/sync-bellevue': {
+      id: '/api/public/cron/sync-bellevue'
+      path: '/api/public/cron/sync-bellevue'
+      fullPath: '/api/public/cron/sync-bellevue'
+      preLoaderRoute: typeof ApiPublicCronSyncBellevueRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/cron/sync-arlington': {
+      id: '/api/public/cron/sync-arlington'
+      path: '/api/public/cron/sync-arlington'
+      fullPath: '/api/public/cron/sync-arlington'
+      preLoaderRoute: typeof ApiPublicCronSyncArlingtonRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/cron/health-check': {
       id: '/api/public/cron/health-check'
       path: '/api/public/cron/health-check'
       fullPath: '/api/public/cron/health-check'
       preLoaderRoute: typeof ApiPublicCronHealthCheckRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/admin/sync-seattle': {
+      id: '/api/public/admin/sync-seattle'
+      path: '/api/public/admin/sync-seattle'
+      fullPath: '/api/public/admin/sync-seattle'
+      preLoaderRoute: typeof ApiPublicAdminSyncSeattleRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/admin/sync-nyc': {
@@ -753,6 +939,7 @@ interface AdminRouteChildren {
   AdminBellevueCoverageRoute: typeof AdminBellevueCoverageRoute
   AdminBetaReadinessRoute: typeof AdminBetaReadinessRoute
   AdminForecastRoute: typeof AdminForecastRoute
+  AdminFreshnessRoute: typeof AdminFreshnessRoute
   AdminHealthRoute: typeof AdminHealthRoute
   AdminLaCoverageRoute: typeof AdminLaCoverageRoute
   AdminNycCoverageRoute: typeof AdminNycCoverageRoute
@@ -769,6 +956,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminBellevueCoverageRoute: AdminBellevueCoverageRoute,
   AdminBetaReadinessRoute: AdminBetaReadinessRoute,
   AdminForecastRoute: AdminForecastRoute,
+  AdminFreshnessRoute: AdminFreshnessRoute,
   AdminHealthRoute: AdminHealthRoute,
   AdminLaCoverageRoute: AdminLaCoverageRoute,
   AdminNycCoverageRoute: AdminNycCoverageRoute,
@@ -802,19 +990,17 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicAdminSyncBellevueRoute: ApiPublicAdminSyncBellevueRoute,
   ApiPublicAdminSyncLaRoute: ApiPublicAdminSyncLaRoute,
   ApiPublicAdminSyncNycRoute: ApiPublicAdminSyncNycRoute,
+  ApiPublicAdminSyncSeattleRoute: ApiPublicAdminSyncSeattleRoute,
   ApiPublicCronHealthCheckRoute: ApiPublicCronHealthCheckRoute,
+  ApiPublicCronSyncArlingtonRoute: ApiPublicCronSyncArlingtonRoute,
+  ApiPublicCronSyncBellevueRoute: ApiPublicCronSyncBellevueRoute,
+  ApiPublicCronSyncLaFullRoute: ApiPublicCronSyncLaFullRoute,
+  ApiPublicCronSyncLaIncrementalRoute: ApiPublicCronSyncLaIncrementalRoute,
   ApiPublicCronSyncLaOccupancyRoute: ApiPublicCronSyncLaOccupancyRoute,
+  ApiPublicCronSyncNycFullRoute: ApiPublicCronSyncNycFullRoute,
+  ApiPublicCronSyncNycIncrementalRoute: ApiPublicCronSyncNycIncrementalRoute,
+  ApiPublicCronSyncSeattleRoute: ApiPublicCronSyncSeattleRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

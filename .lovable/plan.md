@@ -1,94 +1,155 @@
-# Add Arlington, VA as a supported city
+# Production-Grade Sync Strategy
 
-This adds Arlington County, Virginia to the Parking Intelligence platform following the same architecture as Los Angeles, Santa Monica, West Hollywood, and Pasadena. The engine will never invent legality — anything Arlington doesn't publish stays UNKNOWN until resolved by a sign scan.
+Audit-driven plan. Every recommendation below is grounded in what the upstream actually supports — see the per-provider table.
 
-## Phase 1 — Data Discovery (Arlington GIS Open Data)
+## 1. Per-provider audit & recommended cadence
 
-Arlington publishes geospatial data primarily through the **Arlington County GIS Open Data Hub** (ArcGIS Hub) and **TransportationGIS** ArcGIS REST services. I'll audit and document:
+Highlights from the audit:
+- **Only NYC providers** (Socrata) natively support incremental via `:updated_at`.
+- **All ArcGIS providers** (Seattle, LA, Santa Monica, WeHo, Pasadena, Arlington, Bellevue) *could* support incremental via `EditDate`, but it is not currently used. High-value ArcGIS incremental targets: `arlington-curb` (~132k rows), `bellevue-signs` (~19.5k rows).
+- **LA occupancy** (`cron.sync-la-occupancy.ts`) is the only real-time feed and already runs every 5 min.
+- **Seattle has no admin/cron route at all** — gap to fix.
+- `seattle-signposts` has a silent pagination truncation bug (single 2k page, no offset loop).
+- `bellevue-curb` has a known upstream CRS registration bug — leave as full-only until fixed.
 
-| # | Dataset | Source (ArcGIS REST / Hub) | Geometry | Usable for curb legality? |
+| Provider | Source | Incremental? | Full cadence | Incremental cadence |
 |---|---|---|---|---|
-| 1 | Street Centerlines | `gisdata.arlingtonva.us/.../MapServer` | LineString | Yes — base for segments |
-| 2 | Parking Meters | Arlington GIS Hub: Parking Meters layer | Point | Yes — `metered` |
-| 3 | Residential Permit Parking (RPP) Zones | Hub: RPP District polygons | Polygon | Yes — `permit_only` overlay |
-| 4 | Loading Zones | Hub: Curbspace / Loading layer (if published) | Point/Line | Yes — `loading_only` |
-| 5 | Time-Limited Parking | Hub: Curb Regulations (if published) | Line | Yes — `time_limited` |
-| 6 | Street Sweeping | Hub: DES sweeping routes (if published) | Line | Yes — `street_sweeping` |
-| 7 | Tow-away / No-Parking | Hub: signage layer (often absent) | Point | Partial — usually UNKNOWN |
-| 8 | Garages & Lots | Hub: Parking Facilities | Point/Polygon | Off-street, info-only |
+| seattle-blockface | ArcGIS | EditDate (add) | Weekly | — |
+| seattle-signposts | ArcGIS | EditDate (add) | Weekly (after pagination fix) | — |
+| seattle-rpz | ArcGIS | — | Monthly | — |
+| ladot | ArcGIS | EditDate (add) | **6h** | — (occupancy already 5m) |
+| santa-monica-* | ArcGIS | — | **6h** (sm), Monthly (permit/meters static) | — |
+| west-hollywood + permit | ArcGIS | — | **6h** (sweep), Monthly (permit) | — |
+| pasadena | ArcGIS | — | **6h** | — |
+| arlington (centerlines + meters) | ArcGIS | EditDate (add) | **12h** | — |
+| arlington-permit | ArcGIS | — | **12h** | — |
+| **arlington-curb** | ArcGIS | EditDate (add) | **12h** | **30m** (Phase 2) |
+| bellevue (centerlines + 5 static overlays) | ArcGIS | — | **12h** | — |
+| **bellevue-signs** | ArcGIS | EditDate (add) | **12h** | **30m** (Phase 2) |
+| bellevue-curb | ArcGIS | blocked (CRS bug) | **12h** | — |
+| **nyc-centerline** | Socrata | `:updated_at` ✅ | **6h** | **30m** |
+| **nyc-signs** | Socrata | `:updated_at` ✅ | **6h** | **30m** |
 
-The discovery report (saved as `docs/arlington-coverage-discovery.md`) will list final URLs, feature counts, last-update dates, and an explicit "UNKNOWN — not published" entry for any dataset Arlington doesn't expose. Datasets not present at sync time are skipped gracefully and logged in `provider_health.notes`.
+The user-requested cadences (LA 6h+30m, NYC 6h+30m, Arlington 12h, Bellevue 12h) are honored. Seattle is added at weekly/monthly because the user did not specify it but the providers are wired.
 
-## Phase 2 — Providers
+## 2. Architecture
 
-Following `src/lib/parking/providers/types.ts`:
+### Sync orchestrator (new)
 
-- `src/lib/parking/providers/arlington.server.ts` — `ArlingtonProvider` (segment-creating, street centerlines + meters baseline).
-- `src/lib/parking/providers/arlington-permit.server.ts` — `ArlingtonPermitOverlay` (RPP polygons → `permit_only` rules on segments via PostGIS spatial join, mirroring `weho-permit.server.ts`).
-- `src/lib/parking/providers/arlington-loading.server.ts` — overlay for loading zones (if dataset exists).
-- `src/lib/parking/providers/arlington-sweeping.server.ts` — overlay for sweeping routes (if dataset exists).
+`src/lib/parking/sync-orchestrator.server.ts`:
+- `runSync({ citySlug, providerId?, mode: "full" | "incremental", trigger: "cron" | "manual" })`
+- **Acquires a Postgres advisory lock** on `(city_slug, provider_id, mode)` — duplicate runs return `{ status: "already_running" }` immediately.
+- Writes a row to `sync_logs` at start (status=`running`) and updates it on completion.
+- Updates `provider_health` with last_started/completed/duration/imported/skipped/error.
+- For `mode: "incremental"`, passes `since: provider_health.last_success_at` to the provider; provider chooses whether to honor it.
 
-Each registers in `src/lib/parking/providers/registry.server.ts` with `cities: ["arlington"]`, writes to `provider_health`, and participates in `syncProvider` / `syncAllProvidersForCity`.
+### Provider contract extension
 
-## Phase 3 — Segment generation
+In `src/lib/parking/providers/types.ts`, extend `ParkingProvider` / `OverlayProvider`:
+```ts
+fetchSegments(citySlug, bbox, opts?: { since?: Date }): Promise<...>
+supportsIncremental?: boolean   // declarative capability
+```
+NYC providers and (Phase 2) `arlington-curb` + `bellevue-signs` set `supportsIncremental = true` and add `:updated_at` / `EditDate` to their `where` / `$where` clauses when `since` is passed. All other providers ignore `since` and run full — orchestrator transparently degrades incremental → full when unsupported.
 
-`ArlingtonProvider.fetchSegments` returns `NormalizedSegment[]` from street centerlines, deduped by `external_id = arlington:centerline/<OBJECTID>`. Existing upsert logic in `parking.functions.ts` handles dedup + `data_source` attribution. Side = `both` unless the dataset provides a curb side.
+### Cron routes (new)
 
-## Phase 4 — Rule mapping
+Under `src/routes/api/public/cron/`:
+- `cron.sync-la-full.ts` — every 6h, full sync for los-angeles + santa-monica + west-hollywood + pasadena.
+- `cron.sync-la-incremental.ts` — every 30m, incremental (degrades to full where unsupported, so effectively a no-op for static LA-region overlays — see Phase 2).
+- `cron.sync-nyc-full.ts` — every 6h, full sync.
+- `cron.sync-nyc-incremental.ts` — every 30m, Socrata `:updated_at` delta.
+- `cron.sync-arlington.ts` — every 12h, full.
+- `cron.sync-bellevue.ts` — every 12h, full.
+- `cron.sync-seattle.ts` — weekly (Sundays 04:00 UTC), full.
 
-| Arlington dataset | restriction_code |
-|---|---|
-| Meters | `metered` |
-| RPP zone | `permit_only` (+ `permit_zone`) |
-| Loading zone | `loading_only` |
-| Time-limited curb | `time_limited` (+ `time_limit_minutes`) |
-| Sweeping route | `street_sweeping` (+ day/time) |
-| Tow-away sign point | `tow_away` |
-| No matching data | row omitted → engine returns UNKNOWN |
+All routes go through the orchestrator → automatic locking, logging, health updates. They authenticate via the documented `apikey: <anon-key>` pattern.
 
-Priority order matches the existing engine. No legality is fabricated.
+### pg_cron schedule
 
-## Phase 5 — Admin dashboard
+Inserted via `supabase--insert` (data, not schema):
+```
+la-full          0 */6 * * *
+la-incremental   */30 * * * *
+nyc-full         15 */6 * * *     -- offset to spread load
+nyc-incremental  */30 * * * *
+arlington        0 */12 * * *
+bellevue         30 */12 * * *
+seattle          0 4 * * 0
+la-occupancy     */5 * * * *      -- already exists, unchanged
+health-check     */15 * * * *     -- already exists, unchanged
+```
 
-- Add `arlington` to the city list in `src/routes/api/public/admin.sync-la.ts` (or a new `admin.sync-arlington.ts` endpoint mirroring it — I'll add the dedicated route per the task).
-- Extend `src/lib/parking/la-coverage.functions.ts` → rename internal helpers to be city-agnostic and add Arlington areas (Rosslyn, Courthouse, Clarendon, Ballston, Crystal City, Pentagon City, Shirlington, Columbia Pike). The existing `/admin/la-coverage` page stays; I'll add `/admin/arlington-coverage` reusing the same component shape.
-- Surface Arlington in `admin.accuracy.tsx`, `admin.health.tsx`, `admin.provider-sync.tsx` city pickers.
+### Smart refresh (map reads)
 
-## Phase 6 — Coverage report
+Already correct — `getSegmentDetails` and the map queries read only from PostGIS. **Add a guard**: orchestrator is the only call site for `syncAllProvidersForCity` from production paths; map / session / scan code must never trigger it. Add an ESLint rule or a lint comment + a runtime assertion that throws if called outside an orchestrator/admin/cron path.
 
-Generate `docs/arlington-coverage-report.md` summarizing segments, rules, rule density, % sweeping / permit / metered / unknown, provider health, dataset limitations, and recommended next steps (e.g. "Arlington does not publish a curb-regulations dataset — resolve via AI Sign Scanner").
+### Sync locking
 
-## Database changes
+Postgres advisory lock keyed by hash of `city_slug:provider_id:mode`:
+```sql
+SELECT pg_try_advisory_lock(hashtext($1));
+```
+If `false`, orchestrator returns `{ status: "already_running", message: "Sync already in progress" }` with HTTP 409 from the cron/admin route. Lock is released in `finally`.
 
-One migration:
-1. `INSERT INTO public.cities (slug, name, timezone, center, default_zoom)` for `arlington` (timezone `America/New_York`, center near Courthouse `[-77.0852, 38.8903]`).
-2. Postgres function `arlington_area_counts(p_city_id, bbox...)` mirroring `la_area_counts` for the coverage dashboard.
+### Monitoring schema
 
-No new tables — Arlington reuses `street_segments`, `parking_rules`, `provider_health`, `sync_logs`.
+Extend `provider_health` (migration) with the fields the user requested:
+- `last_sync_started_at timestamptz`
+- `last_sync_completed_at timestamptz`
+- `records_imported int`
+- `records_skipped int`
+- `duration_ms int`
+- `provider_status text` (`healthy` | `warning` | `failed` | `running`)
+- `provider_error text`
+- `next_scheduled_at timestamptz` (computed from cron schedule)
+- `supports_incremental boolean`
+- `last_incremental_at timestamptz`
 
-## Technical notes
+`sync_logs` already has most of this — keep it as the historical run log; `provider_health` is the current-state row.
 
-- All Arlington REST calls use bbox filtering and pagination (`resultOffset` / `resultRecordCount`) like the existing LA providers.
-- Network failures or missing datasets set `provider_health.healthy = false` with a clear `last_error`, never throw out of the sync.
-- New providers follow the `*.server.ts` naming so they stay out of the client bundle.
-- Endpoint: `GET /api/public/admin/sync-arlington?wait=1` runs the bounded city sync (same safety rails as `sync-la`).
+### Freshness Dashboard
 
-## Files to add
+New tab in `src/routes/admin.provider-sync.tsx` (or a sibling route `admin.freshness.tsx`):
+- Table: provider, last successful sync, next scheduled sync, records imported (last run), supports_incremental?, status badge (Healthy/Warning/Failed).
+- Status thresholds: Healthy if last_success within 2× expected cadence, Warning within 4×, Failed beyond.
+- Existing manual sync buttons stay; add per-provider and per-borough/neighborhood buttons that call the orchestrator with `providerId` / `providerParams`.
 
-- `src/lib/parking/providers/arlington.server.ts`
-- `src/lib/parking/providers/arlington-permit.server.ts`
-- `src/lib/parking/providers/arlington-loading.server.ts`
-- `src/lib/parking/providers/arlington-sweeping.server.ts`
-- `src/lib/parking/arlington-coverage.functions.ts`
-- `src/routes/admin.arlington-coverage.tsx`
-- `src/routes/api/public/admin.sync-arlington.ts`
-- `docs/arlington-coverage-discovery.md`
-- `docs/arlington-coverage-report.md`
+### Manual sync buttons
 
-## Files to edit
+Existing admin buttons get rewired through the orchestrator (so they share locking + logging). UI gains:
+- Full city sync (existing).
+- Per-provider sync (new dropdown).
+- Per-borough sync for NYC (existing `?boroughs=` param surfaced as UI).
 
-- `src/lib/parking/providers/registry.server.ts` — register Arlington providers.
-- `src/routes/admin.index.tsx` — link to Arlington coverage page.
-- One Supabase migration for the `cities` row + `arlington_area_counts` SQL function.
+### Future real-time mode
 
-After approval I'll implement Phases 1–6 in that order, starting with the migration.
+The orchestrator's provider contract (`fetchSegments(..., { since })` + `supportsIncremental`) is the seam:
+- **Webhook**: an external service POSTs to a new `/api/public/hooks/sync-<city>` route that calls `runSync({ mode: "incremental", since: webhookPayload.cursor })`. No core changes.
+- **CDC**: a polling worker can call the same orchestrator at any cadence — 5 min, 1 min — with no contract changes; locking prevents pile-ups.
+- **Per-provider real-time opt-in**: providers declare `realtimeCapable = true` and the orchestrator picks them up for higher-frequency runs.
+
+## 3. Implementation phases
+
+**Phase 1 — Framework (this PR):**
+1. Migration: extend `provider_health` columns.
+2. New `sync-orchestrator.server.ts` with advisory locking + logging.
+3. Extend provider types with `since` + `supportsIncremental` (default false everywhere — no behavior change).
+4. New cron routes wired through the orchestrator.
+5. New `admin.sync-seattle.ts` to close the gap.
+6. pg_cron schedule via `supabase--insert`.
+7. Freshness dashboard route + rewire existing admin buttons through the orchestrator.
+
+**Phase 2 — Incremental adapters (follow-up PR per provider):**
+1. `nyc-centerline` and `nyc-signs`: add `:updated_at` to `$where` when `since` is passed; flip `supportsIncremental = true`.
+2. `arlington-curb`: add `EditDate` filter.
+3. `bellevue-signs`: add `EditDate` filter.
+4. Fix `seattle-signposts` pagination bug while we're in there.
+
+Splitting these prevents one risky provider change from blocking the framework. Phase 1 alone already gives the user the requested schedule, locking, monitoring, and dashboard — incremental mode just degrades to full on the providers that haven't been adapted yet.
+
+## 4. Out of scope (call out for the user)
+
+- `bellevue-curb` CRS bug — upstream issue, ticket Bellevue.
+- Switching LA occupancy off its current 5-min cadence (it's already correct).
+- Real webhook/CDC integrations — only the architectural seam is delivered.
