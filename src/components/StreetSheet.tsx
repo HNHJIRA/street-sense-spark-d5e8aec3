@@ -303,7 +303,6 @@ export function StreetSheet({ timezone, restrictionTypes, cityId, citySlug }: St
                               </div>
                               <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
                                 <Meta label="Source" value={providerLabel(r.data_source)} />
-                                <Meta label="Priority" value={String(r.priority)} mono />
                                 <Meta label="Days" value={formatDays(r.days_of_week)} />
                                 <Meta label="Hours" value={formatHours(r.time_start, r.time_end)} />
                                 <Meta label="Color" value={(t?.color ?? "gray").toUpperCase()} />
