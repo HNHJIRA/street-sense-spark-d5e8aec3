@@ -415,10 +415,16 @@ export function MapView({ token, city }: MapViewProps) {
               "gray", COLOR_HEX.gray,
               COLOR_HEX.gray,
             ];
-            const widthExpr: any = [
-              "interpolate", ["linear"], ["zoom"],
-              13, 1.8, 15, 3.5, 16, 4.5, 17, 6, 18, 8, 19, 11,
-            ];
+            const widthExpr: any = debugColors
+              ? [
+                  "match", ["get", "color"],
+                  "gray", 6,
+                  /* green/yellow/red */ 12,
+                ]
+              : [
+                  "interpolate", ["linear"], ["zoom"],
+                  13, 1.8, 15, 3.5, 16, 4.5, 17, 6, 18, 8, 19, 11,
+                ];
             // line-offset cannot wrap a zoom interpolate in a multiplication —
             // zoom must be the TOP-LEVEL input. Build sign-baked offsets instead.
             const offsetFor = (sign: 1 | -1): any => [
