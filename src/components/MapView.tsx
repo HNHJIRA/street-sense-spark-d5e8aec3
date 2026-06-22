@@ -97,6 +97,12 @@ export function MapView({ token, city }: MapViewProps) {
   const [globeMode, setGlobeMode] = useState(false);
   const [topView, setTopView] = useState(false);
   const [styleVersion, setStyleVersion] = useState(0);
+  const [colorCounts, setColorCounts] = useState<{ green: number; yellow: number; red: number; gray: number; total: number }>(
+    { green: 0, yellow: 0, red: 0, gray: 0, total: 0 },
+  );
+  const debugColors =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("debug") === "colors";
   const mapType = useMapTypeStore((s) => s.mapType);
   // Latest mapType captured at init time so the effect that creates the map
   // doesn't need to depend on it (we don't want to recreate the map on switch).
