@@ -9,6 +9,7 @@ const TABS = [
   { to: "/admin/health", label: "Health" },
   { to: "/admin/accuracy", label: "Accuracy" },
   { to: "/admin/provider-sync", label: "Provider Sync" },
+  { to: "/admin/freshness", label: "Freshness" },
   { to: "/admin/validation", label: "Validation" },
   { to: "/admin/forecast", label: "Forecast" },
   { to: "/admin/analytics", label: "Analytics" },

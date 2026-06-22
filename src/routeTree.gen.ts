@@ -31,6 +31,7 @@ import { Route as AdminProviderSyncRouteImport } from './routes/admin.provider-s
 import { Route as AdminNycCoverageRouteImport } from './routes/admin.nyc-coverage'
 import { Route as AdminLaCoverageRouteImport } from './routes/admin.la-coverage'
 import { Route as AdminHealthRouteImport } from './routes/admin.health'
+import { Route as AdminFreshnessRouteImport } from './routes/admin.freshness'
 import { Route as AdminForecastRouteImport } from './routes/admin.forecast'
 import { Route as AdminBetaReadinessRouteImport } from './routes/admin.beta-readiness'
 import { Route as AdminBellevueCoverageRouteImport } from './routes/admin.bellevue-coverage'
@@ -162,6 +163,11 @@ const AdminLaCoverageRoute = AdminLaCoverageRouteImport.update({
 const AdminHealthRoute = AdminHealthRouteImport.update({
   id: '/health',
   path: '/health',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminFreshnessRoute = AdminFreshnessRouteImport.update({
+  id: '/freshness',
+  path: '/freshness',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminForecastRoute = AdminForecastRouteImport.update({
@@ -309,6 +315,7 @@ export interface FileRoutesByFullPath {
   '/admin/bellevue-coverage': typeof AdminBellevueCoverageRoute
   '/admin/beta-readiness': typeof AdminBetaReadinessRoute
   '/admin/forecast': typeof AdminForecastRoute
+  '/admin/freshness': typeof AdminFreshnessRoute
   '/admin/health': typeof AdminHealthRoute
   '/admin/la-coverage': typeof AdminLaCoverageRoute
   '/admin/nyc-coverage': typeof AdminNycCoverageRoute
@@ -354,6 +361,7 @@ export interface FileRoutesByTo {
   '/admin/bellevue-coverage': typeof AdminBellevueCoverageRoute
   '/admin/beta-readiness': typeof AdminBetaReadinessRoute
   '/admin/forecast': typeof AdminForecastRoute
+  '/admin/freshness': typeof AdminFreshnessRoute
   '/admin/health': typeof AdminHealthRoute
   '/admin/la-coverage': typeof AdminLaCoverageRoute
   '/admin/nyc-coverage': typeof AdminNycCoverageRoute
@@ -401,6 +409,7 @@ export interface FileRoutesById {
   '/admin/bellevue-coverage': typeof AdminBellevueCoverageRoute
   '/admin/beta-readiness': typeof AdminBetaReadinessRoute
   '/admin/forecast': typeof AdminForecastRoute
+  '/admin/freshness': typeof AdminFreshnessRoute
   '/admin/health': typeof AdminHealthRoute
   '/admin/la-coverage': typeof AdminLaCoverageRoute
   '/admin/nyc-coverage': typeof AdminNycCoverageRoute
@@ -449,6 +458,7 @@ export interface FileRouteTypes {
     | '/admin/bellevue-coverage'
     | '/admin/beta-readiness'
     | '/admin/forecast'
+    | '/admin/freshness'
     | '/admin/health'
     | '/admin/la-coverage'
     | '/admin/nyc-coverage'
@@ -494,6 +504,7 @@ export interface FileRouteTypes {
     | '/admin/bellevue-coverage'
     | '/admin/beta-readiness'
     | '/admin/forecast'
+    | '/admin/freshness'
     | '/admin/health'
     | '/admin/la-coverage'
     | '/admin/nyc-coverage'
@@ -540,6 +551,7 @@ export interface FileRouteTypes {
     | '/admin/bellevue-coverage'
     | '/admin/beta-readiness'
     | '/admin/forecast'
+    | '/admin/freshness'
     | '/admin/health'
     | '/admin/la-coverage'
     | '/admin/nyc-coverage'
@@ -756,6 +768,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminHealthRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/freshness': {
+      id: '/admin/freshness'
+      path: '/freshness'
+      fullPath: '/admin/freshness'
+      preLoaderRoute: typeof AdminFreshnessRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/forecast': {
       id: '/admin/forecast'
       path: '/forecast'
@@ -920,6 +939,7 @@ interface AdminRouteChildren {
   AdminBellevueCoverageRoute: typeof AdminBellevueCoverageRoute
   AdminBetaReadinessRoute: typeof AdminBetaReadinessRoute
   AdminForecastRoute: typeof AdminForecastRoute
+  AdminFreshnessRoute: typeof AdminFreshnessRoute
   AdminHealthRoute: typeof AdminHealthRoute
   AdminLaCoverageRoute: typeof AdminLaCoverageRoute
   AdminNycCoverageRoute: typeof AdminNycCoverageRoute
@@ -936,6 +956,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminBellevueCoverageRoute: AdminBellevueCoverageRoute,
   AdminBetaReadinessRoute: AdminBetaReadinessRoute,
   AdminForecastRoute: AdminForecastRoute,
+  AdminFreshnessRoute: AdminFreshnessRoute,
   AdminHealthRoute: AdminHealthRoute,
   AdminLaCoverageRoute: AdminLaCoverageRoute,
   AdminNycCoverageRoute: AdminNycCoverageRoute,
