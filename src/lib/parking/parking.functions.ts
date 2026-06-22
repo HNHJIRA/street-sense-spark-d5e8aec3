@@ -203,7 +203,7 @@ export const getSegmentDetails = createServerFn({ method: "GET" })
     if (!seg) throw new Error("Segment not found");
     const { data: rules } = await admin
       .from("parking_rules")
-      .select("id, street_segment_id, priority, restriction_code, days_of_week, time_start, time_end, permit_zone, time_limit_minutes, effective_from, effective_to, notes")
+      .select("id, street_segment_id, priority, restriction_code, days_of_week, time_start, time_end, permit_zone, time_limit_minutes, effective_from, effective_to, notes, data_source")
       .eq("street_segment_id", data.id)
       .order("priority", { ascending: true });
     const { data: events } = await admin

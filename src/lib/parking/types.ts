@@ -21,6 +21,8 @@ export interface ParkingRule {
   effective_from: string | null;
   effective_to: string | null;
   notes: string | null;
+  /** Provider id that produced this rule (e.g. "la-dot", "nyc-signs"). */
+  data_source?: string | null;
 }
 
 export interface ParkingEvent {
