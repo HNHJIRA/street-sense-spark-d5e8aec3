@@ -11,7 +11,7 @@ async function run() {
     try {
       results.push(await runSync({ data: { citySlug: slug, mode: "full", trigger: "cron" } }));
     } catch (e) {
-      results.push({ ok: false, city: slug, error: (e as Error).message });
+      results.push({ ok: false, status: "error", city: slug, mode: "full", trigger: "cron", message: (e as Error).message });
     }
   }
   return new Response(
