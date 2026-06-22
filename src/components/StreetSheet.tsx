@@ -255,19 +255,7 @@ export function StreetSheet({ timezone, restrictionTypes, cityId, citySlug }: St
                     <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
                       Posted Rules ({sorted.length})
                     </div>
-                    <div className="text-[10px] font-medium text-slate-400">Lowest priority wins</div>
                   </div>
-
-                  {winner && (
-                    <div className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 p-3">
-                      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-amber-700">
-                        <Trophy className="h-3.5 w-3.5" /> Why this rule won
-                      </div>
-                      <p className="mt-1 text-xs leading-relaxed text-amber-900">
-                        {explainWinner(winner, sorted)}
-                      </p>
-                    </div>
-                  )}
 
                   <div className="space-y-2">
                     {sorted.map((r) => {
