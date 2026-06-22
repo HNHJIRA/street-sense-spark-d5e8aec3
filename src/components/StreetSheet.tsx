@@ -325,6 +325,27 @@ export function StreetSheet({ timezone, restrictionTypes, cityId, citySlug }: St
               <DayPlannerCard segmentId={selectedSegmentId} citySlug={citySlug} />
             </div> */}
 
+            {data && (
+              <details className="mt-5 rounded-2xl border border-[var(--pc-border)] bg-slate-50 p-3">
+                <summary className="cursor-pointer text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                  Raw JSON ({data.rules?.length ?? 0} rules · {data.events?.length ?? 0} events)
+                </summary>
+                <div className="mt-2 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+                      toast.success("JSON copied");
+                    }}
+                    className="rounded-full bg-slate-900 px-3 py-1 text-[10px] font-bold text-white"
+                  >Copy</button>
+                </div>
+                <pre className="mt-2 max-h-80 overflow-auto rounded-xl bg-slate-900 p-3 text-[10px] leading-snug text-slate-100 whitespace-pre">
+{JSON.stringify(data, null, 2)}
+                </pre>
+              </details>
+            )}
+
             <div className="mt-5 text-center text-[10px] text-slate-400">
               {data?.source_label ? `Source: ${data.source_label} · ` : ""}Verify posted signs before parking.
             </div>
