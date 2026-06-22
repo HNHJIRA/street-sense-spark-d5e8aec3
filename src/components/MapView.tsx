@@ -25,16 +25,10 @@ interface MapViewProps {
 }
 
 const COLOR_HEX: Record<ParkingColor, string> = {
-  green: "#10E26A",
+  green: "#22C55E",
   yellow: "#F0CE63",
   red: "#EF4444",
   gray: "#6B7280",
-};
-const COLOR_LABELS: Record<ParkingColor, string> = {
-  green: "Parking Allowed",
-  yellow: "Regulated Parking",
-  red: "Parking Restricted",
-  gray: "Unknown",
 };
 
 const EARTH_CIRCUMFERENCE_M = 40_075_016.686;
@@ -106,12 +100,9 @@ export function MapView({ token, city }: MapViewProps) {
   const [colorCounts, setColorCounts] = useState<{ green: number; yellow: number; red: number; gray: number; total: number }>(
     { green: 0, yellow: 0, red: 0, gray: 0, total: 0 },
   );
-  type SampleEntry = { id: string; name: string; center: [number, number] };
-  const [samples, setSamples] = useState<Record<ParkingColor, SampleEntry[]>>({ green: [], yellow: [], red: [], gray: [] });
-  const initialDebug = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("debug") === "colors";
-  const [verificationMode, setVerificationMode] = useState<boolean>(initialDebug);
-  const [insightOpen, setInsightOpen] = useState<boolean>(true);
-  const [cityNow, setCityNow] = useState<string>("");
+  const debugColors =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("debug") === "colors";
   const mapType = useMapTypeStore((s) => s.mapType);
   // Latest mapType captured at init time so the effect that creates the map
   // doesn't need to depend on it (we don't want to recreate the map on switch).
@@ -208,29 +199,14 @@ export function MapView({ token, city }: MapViewProps) {
     const features = Array.from(featuresRef.current.values());
     const data: FeatureCollection<LineString> = { type: "FeatureCollection", features };
     src.setData(data);
-    // Tally counts + collect up to 5 jump-to samples per color from the
-    // exact GeoJSON features mounted into the Mapbox source — guarantees the
-    // panel reflects what the map is rendering.
+    // Tally color counts from rendered feature set so the debug overlay
+    // reflects exactly what the map source contains (not a separate query).
     const counts = { green: 0, yellow: 0, red: 0, gray: 0, total: features.length };
-    const buckets: Record<ParkingColor, SampleEntry[]> = { green: [], yellow: [], red: [], gray: [] };
     for (const f of features) {
-      const c = (f.properties?.color as ParkingColor) ?? "gray";
-      if (c !== "green" && c !== "yellow" && c !== "red" && c !== "gray") continue;
-      counts[c]++;
-      if (buckets[c].length < 5) {
-        const coords = f.geometry.coordinates as [number, number][];
-        if (coords.length) {
-          const mid = coords[Math.floor(coords.length / 2)];
-          buckets[c].push({
-            id: String(f.properties?.segmentId ?? f.id ?? ""),
-            name: String(f.properties?.name ?? "—"),
-            center: [mid[0], mid[1]],
-          });
-        }
-      }
+      const c = (f.properties?.color as keyof typeof counts) ?? "gray";
+      if (c === "green" || c === "yellow" || c === "red" || c === "gray") counts[c]++;
     }
     setColorCounts(counts);
-    setSamples(buckets);
   }, []);
 
   const loadBbox = useCallback(async () => {
@@ -439,15 +415,15 @@ export function MapView({ token, city }: MapViewProps) {
               "gray", COLOR_HEX.gray,
               COLOR_HEX.gray,
             ];
-            const widthExpr: any = verificationMode
-              ? ["match", ["get", "color"], "gray", 6, /* g/y/r */ 12]
+            const widthExpr: any = debugColors
+              ? [
+                  "match", ["get", "color"],
+                  "gray", 6,
+                  /* green/yellow/red */ 12,
+                ]
               : [
-                  // Slightly thicker than before; green a touch wider so
-                  // "Allowed" segments stand out from the basemap.
-                  "case",
-                  ["==", ["get", "color"], "green"],
-                  ["interpolate", ["linear"], ["zoom"], 13, 2.6, 15, 4.5, 16, 5.8, 17, 7.5, 18, 10, 19, 14],
-                  ["interpolate", ["linear"], ["zoom"], 13, 2.0, 15, 3.8, 16, 4.8, 17, 6.4, 18, 8.5, 19, 11.5],
+                  "interpolate", ["linear"], ["zoom"],
+                  13, 1.8, 15, 3.5, 16, 4.5, 17, 6, 18, 8, 19, 11,
                 ];
             // line-offset cannot wrap a zoom interpolate in a multiplication —
             // zoom must be the TOP-LEVEL input. Build sign-baked offsets instead.
@@ -747,70 +723,23 @@ export function MapView({ token, city }: MapViewProps) {
     );
   };
 
-  const flyToFeature = useCallback((center: [number, number]) => {
-    const map = mapRef.current;
-    if (!map) return;
-    map.flyTo({ center, zoom: 18, pitch: topView ? 0 : 60, duration: 1100, essential: true });
-  }, [topView]);
-
-  // City-clock tick: "Los Angeles — Mon 06:43 AM" — explains why colors
-  // shift across the day. Re-renders every 30s.
-  useEffect(() => {
-    const fmt = () => {
-      try {
-        const d = new Date();
-        const parts = new Intl.DateTimeFormat("en-US", {
-          timeZone: city.timezone, weekday: "short", hour: "numeric", minute: "2-digit",
-        }).formatToParts(d);
-        const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
-        const ampm = get("dayPeriod");
-        return `${city.name} — ${get("weekday")} ${get("hour")}:${get("minute")}${ampm ? " " + ampm : ""}`;
-      } catch {
-        return city.name;
-      }
-    };
-    setCityNow(fmt());
-    const id = window.setInterval(() => setCityNow(fmt()), 30_000);
-    return () => window.clearInterval(id);
-  }, [city.name, city.timezone]);
-
-  // Live-toggle line widths when verification mode changes (without
-  // recreating the style). Mirrors the widthExpr defined at style.load.
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!ready || !map) return;
-    const verifyExpr: any = ["match", ["get", "color"], "gray", 6, 12];
-    const normalExpr: any = [
-      "case",
-      ["==", ["get", "color"], "green"],
-      ["interpolate", ["linear"], ["zoom"], 13, 2.6, 15, 4.5, 16, 5.8, 17, 7.5, 18, 10, 19, 14],
-      ["interpolate", ["linear"], ["zoom"], 13, 2.0, 15, 3.8, 16, 4.8, 17, 6.4, 18, 8.5, 19, 11.5],
-    ];
-    const expr = verificationMode ? verifyExpr : normalExpr;
-    for (const id of ["seg-left", "seg-right"]) {
-      if (map.getLayer(id)) {
-        try { map.setPaintProperty(id, "line-width", expr); } catch { /* ignore */ }
-      }
-    }
-  }, [verificationMode, ready, styleVersion]);
-
-
   return (
     <>
       <div ref={container} className="absolute inset-0 z-0 h-full w-full" />
 
-      {ready && (
-        <InsightPanel
-          cityNow={cityNow}
-          counts={colorCounts}
-          samples={samples}
-          verificationMode={verificationMode}
-          onToggleVerification={() => setVerificationMode((v) => !v)}
-          open={insightOpen}
-          onToggleOpen={() => setInsightOpen((v) => !v)}
-          onJumpTo={flyToFeature}
-        />
+      {debugColors && (
+        <div className="pointer-events-none absolute left-3 z-30 rounded-md bg-black/85 p-2 font-mono text-[11px] text-white shadow-xl"
+             style={{ top: "calc(var(--safe-top) + 4.5rem)" }}>
+          <div className="mb-1 text-[10px] font-bold uppercase tracking-wider opacity-70">
+            Render Debug · {colorCounts.total} segs in view
+          </div>
+          <div className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-sm" style={{ background: "#22C55E" }} />green: {colorCounts.green}</div>
+          <div className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-sm" style={{ background: "#F0CE63" }} />yellow: {colorCounts.yellow}</div>
+          <div className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-sm" style={{ background: "#EF4444" }} />red: {colorCounts.red}</div>
+          <div className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-sm" style={{ background: "#6B7280" }} />gray: {colorCounts.gray}</div>
+        </div>
       )}
+
 
       {ready && (
         <div
@@ -852,126 +781,5 @@ function MapBtn({
     >
       {children}
     </button>
-  );
-}
-
-type CountsT = { green: number; yellow: number; red: number; gray: number; total: number };
-type SamplesT = Record<ParkingColor, { id: string; name: string; center: [number, number] }[]>;
-
-function InsightPanel({
-  cityNow, counts, samples, verificationMode, onToggleVerification,
-  open, onToggleOpen, onJumpTo,
-}: {
-  cityNow: string;
-  counts: CountsT;
-  samples: SamplesT;
-  verificationMode: boolean;
-  onToggleVerification: () => void;
-  open: boolean;
-  onToggleOpen: () => void;
-  onJumpTo: (center: [number, number]) => void;
-}) {
-  const total = counts.total || 1;
-  const rows: { color: ParkingColor; pct: number }[] = [
-    { color: "green", pct: (counts.green / total) * 100 },
-    { color: "yellow", pct: (counts.yellow / total) * 100 },
-    { color: "red", pct: (counts.red / total) * 100 },
-    { color: "gray", pct: (counts.gray / total) * 100 },
-  ];
-  return (
-    <div
-      className="pointer-events-auto absolute left-3 z-30 w-[260px] overflow-hidden rounded-xl bg-white/95 backdrop-blur shadow-xl ring-1 ring-black/5"
-      style={{ top: "calc(var(--safe-top) + 4.5rem)" }}
-    >
-      <button
-        onClick={onToggleOpen}
-        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-700 hover:bg-slate-50"
-      >
-        <span className="truncate">{cityNow || "Map insight"}</span>
-        <span className="text-slate-400">{open ? "–" : "+"}</span>
-      </button>
-
-      {open && (
-        <div className="space-y-3 px-3 pb-3">
-          {/* Legend + live distribution */}
-          <div className="space-y-1.5">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-              Visible area · {counts.total} segments
-            </div>
-            {rows.map((r) => (
-              <div key={r.color} className="flex items-center gap-2">
-                <span className="h-3 w-3 flex-none rounded-sm" style={{ background: COLOR_HEX[r.color] }} />
-                <span className="flex-1 truncate text-xs text-slate-700">{COLOR_LABELS[r.color]}</span>
-                <span className="font-mono text-[11px] tabular-nums text-slate-900">{counts[r.color]}</span>
-                <span className="w-9 text-right font-mono text-[10px] tabular-nums text-slate-400">
-                  {counts.total ? `${r.pct.toFixed(0)}%` : "—"}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          {/* Stacked distribution bar */}
-          {counts.total > 0 && (
-            <div className="flex h-1.5 overflow-hidden rounded-full bg-slate-100">
-              {rows.map((r) =>
-                r.pct > 0 ? (
-                  <div key={r.color} style={{ width: `${r.pct}%`, background: COLOR_HEX[r.color] }} />
-                ) : null,
-              )}
-            </div>
-          )}
-
-          {/* Verification toggle */}
-          <button
-            onClick={onToggleVerification}
-            className={`flex w-full items-center justify-between rounded-md border px-2 py-1.5 text-xs font-medium transition ${
-              verificationMode
-                ? "border-slate-900 bg-slate-900 text-white"
-                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-            }`}
-          >
-            <span>Color Verification Mode</span>
-            <span className={`h-3 w-6 rounded-full transition ${verificationMode ? "bg-emerald-400" : "bg-slate-300"}`} />
-          </button>
-
-          {/* Jump to example */}
-          <div className="space-y-1.5">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-              Jump to example
-            </div>
-            {(["green", "yellow", "red"] as const).map((c) => (
-              <div key={c}>
-                <div className="mb-0.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                  <span className="h-2 w-2 rounded-sm" style={{ background: COLOR_HEX[c] }} />
-                  {COLOR_LABELS[c]}
-                </div>
-                {samples[c].length === 0 ? (
-                  <div className="pl-3 text-[11px] italic text-slate-400">none in view</div>
-                ) : (
-                  <ul className="space-y-0.5">
-                    {samples[c].map((s) => (
-                      <li key={s.id}>
-                        <button
-                          onClick={() => onJumpTo(s.center)}
-                          className="block w-full truncate rounded px-2 py-0.5 text-left text-[11px] text-slate-700 hover:bg-slate-100"
-                          title={s.name}
-                        >
-                          {s.name}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ))}
-          </div>
-
-          <p className="text-[10px] leading-snug text-slate-500">
-            Distribution reflects the engine's evaluation at the current city
-            time. Colors shift as meter / sweep windows open and close.
-          </p>
-        </div>
-      )}
-    </div>
   );
 }
