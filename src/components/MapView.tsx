@@ -97,6 +97,12 @@ export function MapView({ token, city }: MapViewProps) {
   const [globeMode, setGlobeMode] = useState(false);
   const [topView, setTopView] = useState(false);
   const [styleVersion, setStyleVersion] = useState(0);
+  const [colorCounts, setColorCounts] = useState<{ green: number; yellow: number; red: number; gray: number; total: number }>(
+    { green: 0, yellow: 0, red: 0, gray: 0, total: 0 },
+  );
+  const debugColors =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("debug") === "colors";
   const mapType = useMapTypeStore((s) => s.mapType);
   // Latest mapType captured at init time so the effect that creates the map
   // doesn't need to depend on it (we don't want to recreate the map on switch).
@@ -190,11 +196,17 @@ export function MapView({ token, city }: MapViewProps) {
     if (!map) return;
     const src = map.getSource("segments") as MapboxGL.GeoJSONSource | undefined;
     if (!src) return;
-    const data: FeatureCollection<LineString> = {
-      type: "FeatureCollection",
-      features: Array.from(featuresRef.current.values()),
-    };
+    const features = Array.from(featuresRef.current.values());
+    const data: FeatureCollection<LineString> = { type: "FeatureCollection", features };
     src.setData(data);
+    // Tally color counts from rendered feature set so the debug overlay
+    // reflects exactly what the map source contains (not a separate query).
+    const counts = { green: 0, yellow: 0, red: 0, gray: 0, total: features.length };
+    for (const f of features) {
+      const c = (f.properties?.color as keyof typeof counts) ?? "gray";
+      if (c === "green" || c === "yellow" || c === "red" || c === "gray") counts[c]++;
+    }
+    setColorCounts(counts);
   }, []);
 
   const loadBbox = useCallback(async () => {
@@ -403,10 +415,16 @@ export function MapView({ token, city }: MapViewProps) {
               "gray", COLOR_HEX.gray,
               COLOR_HEX.gray,
             ];
-            const widthExpr: any = [
-              "interpolate", ["linear"], ["zoom"],
-              13, 1.8, 15, 3.5, 16, 4.5, 17, 6, 18, 8, 19, 11,
-            ];
+            const widthExpr: any = debugColors
+              ? [
+                  "match", ["get", "color"],
+                  "gray", 6,
+                  /* green/yellow/red */ 12,
+                ]
+              : [
+                  "interpolate", ["linear"], ["zoom"],
+                  13, 1.8, 15, 3.5, 16, 4.5, 17, 6, 18, 8, 19, 11,
+                ];
             // line-offset cannot wrap a zoom interpolate in a multiplication —
             // zoom must be the TOP-LEVEL input. Build sign-baked offsets instead.
             const offsetFor = (sign: 1 | -1): any => [
@@ -708,6 +726,20 @@ export function MapView({ token, city }: MapViewProps) {
   return (
     <>
       <div ref={container} className="absolute inset-0 z-0 h-full w-full" />
+
+      {debugColors && (
+        <div className="pointer-events-none absolute left-3 z-30 rounded-md bg-black/85 p-2 font-mono text-[11px] text-white shadow-xl"
+             style={{ top: "calc(var(--safe-top) + 4.5rem)" }}>
+          <div className="mb-1 text-[10px] font-bold uppercase tracking-wider opacity-70">
+            Render Debug · {colorCounts.total} segs in view
+          </div>
+          <div className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-sm" style={{ background: "#22C55E" }} />green: {colorCounts.green}</div>
+          <div className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-sm" style={{ background: "#F0CE63" }} />yellow: {colorCounts.yellow}</div>
+          <div className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-sm" style={{ background: "#EF4444" }} />red: {colorCounts.red}</div>
+          <div className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-sm" style={{ background: "#6B7280" }} />gray: {colorCounts.gray}</div>
+        </div>
+      )}
+
 
       {ready && (
         <div
