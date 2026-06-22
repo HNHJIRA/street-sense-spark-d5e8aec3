@@ -35,6 +35,14 @@ const CITY_BBOX: Record<string, { minLng: number; minLat: number; maxLng: number
 export type SyncMode = "full" | "incremental";
 export type SyncTrigger = "cron" | "manual" | "webhook";
 
+export interface OrchestratorProviderResult {
+  provider: string;
+  providerName?: string;
+  imported: number;
+  skipped: number;
+  error?: string;
+}
+
 export interface OrchestratorResult {
   ok: boolean;
   status: "completed" | "already_running" | "error";
@@ -45,7 +53,7 @@ export interface OrchestratorResult {
   imported?: number;
   skipped?: number;
   duration_ms?: number;
-  results?: unknown;
+  results?: OrchestratorProviderResult[];
 }
 
 function lockKey(citySlug: string, providerId: string | undefined, mode: SyncMode): string {
