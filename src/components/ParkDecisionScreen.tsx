@@ -3,17 +3,14 @@
 // summary. Pure presentation — all data comes from `getDecisionForSegment`
 // (server) + `getDriverSummary` (server). No parking logic lives here.
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
 import {
   CircleCheck, CircleX, TriangleAlert, ShieldQuestion,
-  Clock, Timer, ShieldAlert, BadgeInfo, MapPin, Sparkles, Loader2,
+  Clock, Timer, ShieldAlert, BadgeInfo, MapPin, Sparkles,
   Bell, ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ParkingDecision } from "@/lib/parking/decision";
 import type { SegmentDecisionResult } from "@/lib/parking/decision.functions";
-import { getDriverSummary } from "@/lib/parking/driver-summary.functions";
 import { formatTimelineTime } from "@/lib/parking/timeline";
 
 interface Props {
