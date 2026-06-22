@@ -13,8 +13,6 @@ import {
 import { cn } from "@/lib/utils";
 import type { ParkingDecision } from "@/lib/parking/decision";
 import type { SegmentDecisionResult } from "@/lib/parking/decision.functions";
-import type { ConfidenceLevel } from "@/lib/parking/confidence";
-import { confidenceColorClass } from "@/lib/parking/confidence";
 import { getDriverSummary } from "@/lib/parking/driver-summary.functions";
 import { formatTimelineTime } from "@/lib/parking/timeline";
 
