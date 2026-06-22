@@ -384,3 +384,12 @@ function ActionButton({
     </button>
   );
 }
+
+function Meta({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex items-baseline gap-1.5 min-w-0">
+      <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400 shrink-0">{label}</dt>
+      <dd className={cn("truncate text-slate-700", mono && "font-mono text-[10px]")}>{value}</dd>
+    </div>
+  );
+}
