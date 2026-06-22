@@ -271,62 +271,69 @@ function TimelineCard({ decision, timezone }: { decision: ParkingDecision; timez
 
 
 function DriverSummaryCard({
-  result, decision, timezone, evaluatedAt,
+  result, decision, timezone,
 }: {
   result: SegmentDecisionResult;
   decision: ParkingDecision;
   timezone: string;
   evaluatedAt: Date;
 }) {
-  const fetchSummary = useServerFn(getDriverSummary);
-
-  // Stable cache key — bucket time to 15min so identical screens reuse summary.
-  const bucket = Math.floor(evaluatedAt.getTime() / (15 * 60_000));
-  const queryKey = useMemo(
-    () => ["driver-summary", result.segmentId, bucket, decision.verdict, decision.status.code],
-    [result.segmentId, bucket, decision.verdict, decision.status.code],
+  // Deterministic, instant — mirrors the AI Sign Scanner's local paragraph
+  // builder. No async call, no spinner. The engine still decides; we narrate.
+  const summary = useMemo(
+    () => buildDecisionParagraph({ result, decision, timezone }),
+    [result, decision, timezone],
   );
-
-  const payload = useMemo(() => ({
-    verdict: decision.verdict,
-    street_name: result.name ?? "this street",
-    status_label: decision.status.label,
-    reason: decision.status.notes ?? null,
-    allowed_until_human: formatTime(decision.status.allowed_until, timezone),
-    time_remaining_human: formatDuration(decision.time_remaining_ms),
-    max_stay_minutes: decision.status.time_limit_minutes,
-    permit_zone: decision.status.permit_zone,
-    next_restriction_label: decision.next_restriction?.label ?? null,
-    next_restriction_starts_human: formatTime(decision.next_restriction?.starts_at, timezone),
-    data_source: result.source_label,
-    mode: "decision" as const,
-  }), [decision, result, timezone]);
-
-  const summaryQuery = useQuery({
-    queryKey,
-    queryFn: () => fetchSummary({ data: payload }),
-    staleTime: 15 * 60_000,
-    gcTime: 60 * 60_000,
-  });
 
   return (
     <div className="rounded-2xl border border-[var(--pc-brand)]/30 bg-[color-mix(in_oklab,var(--pc-brand)_8%,white)] p-4">
       <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--pc-brand-end)" }}>
         <Sparkles className="h-3.5 w-3.5" /> AI driver summary
       </div>
-      <div className="mt-2 min-h-[3rem] text-sm leading-relaxed text-slate-800">
-        {summaryQuery.isLoading ? (
-          <span className="inline-flex items-center gap-2 text-slate-500">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Generating summary…
-          </span>
-        ) : summaryQuery.isError ? (
-          <span className="text-slate-500">Summary unavailable right now.</span>
-        ) : (
-          summaryQuery.data?.summary
-        )}
-      </div>
+      <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-slate-800">
+        {summary}
+      </p>
     </div>
   );
+}
+
+function buildDecisionParagraph({
+  result, decision, timezone,
+}: {
+  result: SegmentDecisionResult;
+  decision: ParkingDecision;
+  timezone: string;
+}): string {
+  const street = result.name ?? "this street";
+  const verdict = decision.verdict;
+  const statusLc = decision.status.label.toLowerCase();
+  const allowedUntil = formatTime(decision.status.allowed_until, timezone);
+  const remaining = formatDuration(decision.time_remaining_ms);
+  const maxStay = decision.status.time_limit_minutes;
+  const permit = decision.status.permit_zone;
+  const nextLbl = decision.next_restriction?.label ?? null;
+  const nextAt = formatTime(decision.next_restriction?.starts_at, timezone);
+
+  if (verdict === "UNKNOWN") {
+    return `UNKNOWN. Parking status on ${street} cannot be verified from current data. Please inspect the posted sign before parking.`;
+  }
+
+  const head =
+    verdict === "YES"
+      ? `YES. You can legally park here right now on ${street}.`
+      : verdict === "LIMITED"
+        ? `LIMITED. Parking on ${street} is restricted: ${statusLc}.`
+        : `NO. You cannot park on ${street} right now: ${statusLc}.`;
+
+  const parts: string[] = [head];
+  if (allowedUntil) parts.push(`Allowed until ${allowedUntil}.`);
+  if (remaining && verdict !== "NO") parts.push(`You have about ${remaining} remaining.`);
+  if (maxStay) parts.push(`Maximum stay is ${maxStay} minutes.`);
+  parts.push(permit ? `Permit zone ${permit} required.` : "No permit required.");
+  if (nextLbl && nextAt) {
+    parts.push(`Next: ${nextLbl} at ${nextAt} — move your vehicle before then.`);
+  }
+  return parts.join(" ");
 }
 
 export function ParkDecisionUnknownCTA({ onScanClick }: { onScanClick?: () => void }) {
