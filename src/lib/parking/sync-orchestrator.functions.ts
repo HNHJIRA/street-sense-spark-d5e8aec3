@@ -205,7 +205,13 @@ export const runSync = createServerFn({ method: "POST" })
         imported: run.totals.imported,
         skipped: run.totals.skipped,
         duration_ms: Date.now() - startedAtMs,
-        results: run.results,
+        results: run.results.map((r) => ({
+          provider: r.provider,
+          providerName: r.providerName,
+          imported: r.imported,
+          skipped: r.skipped,
+          error: r.error,
+        })),
       };
     } catch (e) {
       return {
