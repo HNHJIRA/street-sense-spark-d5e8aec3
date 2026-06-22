@@ -7,7 +7,7 @@ const CITIES = ["los-angeles", "santa-monica", "west-hollywood", "pasadena"];
 
 async function run() {
   const started = Date.now();
-  const results = [] as unknown[];
+  const results: import("@/lib/parking/sync-orchestrator.functions").OrchestratorResult[] = [];
   for (const slug of CITIES) {
     try {
       results.push(await runSync({ data: { citySlug: slug, mode: "incremental", trigger: "cron" } }));

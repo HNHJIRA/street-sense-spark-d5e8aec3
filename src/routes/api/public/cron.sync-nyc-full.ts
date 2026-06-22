@@ -5,7 +5,7 @@ import { runSync } from "@/lib/parking/sync-orchestrator.functions";
 async function run() {
   const started = Date.now();
   try {
-    const result = await runSync({ data: { citySlug: "nyc", mode: "full", trigger: "cron" } });
+    const result: import("@/lib/parking/sync-orchestrator.functions").OrchestratorResult = await runSync({ data: { citySlug: "nyc", mode: "full", trigger: "cron" } });
     return new Response(
       JSON.stringify({ ok: result.ok, duration_ms: Date.now() - started, result }),
       { status: 200, headers: { "Content-Type": "application/json" } },

@@ -16,7 +16,7 @@ async function run({ request }: { request: Request }) {
   }
 
   try {
-    const result = await runSync({
+    const result: import("@/lib/parking/sync-orchestrator.functions").OrchestratorResult = await runSync({
       data: { citySlug: "seattle", mode: "full", trigger: "manual", providerId: provider },
     });
     return new Response(JSON.stringify({ ok: result.ok, result }), {
