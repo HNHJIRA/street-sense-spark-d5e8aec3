@@ -196,11 +196,17 @@ export function MapView({ token, city }: MapViewProps) {
     if (!map) return;
     const src = map.getSource("segments") as MapboxGL.GeoJSONSource | undefined;
     if (!src) return;
-    const data: FeatureCollection<LineString> = {
-      type: "FeatureCollection",
-      features: Array.from(featuresRef.current.values()),
-    };
+    const features = Array.from(featuresRef.current.values());
+    const data: FeatureCollection<LineString> = { type: "FeatureCollection", features };
     src.setData(data);
+    // Tally color counts from rendered feature set so the debug overlay
+    // reflects exactly what the map source contains (not a separate query).
+    const counts = { green: 0, yellow: 0, red: 0, gray: 0, total: features.length };
+    for (const f of features) {
+      const c = (f.properties?.color as keyof typeof counts) ?? "gray";
+      if (c === "green" || c === "yellow" || c === "red" || c === "gray") counts[c]++;
+    }
+    setColorCounts(counts);
   }, []);
 
   const loadBbox = useCallback(async () => {
