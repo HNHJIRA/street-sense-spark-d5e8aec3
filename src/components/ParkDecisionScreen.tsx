@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ParkingDecision } from "@/lib/parking/decision";
+import { buildOfficerParagraph, type OfficerArgs } from "@/lib/parking/officer-paragraph";
 import type { SegmentDecisionResult } from "@/lib/parking/decision.functions";
 import { formatTimelineTime } from "@/lib/parking/timeline";
 
