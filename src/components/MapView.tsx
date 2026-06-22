@@ -747,22 +747,54 @@ export function MapView({ token, city }: MapViewProps) {
     );
   };
 
-  return (
-    <>
-      <div ref={container} className="absolute inset-0 z-0 h-full w-full" />
+  const flyToFeature = useCallback((center: [number, number]) => {
+    const map = mapRef.current;
+    if (!map) return;
+    map.flyTo({ center, zoom: 18, pitch: topView ? 0 : 60, duration: 1100, essential: true });
+  }, [topView]);
 
-      {debugColors && (
-        <div className="pointer-events-none absolute left-3 z-30 rounded-md bg-black/85 p-2 font-mono text-[11px] text-white shadow-xl"
-             style={{ top: "calc(var(--safe-top) + 4.5rem)" }}>
-          <div className="mb-1 text-[10px] font-bold uppercase tracking-wider opacity-70">
-            Render Debug · {colorCounts.total} segs in view
-          </div>
-          <div className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-sm" style={{ background: "#22C55E" }} />green: {colorCounts.green}</div>
-          <div className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-sm" style={{ background: "#F0CE63" }} />yellow: {colorCounts.yellow}</div>
-          <div className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-sm" style={{ background: "#EF4444" }} />red: {colorCounts.red}</div>
-          <div className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-sm" style={{ background: "#6B7280" }} />gray: {colorCounts.gray}</div>
-        </div>
-      )}
+  // City-clock tick: "Los Angeles — Mon 06:43 AM" — explains why colors
+  // shift across the day. Re-renders every 30s.
+  useEffect(() => {
+    const fmt = () => {
+      try {
+        const d = new Date();
+        const parts = new Intl.DateTimeFormat("en-US", {
+          timeZone: city.timezone, weekday: "short", hour: "numeric", minute: "2-digit",
+        }).formatToParts(d);
+        const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+        const ampm = get("dayPeriod");
+        return `${city.name} — ${get("weekday")} ${get("hour")}:${get("minute")}${ampm ? " " + ampm : ""}`;
+      } catch {
+        return city.name;
+      }
+    };
+    setCityNow(fmt());
+    const id = window.setInterval(() => setCityNow(fmt()), 30_000);
+    return () => window.clearInterval(id);
+  }, [city.name, city.timezone]);
+
+  // Live-toggle line widths when verification mode changes (without
+  // recreating the style). Mirrors the widthExpr defined at style.load.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    const verifyExpr: any = ["match", ["get", "color"], "gray", 6, 12];
+    const normalExpr: any = [
+      "case",
+      ["==", ["get", "color"], "green"],
+      ["interpolate", ["linear"], ["zoom"], 13, 2.6, 15, 4.5, 16, 5.8, 17, 7.5, 18, 10, 19, 14],
+      ["interpolate", ["linear"], ["zoom"], 13, 2.0, 15, 3.8, 16, 4.8, 17, 6.4, 18, 8.5, 19, 11.5],
+    ];
+    const expr = verificationMode ? verifyExpr : normalExpr;
+    for (const id of ["seg-left", "seg-right"]) {
+      if (map.getLayer(id)) {
+        try { map.setPaintProperty(id, "line-width", expr); } catch { /* ignore */ }
+      }
+    }
+  }, [verificationMode, ready, styleVersion]);
+
+
 
 
       {ready && (
