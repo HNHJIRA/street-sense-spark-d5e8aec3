@@ -795,7 +795,22 @@ export function MapView({ token, city }: MapViewProps) {
   }, [verificationMode, ready, styleVersion]);
 
 
+  return (
+    <>
+      <div ref={container} className="absolute inset-0 z-0 h-full w-full" />
 
+      {ready && (
+        <InsightPanel
+          cityNow={cityNow}
+          counts={colorCounts}
+          samples={samples}
+          verificationMode={verificationMode}
+          onToggleVerification={() => setVerificationMode((v) => !v)}
+          open={insightOpen}
+          onToggleOpen={() => setInsightOpen((v) => !v)}
+          onJumpTo={flyToFeature}
+        />
+      )}
 
       {ready && (
         <div
