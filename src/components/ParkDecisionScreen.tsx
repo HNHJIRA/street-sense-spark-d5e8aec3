@@ -118,9 +118,6 @@ export function ParkDecisionScreen({ result, timezone, evaluatedAt }: Props) {
         <TimelineCard decision={decision} timezone={timezone} />
       )}
 
-      {result.confidence && (
-        <ConfidenceCard level={result.confidence.level} summary={result.confidence.summary} score={result.confidence.score} />
-      )}
 
       {result.found && decision && (
         <DriverSummaryCard
