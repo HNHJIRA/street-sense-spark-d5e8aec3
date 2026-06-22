@@ -5,7 +5,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { getSegmentDetails } from "@/lib/parking/parking.functions";
 import { evaluateRulesAt } from "@/lib/parking/engine";
-import { isRuleActiveAt, providerLabel, formatDays, formatHours, explainWinner } from "@/lib/parking/rule-explain";
+import { isRuleActiveAt, providerLabel, formatDays, formatHours } from "@/lib/parking/rule-explain";
 import type { RestrictionType, StreetSegment } from "@/lib/parking/types";
 import { useAppStore } from "@/stores/app-store";
 import { useDeviceStore } from "@/stores/device-store";
