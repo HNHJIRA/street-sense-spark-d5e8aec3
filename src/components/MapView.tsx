@@ -424,15 +424,15 @@ export function MapView({ token, city }: MapViewProps) {
               "gray", COLOR_HEX.gray,
               COLOR_HEX.gray,
             ];
-            const widthExpr: any = debugColors
-              ? [
-                  "match", ["get", "color"],
-                  "gray", 6,
-                  /* green/yellow/red */ 12,
-                ]
+            const widthExpr: any = verificationMode
+              ? ["match", ["get", "color"], "gray", 6, /* g/y/r */ 12]
               : [
-                  "interpolate", ["linear"], ["zoom"],
-                  13, 1.8, 15, 3.5, 16, 4.5, 17, 6, 18, 8, 19, 11,
+                  // Slightly thicker than before; green a touch wider so
+                  // "Allowed" segments stand out from the basemap.
+                  "case",
+                  ["==", ["get", "color"], "green"],
+                  ["interpolate", ["linear"], ["zoom"], 13, 2.6, 15, 4.5, 16, 5.8, 17, 7.5, 18, 10, 19, 14],
+                  ["interpolate", ["linear"], ["zoom"], 13, 2.0, 15, 3.8, 16, 4.8, 17, 6.4, 18, 8.5, 19, 11.5],
                 ];
             // line-offset cannot wrap a zoom interpolate in a multiplication —
             // zoom must be the TOP-LEVEL input. Build sign-baked offsets instead.
