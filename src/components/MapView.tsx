@@ -727,6 +727,20 @@ export function MapView({ token, city }: MapViewProps) {
     <>
       <div ref={container} className="absolute inset-0 z-0 h-full w-full" />
 
+      {debugColors && (
+        <div className="pointer-events-none absolute left-3 z-30 rounded-md bg-black/85 p-2 font-mono text-[11px] text-white shadow-xl"
+             style={{ top: "calc(var(--safe-top) + 4.5rem)" }}>
+          <div className="mb-1 text-[10px] font-bold uppercase tracking-wider opacity-70">
+            Render Debug · {colorCounts.total} segs in view
+          </div>
+          <div className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-sm" style={{ background: "#22C55E" }} />green: {colorCounts.green}</div>
+          <div className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-sm" style={{ background: "#F0CE63" }} />yellow: {colorCounts.yellow}</div>
+          <div className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-sm" style={{ background: "#EF4444" }} />red: {colorCounts.red}</div>
+          <div className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-sm" style={{ background: "#6B7280" }} />gray: {colorCounts.gray}</div>
+        </div>
+      )}
+
+
       {ready && (
         <div
           className="pointer-events-none absolute right-0 z-20 flex flex-col items-end gap-2 px-3"
