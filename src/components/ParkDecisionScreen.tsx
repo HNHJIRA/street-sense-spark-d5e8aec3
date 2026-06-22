@@ -13,8 +13,6 @@ import {
 import { cn } from "@/lib/utils";
 import type { ParkingDecision } from "@/lib/parking/decision";
 import type { SegmentDecisionResult } from "@/lib/parking/decision.functions";
-import type { ConfidenceLevel } from "@/lib/parking/confidence";
-import { confidenceColorClass } from "@/lib/parking/confidence";
 import { getDriverSummary } from "@/lib/parking/driver-summary.functions";
 import { formatTimelineTime } from "@/lib/parking/timeline";
 
@@ -118,9 +116,6 @@ export function ParkDecisionScreen({ result, timezone, evaluatedAt }: Props) {
         <TimelineCard decision={decision} timezone={timezone} />
       )}
 
-      {result.confidence && (
-        <ConfidenceCard level={result.confidence.level} summary={result.confidence.summary} score={result.confidence.score} />
-      )}
 
       {result.found && decision && (
         <DriverSummaryCard
@@ -274,21 +269,6 @@ function TimelineCard({ decision, timezone }: { decision: ParkingDecision; timez
   );
 }
 
-function ConfidenceCard({
-  level, summary, score,
-}: { level: ConfidenceLevel; summary: string; score: number }) {
-  return (
-    <div className={cn("flex items-center gap-3 rounded-2xl border p-3", confidenceColorClass(level))}>
-      <ShieldQuestion className="h-5 w-5 shrink-0" />
-      <div className="min-w-0 flex-1">
-        <div className="text-[11px] font-bold uppercase tracking-wider opacity-80">
-          {level} confidence · {score}/100
-        </div>
-        <div className="truncate text-xs opacity-90">{summary}</div>
-      </div>
-    </div>
-  );
-}
 
 function DriverSummaryCard({
   result, decision, timezone, evaluatedAt,
