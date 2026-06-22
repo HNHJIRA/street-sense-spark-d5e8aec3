@@ -854,3 +854,124 @@ function MapBtn({
     </button>
   );
 }
+
+type CountsT = { green: number; yellow: number; red: number; gray: number; total: number };
+type SamplesT = Record<ParkingColor, { id: string; name: string; center: [number, number] }[]>;
+
+function InsightPanel({
+  cityNow, counts, samples, verificationMode, onToggleVerification,
+  open, onToggleOpen, onJumpTo,
+}: {
+  cityNow: string;
+  counts: CountsT;
+  samples: SamplesT;
+  verificationMode: boolean;
+  onToggleVerification: () => void;
+  open: boolean;
+  onToggleOpen: () => void;
+  onJumpTo: (center: [number, number]) => void;
+}) {
+  const total = counts.total || 1;
+  const rows: { color: ParkingColor; pct: number }[] = [
+    { color: "green", pct: (counts.green / total) * 100 },
+    { color: "yellow", pct: (counts.yellow / total) * 100 },
+    { color: "red", pct: (counts.red / total) * 100 },
+    { color: "gray", pct: (counts.gray / total) * 100 },
+  ];
+  return (
+    <div
+      className="pointer-events-auto absolute left-3 z-30 w-[260px] overflow-hidden rounded-xl bg-white/95 backdrop-blur shadow-xl ring-1 ring-black/5"
+      style={{ top: "calc(var(--safe-top) + 4.5rem)" }}
+    >
+      <button
+        onClick={onToggleOpen}
+        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-700 hover:bg-slate-50"
+      >
+        <span className="truncate">{cityNow || "Map insight"}</span>
+        <span className="text-slate-400">{open ? "–" : "+"}</span>
+      </button>
+
+      {open && (
+        <div className="space-y-3 px-3 pb-3">
+          {/* Legend + live distribution */}
+          <div className="space-y-1.5">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              Visible area · {counts.total} segments
+            </div>
+            {rows.map((r) => (
+              <div key={r.color} className="flex items-center gap-2">
+                <span className="h-3 w-3 flex-none rounded-sm" style={{ background: COLOR_HEX[r.color] }} />
+                <span className="flex-1 truncate text-xs text-slate-700">{COLOR_LABELS[r.color]}</span>
+                <span className="font-mono text-[11px] tabular-nums text-slate-900">{counts[r.color]}</span>
+                <span className="w-9 text-right font-mono text-[10px] tabular-nums text-slate-400">
+                  {counts.total ? `${r.pct.toFixed(0)}%` : "—"}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Stacked distribution bar */}
+          {counts.total > 0 && (
+            <div className="flex h-1.5 overflow-hidden rounded-full bg-slate-100">
+              {rows.map((r) =>
+                r.pct > 0 ? (
+                  <div key={r.color} style={{ width: `${r.pct}%`, background: COLOR_HEX[r.color] }} />
+                ) : null,
+              )}
+            </div>
+          )}
+
+          {/* Verification toggle */}
+          <button
+            onClick={onToggleVerification}
+            className={`flex w-full items-center justify-between rounded-md border px-2 py-1.5 text-xs font-medium transition ${
+              verificationMode
+                ? "border-slate-900 bg-slate-900 text-white"
+                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+            }`}
+          >
+            <span>Color Verification Mode</span>
+            <span className={`h-3 w-6 rounded-full transition ${verificationMode ? "bg-emerald-400" : "bg-slate-300"}`} />
+          </button>
+
+          {/* Jump to example */}
+          <div className="space-y-1.5">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              Jump to example
+            </div>
+            {(["green", "yellow", "red"] as const).map((c) => (
+              <div key={c}>
+                <div className="mb-0.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                  <span className="h-2 w-2 rounded-sm" style={{ background: COLOR_HEX[c] }} />
+                  {COLOR_LABELS[c]}
+                </div>
+                {samples[c].length === 0 ? (
+                  <div className="pl-3 text-[11px] italic text-slate-400">none in view</div>
+                ) : (
+                  <ul className="space-y-0.5">
+                    {samples[c].map((s) => (
+                      <li key={s.id}>
+                        <button
+                          onClick={() => onJumpTo(s.center)}
+                          className="block w-full truncate rounded px-2 py-0.5 text-left text-[11px] text-slate-700 hover:bg-slate-100"
+                          title={s.name}
+                        >
+                          {s.name}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <p className="text-[10px] leading-snug text-slate-500">
+            Distribution reflects the engine's evaluation at the current city
+            time. Colors shift as meter / sweep windows open and close.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
