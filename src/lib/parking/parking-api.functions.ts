@@ -144,7 +144,7 @@ export const analyzeParkingSign = createServerFn({ method: "POST" })
       res = await fetch(analysisUrl, {
         method: "POST",
         headers: { ...headers, "Content-Type": "application/json" },
-        body: JSON.stringify({ file: fileUrl }),
+        body: JSON.stringify({ file: fileUrl, timezone, time_zone: timezone }),
       });
     } else {
       // Fallback: send the file directly as multipart so the user still gets a
@@ -152,12 +152,15 @@ export const analyzeParkingSign = createServerFn({ method: "POST" })
       const fd = new FormData();
       const blob = new Blob([bytes], { type: data.mimeType });
       fd.append("file", blob, fileName);
+      fd.append("timezone", timezone);
+      fd.append("time_zone", timezone);
       res = await fetch(analysisUrl, {
         method: "POST",
         headers, // no Content-Type — fetch sets the multipart boundary
         body: fd,
       });
     }
+
     const durationMs = Date.now() - started;
     const text = await res.text();
     let raw: ParkingApiJson = text;
