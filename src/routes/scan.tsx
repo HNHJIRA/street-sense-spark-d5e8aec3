@@ -13,6 +13,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { LocationStatusCard } from "@/components/LocationStatusCard";
 import { getCityInfo } from "@/lib/parking/parking.functions";
 import { scanSign, type SignScanResponse } from "@/lib/parking/scan.functions";
+import { analyzeParkingSign } from "@/lib/parking/parking-api.functions";
 import { buildRuleTimeline } from "@/lib/parking/driver-narrative";
 import type { NormalizedRule } from "@/lib/parking/providers/types";
 import { buildOfficerParagraph, type OfficerArgs } from "@/lib/parking/officer-paragraph";
@@ -34,6 +35,7 @@ export const Route = createFileRoute("/scan")({
 function ScanPage() {
   const city = useSuspenseQuery(cityOpts).data;
   const scan = useServerFn(scanSign);
+  const backendAnalyze = useServerFn(analyzeParkingSign);
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -89,14 +91,35 @@ function ScanPage() {
       setPreviewUrl(`data:${mimeType};base64,${base64}`);
       // Use the global GPS store — live fix, then last-known, then null.
       const fix = liveLocation ?? lastKnown;
-      const res = await scan({
-        data: {
-          cityId: city.id, citySlug: city.slug, timezone: "America/Los_Angeles",
-          imageBase64: base64,
-          mimeType,
-          lng: fix?.lng ?? null, lat: fix?.lat ?? null,
-        },
-      });
+      // Fire the new backend API call in parallel with the existing pipeline.
+      // The existing pipeline keeps the UI rendering until we map the
+      // backend response shape into the UI in a follow-up.
+      const backendP = backendAnalyze({ data: { imageBase64: base64, mimeType } })
+        .then((r) => {
+          // eslint-disable-next-line no-console
+          console.groupCollapsed("%c[PARKING API] raw backend response", "color:#2563eb;font-weight:bold");
+          console.log("status:", r.status, "duration(ms):", r.durationMs);
+          console.log("fileUrl:", r.fileUrl);
+          console.log("raw:", r.raw);
+          console.groupEnd();
+          return r;
+        })
+        .catch((e: Error) => {
+          // eslint-disable-next-line no-console
+          console.error("[PARKING API] backend call failed:", e.message);
+          return null;
+        });
+      const [res] = await Promise.all([
+        scan({
+          data: {
+            cityId: city.id, citySlug: city.slug, timezone: "America/Los_Angeles",
+            imageBase64: base64,
+            mimeType,
+            lng: fix?.lng ?? null, lat: fix?.lat ?? null,
+          },
+        }),
+        backendP,
+      ]);
       setResult(res);
       // eslint-disable-next-line no-console
       console.groupCollapsed("%cDEBUG PIPELINE TRACE", "color:#16a34a;font-weight:bold");
