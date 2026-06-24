@@ -122,11 +122,16 @@ export const analyzeParkingSign = createServerFn({ method: "POST" })
 
     // Upload bytes directly to S3 with PUT. Content-Type must match what was
     // signed (the backend signs `content-type` into the request).
+    // The backend signs presigned PUT URLs with a fixed Content-Type of
+    // "image/jpg" regardless of the file extension or content_type param it
+    // receives. Sending anything else (image/jpeg, image/png, etc.) yields
+    // a SignatureDoesNotMatch 403 from S3. Do not "fix" this to data.mimeType.
     const putRes = await fetch(uploadUrl, {
       method: "PUT",
-      headers: { "Content-Type": data.mimeType },
+      headers: { "Content-Type": "image/jpg" },
       body: bytes,
     });
+
     // eslint-disable-next-line no-console
     console.log("[parking-api] s3 upload", putRes.status);
     if (!putRes.ok) {
