@@ -95,71 +95,54 @@ export const analyzeParkingSign = createServerFn({ method: "POST" })
 
     let fileUrl: string | null = null;
 
-    // === Step 1: presigned URL ===
-    // We attempt the configured presign endpoint. If the backend rejects this
-    // step we fall through to a multipart upload directly against the analysis
-    // endpoint, so the analysis call always happens with the bearer token.
-    try {
-      const presignRes = await fetch(`${cfg.baseUrl}${cfg.endpoints.presignedUrl}`, {
-        method: "POST",
-        headers: { ...headers, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          file_name: fileName,
-          fileName,
-          content_type: data.mimeType,
-          contentType: data.mimeType,
-        }),
-      });
-      const presignText = await presignRes.text();
-      // eslint-disable-next-line no-console
-      console.log("[parking-api] presign", presignRes.status, presignText.slice(0, 500));
-      if (presignRes.ok) {
-        let parsed: PresignedUrlResponse = {};
-        try { parsed = JSON.parse(presignText) as PresignedUrlResponse; } catch { /* non-JSON */ }
-        const uploadUrl = pickUploadUrl(parsed);
-        if (uploadUrl) {
-          const putRes = await fetch(uploadUrl, {
-            method: "PUT",
-            headers: { "Content-Type": data.mimeType },
-            body: bytes,
-          });
-          // eslint-disable-next-line no-console
-          console.log("[parking-api] s3 upload", putRes.status);
-          if (putRes.ok) {
-            fileUrl = pickPublicUrl(parsed, uploadUrl);
-          }
-        }
-      }
-    } catch (e) {
-      // eslint-disable-next-line no-console
-      console.warn("[parking-api] presign step failed:", (e as Error).message);
+    // === Step 1: presigned URL (GET) ===
+    // Backend: GET /authentication/v1/user/generate_s3_presigned_url/?file_name=...&content_type=...
+    // → { data: { presigned_put_url, file_url, object_key } }
+    const presignQs = new URLSearchParams({
+      file_name: fileName,
+      content_type: data.mimeType,
+    });
+    const presignRes = await fetch(
+      `${cfg.baseUrl}${cfg.endpoints.presignedUrl}?${presignQs.toString()}`,
+      { method: "GET", headers },
+    );
+    const presignText = await presignRes.text();
+    // eslint-disable-next-line no-console
+    console.log("[parking-api] presign", presignRes.status, presignText.slice(0, 300));
+    if (!presignRes.ok) {
+      throw new Error(`Presigned URL request failed (${presignRes.status}): ${presignText.slice(0, 300)}`);
+    }
+    let presignJson: { data?: { presigned_put_url?: string; file_url?: string; object_key?: string } } = {};
+    try { presignJson = JSON.parse(presignText); } catch { /* noop */ }
+    const uploadUrl = presignJson.data?.presigned_put_url ?? null;
+    fileUrl = presignJson.data?.file_url ?? null;
+    if (!uploadUrl || !fileUrl) {
+      throw new Error("Presigned URL response missing presigned_put_url / file_url");
+    }
+
+    // Upload bytes directly to S3 with PUT. Content-Type must match what was
+    // signed (the backend signs `content-type` into the request).
+    const putRes = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": data.mimeType },
+      body: bytes,
+    });
+    // eslint-disable-next-line no-console
+    console.log("[parking-api] s3 upload", putRes.status);
+    if (!putRes.ok) {
+      const t = await putRes.text();
+      throw new Error(`S3 upload failed (${putRes.status}): ${t.slice(0, 300)}`);
     }
 
     // === Step 2: parking-sign-analysis ===
     const analysisUrl = `${cfg.baseUrl}${cfg.endpoints.parkingSignAnalysis}`;
     const started = Date.now();
-    let res: Response;
-    if (fileUrl) {
-      // Preferred path: backend gets a URL string per the Postman collection.
-      res = await fetch(analysisUrl, {
-        method: "POST",
-        headers: { ...headers, "Content-Type": "application/json" },
-        body: JSON.stringify({ file: fileUrl, timezone, time_zone: timezone }),
-      });
-    } else {
-      // Fallback: send the file directly as multipart so the user still gets a
-      // backend-driven answer even when presign isn't wired yet.
-      const fd = new FormData();
-      const blob = new Blob([bytes], { type: data.mimeType });
-      fd.append("file", blob, fileName);
-      fd.append("timezone", timezone);
-      fd.append("time_zone", timezone);
-      res = await fetch(analysisUrl, {
-        method: "POST",
-        headers, // no Content-Type — fetch sets the multipart boundary
-        body: fd,
-      });
-    }
+    const res = await fetch(analysisUrl, {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ file: fileUrl, timezone, time_zone: timezone }),
+    });
+
 
     const durationMs = Date.now() - started;
     const text = await res.text();
