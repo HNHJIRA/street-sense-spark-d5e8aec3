@@ -8,11 +8,16 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getParkingApiConfig, authHeader } from "./parking-api.config";
 
+export type ParkingApiJson =
+  | string | number | boolean | null
+  | { [k: string]: ParkingApiJson }
+  | ParkingApiJson[];
+
 export interface ParkingSignAnalysisResult {
   /** HTTP status of the analysis call (echoed for debugging). */
   status: number;
   /** Raw JSON body returned by the backend, unmodified. */
-  raw: unknown;
+  raw: ParkingApiJson;
   /** The public/object URL that was sent to the analysis endpoint. */
   fileUrl: string | null;
   /** Time the analysis call took, in ms (server-side). */
@@ -148,8 +153,8 @@ export const analyzeParkingSign = createServerFn({ method: "POST" })
     }
     const durationMs = Date.now() - started;
     const text = await res.text();
-    let raw: unknown = text;
-    try { raw = JSON.parse(text); } catch { /* keep text */ }
+    let raw: ParkingApiJson = text;
+    try { raw = JSON.parse(text) as ParkingApiJson; } catch { /* keep text */ }
     // eslint-disable-next-line no-console
     console.log("[parking-api] analysis", res.status, "in", durationMs, "ms");
     // eslint-disable-next-line no-console
