@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { Loader2, Navigation, ScanLine, Footprints, ArrowRight, Sparkles } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -165,6 +166,20 @@ export function ParkHereButton({ cityId, timezone }: Props) {
 
   return (
     <>
+      {/* Floating Scan Sign FAB — restored map entry point */}
+      <Link
+        to="/scan"
+        aria-label="Scan a parking sign"
+        className="pointer-events-auto absolute right-4 z-20 flex h-14 w-14 items-center justify-center rounded-full text-white transition active:scale-95"
+        style={{
+          bottom: "calc(var(--safe-bottom) + 7.5rem)",
+          background: "linear-gradient(135deg, #24C5FA 0%, #2772F1 100%)",
+          boxShadow: "0 12px 24px -8px rgba(39, 114, 241, 0.55), 0 4px 12px -4px rgba(36, 197, 250, 0.4)",
+        }}
+      >
+        <ScanLine className="h-6 w-6" strokeWidth={2.4} />
+      </Link>
+
       <div
         className="pointer-events-none absolute inset-x-0 bottom-0 z-20"
       >
