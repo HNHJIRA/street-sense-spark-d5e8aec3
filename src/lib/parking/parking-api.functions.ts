@@ -77,6 +77,7 @@ export const analyzeParkingSign = createServerFn({ method: "POST" })
       imageBase64: z.string().min(100).max(12_000_000),
       mimeType: z.string().regex(/^image\/(jpeg|jpg|png|webp|heic|heif)$/i),
       fileName: z.string().min(1).max(128).optional(),
+      timezone: z.string().min(1).max(64).optional(),
     }).parse(input),
   )
   .handler(async ({ data }): Promise<ParkingSignAnalysisResult> => {
@@ -85,6 +86,12 @@ export const analyzeParkingSign = createServerFn({ method: "POST" })
     const bytes = Uint8Array.from(atob(data.imageBase64), (c) => c.charCodeAt(0));
     const ext = (data.mimeType.split("/")[1] ?? "jpg").toLowerCase().replace("jpeg", "jpg");
     const fileName = data.fileName ?? `scan-${Date.now()}.${ext}`;
+    let timezone = data.timezone;
+    if (!timezone) {
+      try { timezone = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { /* noop */ }
+    }
+    if (!timezone) timezone = "UTC";
+
 
     let fileUrl: string | null = null;
 
@@ -137,7 +144,7 @@ export const analyzeParkingSign = createServerFn({ method: "POST" })
       res = await fetch(analysisUrl, {
         method: "POST",
         headers: { ...headers, "Content-Type": "application/json" },
-        body: JSON.stringify({ file: fileUrl }),
+        body: JSON.stringify({ file: fileUrl, timezone, time_zone: timezone }),
       });
     } else {
       // Fallback: send the file directly as multipart so the user still gets a
@@ -145,12 +152,15 @@ export const analyzeParkingSign = createServerFn({ method: "POST" })
       const fd = new FormData();
       const blob = new Blob([bytes], { type: data.mimeType });
       fd.append("file", blob, fileName);
+      fd.append("timezone", timezone);
+      fd.append("time_zone", timezone);
       res = await fetch(analysisUrl, {
         method: "POST",
         headers, // no Content-Type — fetch sets the multipart boundary
         body: fd,
       });
     }
+
     const durationMs = Date.now() - started;
     const text = await res.text();
     let raw: ParkingApiJson = text;
