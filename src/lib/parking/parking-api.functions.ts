@@ -77,6 +77,7 @@ export const analyzeParkingSign = createServerFn({ method: "POST" })
       imageBase64: z.string().min(100).max(12_000_000),
       mimeType: z.string().regex(/^image\/(jpeg|jpg|png|webp|heic|heif)$/i),
       fileName: z.string().min(1).max(128).optional(),
+      timezone: z.string().min(1).max(64).optional(),
     }).parse(input),
   )
   .handler(async ({ data }): Promise<ParkingSignAnalysisResult> => {
@@ -85,6 +86,12 @@ export const analyzeParkingSign = createServerFn({ method: "POST" })
     const bytes = Uint8Array.from(atob(data.imageBase64), (c) => c.charCodeAt(0));
     const ext = (data.mimeType.split("/")[1] ?? "jpg").toLowerCase().replace("jpeg", "jpg");
     const fileName = data.fileName ?? `scan-${Date.now()}.${ext}`;
+    let timezone = data.timezone;
+    if (!timezone) {
+      try { timezone = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { /* noop */ }
+    }
+    if (!timezone) timezone = "UTC";
+
 
     let fileUrl: string | null = null;
 
