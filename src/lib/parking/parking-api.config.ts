@@ -32,7 +32,7 @@ export function getParkingApiConfig(): ParkingApiConfig {
     endpoints: {
       // NOTE: exact path TBD — adjust here once confirmed from the Postman
       // collection. All callers read these from config, never hardcoded.
-      presignedUrl: "/authentication/v1/get-presigned-url/",
+      presignedUrl: "/authentication/v1/user/generate_s3_presigned_url/",
       parkingSignAnalysis: "/authentication/v1/parking-sign-analysis/",
     },
   };
